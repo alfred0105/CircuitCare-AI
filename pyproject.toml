@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "circuitcare-ai"
+version = "0.1.0"
+description = "Local-first circuit fault influence and repair prioritization prototype"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Proprietary - no license granted"}
+authors = [{name = "CircuitCare AI contributors"}]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+circuitcare = "circuitcare.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
