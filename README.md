@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–05 complete.** The CLI parses KiCad XML netlists, reports connectivity candidates, generates explicitly mapped SPICE fault scenarios, and compares supported baseline/fault transient simulations. It does **not** determine actual damage or failure probability. Do not use its output to approve a live repair.
+> **Status: Phases 01–06 complete.** The CLI parses KiCad XML netlists, compares supported ngspice baseline/fault simulations, and ranks inspection candidates against explicitly configured component ratings. Risk levels are deterministic stress/rating assessments; they do **not** determine actual damage or failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -22,7 +22,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 03 | Component-net graph and affected-neighbor candidates | Complete |
 | 04 | Failure modes and fault injection models | Complete; simulation not run |
 | 05 | ngspice baseline/fault electrical comparisons | Complete; supported demo circuit verified |
-| 06 | Secondary-damage stress assessment and evidence | Planned |
+| 06 | Secondary-damage stress assessment and evidence | Complete; overvoltage demo flags C1 above its declared demo rating |
 | 07 | Local lightweight AI and active measurement ranking | Planned |
 | 08 | Repair recommendations and audit trail | Planned |
 | 09 | UI, benchmark, offline evaluation | Planned |
@@ -82,9 +82,23 @@ ngspice must be installed (`brew install ngspice` on macOS). The runner saves lo
 
 The included sample intentionally connects U1 to J1, U2 and C3; R4 is present as a non-directly-connected comparison. A shared net is **a candidate influence path, not evidence of damage**. The CLI reports the selected failed component, total component count, direct candidates, shared nets, and connectivity-only evidence level.
 
+To compare fault-case stress against explicit component ratings and create `risk_assessment.json`, add `--ratings` and `--assess-risk`:
+
+```bash
+circuitcare --netlist tests/fixtures/fault_demo_netlist.xml --fault U1 \
+  --fault-type regulator_output_rise --fault-value 8 \
+  --spice-base data/circuits/fault_demo.cir \
+  --spice-mapping data/circuits/fault_demo_mapping.json \
+  --output data/fault_scenarios/overvoltage_demo \
+  --simulate --probes data/circuits/fault_demo_probes.json \
+  --ratings data/component_specs/fault_demo_ratings.json --assess-risk
+```
+
+The demo raises the ideal 5 V output to 8 V. C1 is measured at 8 V against an explicitly labeled, unverified 6.3 V demo assumption (utilization 1.27, `EXCEEDED`). RLOAD dissipates 16 mW against a 125 mW demo assumption (`WITHIN_LIMIT`). Those rating values are illustrative and are not verified against component datasheets. The priority score is an explainable inspection ordering index, never a damage probability. Missing ratings or probes remain `UNKNOWN`; Q1 is excluded from physical ranking because its fixture pins do not map consistently to the SPICE switch terminals. Capacitor current, ESR loss, and heating are not calculated.
+
 ## Current implementation and next phase
 
-Phases 01–05 are implemented: KiCad component/net data becomes a bipartite graph; the CLI enumerates paths, exports DOT, generates explicitly mapped fault decks, runs baseline and fault decks in ngspice, and saves node and supported component comparisons. Net roles remain user-supplied. Simulation changes are not damage assessments, and ratings are not evaluated in this phase.
+Phases 01–06 are implemented: KiCad component/net data becomes a bipartite graph; the CLI enumerates paths, exports DOT, generates explicitly mapped fault decks, runs baseline and fault decks in ngspice, saves node and component comparisons, and evaluates configured ratings to rank secondary inspection candidates. Only explicitly supplied ratings and supported measurements are evaluated. Simulation and rating exceedance do not confirm damage or estimate failure probability.
 
 ## Scope and caution
 

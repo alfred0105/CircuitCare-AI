@@ -54,15 +54,16 @@ def analyze_fault_impact(
     for candidate in connected:
         measured = stress_by_ref.get(candidate.target_ref)
         delta = measured.get("delta_fault_minus_baseline", {}) if measured else {}
+        is_measured = bool(measured) and measured.get("status") not in {"unavailable", "not_probed"}
         observed = any(
             values is not None
             and any(
                 isinstance(values.get(metric), (int, float))
-                and abs(values[metric]) > 0.0
+                and abs(values[metric]) > 1e-9
                 for metric in ("minimum", "maximum", "last")
             )
             for values in delta.values()
-        )
+        ) if is_measured else None
         candidate_reports.append({
             "component_ref": candidate.target_ref,
             "shared_nets": list(candidate.shared_nets),

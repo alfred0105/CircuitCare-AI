@@ -22,9 +22,9 @@ Add controlled resistor open/short/drift, ideal regulator output rise/drop/loss,
 Run transient ngspice baseline and fault decks from temporary instrumented copies. Save logs and CSV samples; align differing time axes over their shared interval; report probe-node voltage deltas and supported component voltage/current/power changes. Resistor current and dissipation use measured terminal voltage and each deck's actual resistance; ideal voltage-source current uses ngspice's branch-current sign convention. Unsupported current/power stay null with a reason.
 **Complete when:** the supported 5 V divider runs in ngspice, R1 drift changes LOAD from 2.5 V to about 0.455 V, component changes are saved, and simulator failures cannot be marked successful. This is electrical simulation evidence, not proof of damage or a rating assessment.
 
-## Phase 06 — Secondary-damage risk assessment (Nov 10–12)
-Read part-specific ratings and aggregate stress indicators; distinguish out-of-spec stress vs observed damage.
-**Done when:** produce explainable ranked inspection candidates with rating evidence, plus a graph-only baseline comparison.
+## Phase 06 — Secondary-damage risk assessment (Nov 10–12) — Complete
+Load explicit per-component voltage/current/power ratings with source and duration metadata. Compare supported fault-case peak stress, retain baseline deltas, calculate utilization, and classify `EXCEEDED`, `NEAR_LIMIT`, `WITHIN_LIMIT`, or `UNKNOWN`. Rank secondary inspection candidates with a deterministic 0–100 priority index and retain a separate connectivity-only order. Capacitors support terminal-voltage-only evaluation; unsupported current and power remain unknown. Demo ratings are labeled assumptions, not datasheet facts; damage probability is not estimated.
+**Complete when:** the ngspice 5 V→8 V output-rise scenario identifies C1 at 8 V / 6.3 V = 1.27 utilization as `EXCEEDED`, RLOAD at 16 mW / 125 mW as `WITHIN_LIMIT`, writes `risk_assessment.json`, and leaves unknown/unmapped candidates out of false safety conclusions. Q1's inconsistent KiCad/SPICE terminal mapping is explicitly excluded from physical ranking.
 
 ## Phase 07 — Local AI and next-test selection (Nov 13–15)
 Use small classical ML/Bayesian inference; condition rankings on measurement evidence; prefer expected diagnostic value.

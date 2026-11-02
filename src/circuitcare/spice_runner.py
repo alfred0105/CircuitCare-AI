@@ -175,6 +175,8 @@ def _select_vectors(
         model_type = entry.get("model_type")
         if model_type == "resistor" and tokens[0][0].upper() == "R" and len(tokens) >= 4:
             terminals = tokens[1:3]
+        elif model_type == "capacitor" and tokens[0][0].upper() == "C" and len(tokens) >= 4:
+            terminals = tokens[1:3]
         elif model_type == "regulator_output" and tokens[0][0].upper() == "V" and len(tokens) >= 5:
             terminals = tokens[1:3]
             currents.append((reference, element))

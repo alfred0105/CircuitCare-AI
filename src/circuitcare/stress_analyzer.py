@@ -39,6 +39,8 @@ def analyze_component_stress(
         model_type = mapping.get("model_type")
         if model_type == "resistor":
             record, values = _analyze_resistor(reference, element, baseline_text, fault_text, baseline, fault, times)
+        elif model_type == "capacitor":
+            record, values = _analyze_capacitor(reference, element, baseline_text, fault_text, baseline, fault, times)
         elif model_type == "regulator_output":
             record, values = _analyze_voltage_source(
                 reference, element, baseline_text, fault_text, baseline, fault, times, fault_type
@@ -118,6 +120,33 @@ def _analyze_resistor(reference, element, baseline_text, fault_text, baseline, f
     }
     record = _record(reference, "simulated", values, f"V=V(node1)-V(node2); I=V/R; P=V²/R. R1={before[3]}, R2={after[3]}.")
     record["current_direction"] = f"{before[1]} to {before[2]}"
+    return record, values
+
+
+def _analyze_capacitor(reference, element, baseline_text, fault_text, baseline, fault, times):
+    before = _element_tokens(baseline_text, element)
+    after = _element_tokens(fault_text, element)
+    if len(before) < 4 or len(after) < 4 or before[0][0].upper() != "C" or after[0][0].upper() != "C":
+        return _unavailable(reference, f"Mapped capacitor element {element!r} is missing or unsupported."), _empty_series()
+    if [node.casefold() for node in before[1:3]] != [node.casefold() for node in after[1:3]]:
+        return _unavailable(reference, "The mapped capacitor terminals differ between baseline and fault circuits."), _empty_series()
+    baseline_voltage = _terminal_voltage(before[1], before[2], baseline, times)
+    fault_voltage = _terminal_voltage(after[1], after[2], fault, times)
+    values = {
+        "voltage_v": {"baseline": baseline_voltage, "fault": fault_voltage},
+        "current_a": {"baseline": None, "fault": None},
+        "power_w": {"baseline": None, "fault": None},
+    }
+    record = _record(
+        reference,
+        "voltage_only",
+        values,
+        f"V=V({before[1]})-V({before[2]}); capacitor current, ESR loss, and heating are not modeled.",
+    )
+    record["unsupported_metrics"] = {
+        "current_a": "Capacitor current is not calculated in this phase.",
+        "power_w": "Capacitor ESR loss and heating are not modeled.",
+    }
     return record, values
 
 
