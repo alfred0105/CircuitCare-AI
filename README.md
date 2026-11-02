@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–02 complete; Phase 03 has an initial implementation.** The CLI parses KiCad XML netlists and reports direct connectivity candidates. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair. KiCad 10.0.6 export verification used the bundled Raspberry Pi HAT schematic.
+> **Status: Phases 01–03 complete.** The CLI parses KiCad XML netlists and reports direct and indirect connectivity candidates. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -19,7 +19,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 |---|---|---|
 | 01 | Python environment, conventions, sample data | Complete |
 | 02 | KiCad netlist parser | Complete; verified with KiCad 10.0.6 export |
-| 03 | Component-net graph and affected-neighbor candidates | Initial implementation |
+| 03 | Component-net graph and affected-neighbor candidates | Complete |
 | 04 | Failure modes and fault injection models | Planned |
 | 05 | ngspice baseline/fault electrical comparisons | Planned |
 | 06 | Secondary-damage stress assessment and evidence | Planned |
@@ -46,11 +46,20 @@ To inspect parsed component metadata and pin-to-net connections, add `--show-pin
 circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1 --show-pins
 ```
 
+To list direct and indirect connectivity paths (two component hops by default), use `--show-paths`. Export the bipartite graph as DOT with `--export-dot`:
+
+```bash
+circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1 --show-paths --max-hops 2
+circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1 --export-dot circuit_graph.dot
+```
+
+Net types are unknown unless explicitly supplied in a JSON mapping such as `{"GND":"ground","VIN":"power","VOUT":"power","SIGNAL":"signal"}` using `--net-types net-types.json`. `--exclude-net-types ground` filters ground paths from path traversal while retaining them in the graph and direct connectivity results. This filter does not imply that a real effect cannot travel through GND.
+
 The included sample intentionally connects U1 to J1, U2 and C3; R4 is present as a non-directly-connected comparison. A shared net is **a candidate influence path, not evidence of damage**. The CLI reports the selected failed component, total component count, direct candidates, shared nets, and connectivity-only evidence level.
 
 ## Current implementation and next phase
 
-Phase 02 was verified with the repository fixture and an XML export from KiCad 10.0.6's bundled Raspberry Pi HAT schematic (6 components, 35 nets). The real export preserved component metadata and pin-to-net connections through the parser and `--show-pins` CLI. Phase 03 will build on this connection data. Circuit connectivity alone remains an unverified candidate, not damage or risk.
+Phases 01–03 are implemented: KiCad component/net data becomes a bipartite graph, and the CLI can enumerate simple direct and indirect connectivity paths and export the graph in DOT format. Optional net type metadata is user-supplied; no signal direction or electrical role is inferred. Paths remain connectivity evidence only, not damage or risk.
 
 ## Scope and caution
 

@@ -10,9 +10,9 @@ Python 3.11+ package metadata, offline CLI, KiCad XML fixture, baseline connecti
 Extract component references, values, library IDs, optional footprint and datasheet, pin-to-net connections, and net codes. Assign unique names to unnamed nets, deduplicate repeated identical pin links, reject conflicting pin assignments, and sort parsed data deterministically. Verified against the repository fixture and a KiCad 10.0.6 XML export from its bundled Raspberry Pi HAT schematic (6 components, 35 nets).
 **Complete when:** deterministic extraction from fixture and real KiCad XML is verified. Do not infer electrical function from net names alone.
 
-## Phase 03 — Connectivity and candidate influence (Nov 4)
-Build a component–net bipartite graph and report direct connected candidates, ordered paths, and evidence.
-**Done when:** user selects failed component; connected candidate components and shared nets appear. Explicitly label graph-only findings as **unverified**.
+## Phase 03 — Connectivity and candidate influence (Nov 4) — Complete
+Build a typed component–net bipartite graph with pin-preserving edges. Find direct and indirect simple paths up to the requested component-hop limit, keep candidate evidence at `connectivity_only`, and export fault/path-highlighted Graphviz DOT. Optional net types come only from user-supplied metadata; GND paths remain present unless explicitly filtered for traversal, and filtering is not a safety conclusion.
+**Complete when:** CLI path output distinguishes direct and indirect candidates, identifies path nets and hop counts, and DOT contains component/net nodes and pin-labeled edges.
 
 ## Phase 04 — Failure-mode library (Nov 5–6)
 Add controlled fault templates: open/short, resistor drift, regulator output fault, and MOSFET switch fault. Require explicit scenario metadata and valid component model.
