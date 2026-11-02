@@ -58,7 +58,7 @@ def assess_component_risk(
             for metric in evaluated
             if isinstance(metric.get("rating_source"), dict)
         })
-        factors = _priority_factors(level, max_ratio, stress, has_rating_evidence=bool(evaluated))
+        factors = _priority_factors(level, max_ratio, item["metrics"], has_rating_evidence=bool(evaluated))
         score = min(100.0, sum(factors.values()))
         assessments.append({
             "component_ref": reference,
@@ -81,10 +81,10 @@ def assess_component_risk(
     return assessments
 
 
-def _priority_factors(level: str, ratio: float | None, stress: dict[str, Any], *, has_rating_evidence: bool) -> dict[str, float]:
+def _priority_factors(level: str, ratio: float | None, metrics: dict[str, Any], *, has_rating_evidence: bool) -> dict[str, float]:
     level_points = {"EXCEEDED": 70, "NEAR_LIMIT": 45, "WITHIN_LIMIT": 20, "UNKNOWN": 0}[level]
     utilization_points = min(20.0, 20.0 * min(ratio or 0.0, 1.5) / 1.5)
-    delta_points = 5.0 if _has_increased_stress(stress) else 0.0
+    delta_points = 5.0 if _has_increased_stress(metrics) else 0.0
     rating_evidence_points = 5.0 if has_rating_evidence else 0.0
     return {
         "risk_class_weight": level_points,
@@ -94,11 +94,13 @@ def _priority_factors(level: str, ratio: float | None, stress: dict[str, Any], *
     }
 
 
-def _has_increased_stress(stress: dict[str, Any]) -> bool:
-    for values in stress.get("delta_fault_minus_baseline", {}).values():
-        if isinstance(values, dict) and any(
-            isinstance(values.get(key), (int, float)) and abs(values[key]) > 1e-9
-            for key in ("minimum", "maximum", "last")
-        ):
-            return True
+def _has_increased_stress(rating_metrics: dict[str, Any]) -> bool:
+    """Return true only when comparable physical stress magnitude rose."""
+    for values in rating_metrics.values():
+        increase = values.get("stress_increase") if isinstance(values, dict) else None
+        baseline = values.get("baseline_stress") if isinstance(values, dict) else None
+        if isinstance(increase, (int, float)) and isinstance(baseline, (int, float)):
+            tolerance = max(1e-12, abs(baseline) * 1e-9)
+            if increase > tolerance:
+                return True
     return False

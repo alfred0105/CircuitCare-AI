@@ -4,14 +4,14 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–06 complete.** The CLI parses KiCad XML netlists, compares supported ngspice baseline/fault simulations, and ranks inspection candidates against explicitly configured component ratings. Risk levels are deterministic stress/rating assessments; they do **not** determine actual damage or failure probability.
+> **Status: Phases 01–07 complete.** The CLI parses KiCad XML netlists, compares supported ngspice baseline/fault simulations, ranks inspection candidates against explicitly configured component ratings, and updates local Bayesian diagnoses from supplied measurements. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
 - Track possible **secondary effects** through the circuit topology.
-- Verify candidate impacts using **normal-vs-fault SPICE simulations** and component limits (planned).
-- Use **lightweight local inference** for risk ranking and information-efficient next measurements (planned).
-- Return **ranked inspection/repair guidance with evidence**, not fabricated failure probabilities (planned).
+- Verify supported candidate impacts using **normal-vs-fault SPICE simulations** and explicitly configured component limits.
+- Use **lightweight local Bayesian inference** and expected information gain to update diagnoses and rank measurements.
+- Return **ranked inspection guidance with evidence**, without presenting conditionally weighted hypotheses as real-world failure probabilities.
 
 ## Roadmap
 
@@ -23,7 +23,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 04 | Failure modes and fault injection models | Complete; simulation not run |
 | 05 | ngspice baseline/fault electrical comparisons | Complete; supported demo circuit verified |
 | 06 | Secondary-damage stress assessment and evidence | Complete; overvoltage demo flags C1 above its declared demo rating |
-| 07 | Local lightweight AI and active measurement ranking | Planned |
+| 07 | Local lightweight AI and active measurement ranking | Complete; simulated measurement updates hypothesis posterior |
 | 08 | Repair recommendations and audit trail | Planned |
 | 09 | UI, benchmark, offline evaluation | Planned |
 | 10 | Stabilization, poster, reproducible demo | Planned |
@@ -96,9 +96,21 @@ circuitcare --netlist tests/fixtures/fault_demo_netlist.xml --fault U1 \
 
 The demo raises the ideal 5 V output to 8 V. C1 is measured at 8 V against an explicitly labeled, unverified 6.3 V demo assumption (utilization 1.27, `EXCEEDED`). RLOAD dissipates 16 mW against a 125 mW demo assumption (`WITHIN_LIMIT`). Those rating values are illustrative and are not verified against component datasheets. The priority score is an explainable inspection ordering index, never a damage probability. Missing ratings or probes remain `UNKNOWN`; Q1 is excluded from physical ranking because its fixture pins do not map consistently to the SPICE switch terminals. Capacitor current, ESR loss, and heating are not calculated.
 
+Run prior-only diagnosis from stored SPICE and risk JSON, then rerun with a measurement:
+
+```bash
+circuitcare-diagnose --hypotheses data/diagnosis/demo_hypotheses.json \
+  --output data/diagnosis/prior_results
+circuitcare-diagnose --hypotheses data/diagnosis/demo_hypotheses.json \
+  --measurements data/diagnosis/demo_measurements.json \
+  --output data/diagnosis/posterior_results
+```
+
+The three hypotheses reference saved 3 V, 6 V, and 8 V ngspice results; predicted node voltages are loaded from each `comparison.json`, not embedded in the diagnosis code. Priors are equal weights, and voltage measurement σ=0.2 V is a labeled demo assumption. The example 7.9 V observation is marked `simulated_demo`; it moves the 8 V hypothesis from 1/3 prior weight to approximately 1.0 conditional posterior. Before measurement, VOUT has the highest calculated information gain; after measuring VOUT it is excluded, and the remaining LOAD prediction is not informative enough to recommend another measurement. Outputs contain posterior history, measurement recommendations, and prior/posterior weighted inspection indices. These conditional values are not real-world failure probabilities, and measurement suggestions do not authorize live probing.
+
 ## Current implementation and next phase
 
-Phases 01–06 are implemented: KiCad component/net data becomes a bipartite graph; the CLI enumerates paths, exports DOT, generates explicitly mapped fault decks, runs baseline and fault decks in ngspice, saves node and component comparisons, and evaluates configured ratings to rank secondary inspection candidates. Only explicitly supplied ratings and supported measurements are evaluated. Simulation and rating exceedance do not confirm damage or estimate failure probability.
+Phases 01–07 are implemented: KiCad component/net data becomes a bipartite graph; the CLIs enumerate paths, run mapped ngspice scenarios, evaluate configured ratings, and perform local Gaussian Bayesian updates with information-gain measurement selection from stored results. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 ## Scope and caution
 
