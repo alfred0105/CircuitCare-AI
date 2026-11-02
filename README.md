@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–04 complete.** The CLI parses KiCad XML netlists, reports connectivity candidates, and generates explicitly mapped SPICE fault scenarios. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
+> **Status: Phases 01–05 complete.** The CLI parses KiCad XML netlists, reports connectivity candidates, generates explicitly mapped SPICE fault scenarios, and compares supported baseline/fault transient simulations. It does **not** determine actual damage or failure probability. Do not use its output to approve a live repair.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -21,7 +21,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 02 | KiCad netlist parser | Complete; verified with KiCad 10.0.6 export |
 | 03 | Component-net graph and affected-neighbor candidates | Complete |
 | 04 | Failure modes and fault injection models | Complete; simulation not run |
-| 05 | ngspice baseline/fault electrical comparisons | Planned |
+| 05 | ngspice baseline/fault electrical comparisons | Complete; supported demo circuit verified |
 | 06 | Secondary-damage stress assessment and evidence | Planned |
 | 07 | Local lightweight AI and active measurement ranking | Planned |
 | 08 | Repair recommendations and audit trail | Planned |
@@ -67,11 +67,24 @@ circuitcare --netlist tests/fixtures/fault_demo_netlist.xml --fault R1 \
 
 This writes `baseline.cir`, a faulted `.cir`, and `scenarios.json`. Supported scenarios include resistor open/short/drift, ideal regulator output rise/drop/loss, and mapped voltage-controlled switch stuck-open/stuck-on. These are stated approximations; scenario generation does not run a simulator. The committed `data/fault_scenarios/` files show resistor open, short, and 10 kΩ drift examples.
 
+To run both baseline and faulted decks with ngspice and compare probe data, add `--simulate` and `--probes`:
+
+```bash
+circuitcare --netlist tests/fixtures/fault_demo_netlist.xml --fault R1 \
+  --fault-type resistance_drift --fault-value 10k \
+  --spice-base data/circuits/fault_demo.cir \
+  --spice-mapping data/circuits/fault_demo_mapping.json \
+  --output data/fault_scenarios/example_001 \
+  --simulate --probes data/circuits/fault_demo_probes.json
+```
+
+ngspice must be installed (`brew install ngspice` on macOS). The runner saves logs and CSV samples; comparison and component stress summaries are JSON. The example uses a 5 V source and two 1 kΩ resistors: LOAD measures 2.5 V at baseline and about 0.455 V with R1 at 10 kΩ. Resistor current/power use the mapped terminals and actual netlist resistance; ideal voltage-source current comes from ngspice. Unsupported switch current/power are left null. These are simulated electrical changes, not damage or rating assessments.
+
 The included sample intentionally connects U1 to J1, U2 and C3; R4 is present as a non-directly-connected comparison. A shared net is **a candidate influence path, not evidence of damage**. The CLI reports the selected failed component, total component count, direct candidates, shared nets, and connectivity-only evidence level.
 
 ## Current implementation and next phase
 
-Phases 01–04 are implemented: KiCad component/net data becomes a bipartite graph; the CLI enumerates direct and indirect paths, exports DOT, and injects explicit faults into a mapped SPICE starter circuit. Net roles remain user-supplied. Fault and path results are not damage assessments, and no simulation or electrical risk calculation runs in these phases.
+Phases 01–05 are implemented: KiCad component/net data becomes a bipartite graph; the CLI enumerates paths, exports DOT, generates explicitly mapped fault decks, runs baseline and fault decks in ngspice, and saves node and supported component comparisons. Net roles remain user-supplied. Simulation changes are not damage assessments, and ratings are not evaluated in this phase.
 
 ## Scope and caution
 

@@ -1,0 +1,256 @@
+"""Run transient SPICE decks with ngspice and collect numeric probe data."""
+
+import csv
+import math
+import re
+import shutil
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+class SimulationError(RuntimeError):
+    """Raised when ngspice cannot produce a valid transient result."""
+
+
+@dataclass(frozen=True)
+class SimulationRun:
+    run_name: str
+    circuit_path: str
+    log_path: str
+    csv_path: str
+    columns: dict[str, list[float]]
+    unsupported_currents: dict[str, str]
+
+
+def ngspice_available(executable: str = "ngspice") -> bool:
+    return shutil.which(executable) is not None
+
+
+def run_ngspice(
+    circuit_path: str | Path,
+    probes: dict[str, Any],
+    component_mapping: dict[str, dict[str, Any]],
+    output_dir: str | Path,
+    run_name: str,
+    *,
+    executable: str = "ngspice",
+    timeout_seconds: int = 120,
+) -> SimulationRun:
+    """Run one transient deck and save its log and normalized CSV samples."""
+    program = shutil.which(executable)
+    if program is None:
+        raise SimulationError(f"ngspice executable {executable!r} was not found")
+    source_path = Path(circuit_path)
+    source = source_path.read_text(encoding="utf-8")
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    safe_name = _safe_name(run_name)
+    runner_path = output / f"{safe_name}.runner.cir"
+    raw_path = output / f"{safe_name}.wrdata"
+    log_path = output / f"{safe_name}.log"
+    csv_path = output / f"{safe_name}.csv"
+
+    voltage_nodes, current_elements, unsupported = _select_vectors(source, probes, component_mapping)
+    expressions = [f"v({node})" for node in voltage_nodes]
+    expressions.extend(f"i({element})" for _, element in current_elements)
+    if not expressions:
+        raise SimulationError("At least one voltage node or supported source current must be probed")
+    vector_columns = {f"v({node})".casefold(): f"voltage:{node}" for node in voltage_nodes}
+    vector_columns.update({f"i({element})".casefold(): f"current:{reference}" for reference, element in current_elements})
+
+    runner_text = _instrument_deck(source, raw_path.name, expressions)
+    runner_path.write_text(runner_text, encoding="utf-8")
+    try:
+        completed = subprocess.run(
+            [program, "-b", "-o", log_path.name, runner_path.name],
+            cwd=output,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SimulationError(f"ngspice timed out for {source_path}; log: {log_path}") from exc
+    if completed.stdout or completed.stderr:
+        with log_path.open("a", encoding="utf-8") as log:
+            if completed.stdout:
+                log.write("\n[stdout]\n" + completed.stdout)
+            if completed.stderr:
+                log.write("\n[stderr]\n" + completed.stderr)
+
+    if completed.returncode != 0:
+        raise SimulationError(f"ngspice exited with code {completed.returncode}; log: {log_path}")
+    log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+    if re.search(r"\b(error|fatal)\s*:", log_text, flags=re.IGNORECASE) or re.search(
+        r"singular matrix|timestep too small|no convergence", log_text, flags=re.IGNORECASE
+    ):
+        raise SimulationError(f"ngspice reported an error; log: {log_path}")
+    log_path.write_text(log_text.rstrip() + "\n", encoding="utf-8")
+    if not raw_path.is_file() or raw_path.stat().st_size == 0:
+        raise SimulationError(f"ngspice produced no probe data; log: {log_path}")
+
+    columns = _read_wrdata(raw_path, vector_columns)
+    if len(columns.get("time_s", [])) < 2:
+        raise SimulationError(f"ngspice produced fewer than two time samples; log: {log_path}")
+    _write_csv(csv_path, columns)
+    runner_path.unlink(missing_ok=True)
+    raw_path.unlink(missing_ok=True)
+    return SimulationRun(
+        run_name=safe_name,
+        circuit_path=str(source_path),
+        log_path=str(log_path),
+        csv_path=str(csv_path),
+        columns=columns,
+        unsupported_currents=unsupported,
+    )
+
+
+def _instrument_deck(source: str, data_filename: str, expressions: list[str]) -> str:
+    transient: list[str] | None = None
+    retained: list[str] = []
+    for line in source.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("*"):
+            retained.append(line)
+            continue
+        tokens = stripped.split()
+        directive = tokens[0].casefold()
+        if directive == ".control":
+            raise SimulationError("Baseline decks with an existing .control block are not supported")
+        if directive == ".tran":
+            if transient is not None:
+                raise SimulationError("Only one .tran analysis is supported per input deck")
+            if len(tokens) < 3:
+                raise SimulationError("Malformed .tran directive; expected step and stop time")
+            transient = tokens[1:]
+            continue
+        if directive == ".end":
+            continue
+        retained.append(line)
+    if transient is None:
+        raise SimulationError("Baseline deck must contain one .tran directive")
+
+    control = [
+        ".control",
+        "set wr_singlescale",
+        "set wr_vecnames",
+        "tran " + " ".join(transient),
+        f"wrdata {data_filename} {' '.join(expressions)}",
+        "quit",
+        ".endc",
+        ".end",
+    ]
+    return "\n".join([*retained, *control, ""])
+
+
+def _select_vectors(
+    source: str,
+    probes: dict[str, Any],
+    component_mapping: dict[str, dict[str, Any]],
+) -> tuple[list[str], list[tuple[str, str]], dict[str, str]]:
+    nodes = []
+    for node in probes.get("voltage_nodes", []):
+        _validate_spice_identifier(str(node), "voltage node")
+        if str(node) != "0" and str(node).casefold() not in {item.casefold() for item in nodes}:
+            nodes.append(str(node))
+
+    currents: list[tuple[str, str]] = []
+    unsupported: dict[str, str] = {}
+    for reference in probes.get("components", []):
+        entry = component_mapping.get(reference)
+        if not isinstance(entry, dict):
+            unsupported[reference] = "No explicit KiCad-to-SPICE mapping is available."
+            continue
+        element = str(entry.get("spice_element", "")).strip()
+        if not element:
+            unsupported[reference] = "The mapping has no SPICE element name."
+            continue
+        _validate_spice_identifier(element, "SPICE element")
+        tokens = _find_element_tokens(source, element)
+        if tokens is None:
+            unsupported[reference] = f"Mapped SPICE element {element} is absent from this circuit."
+            continue
+        model_type = entry.get("model_type")
+        if model_type == "resistor" and tokens[0][0].upper() == "R" and len(tokens) >= 4:
+            terminals = tokens[1:3]
+        elif model_type == "regulator_output" and tokens[0][0].upper() == "V" and len(tokens) >= 5:
+            terminals = tokens[1:3]
+            currents.append((reference, element))
+        elif model_type == "switch" and tokens[0][0].upper() == "S" and len(tokens) >= 6:
+            terminals = tokens[1:3]
+            unsupported[reference] = "Switch current and power are not reported by this probe backend."
+        else:
+            unsupported[reference] = f"Mapped model type {model_type!r} does not have a supported probe model."
+            continue
+        for node in terminals:
+            _validate_spice_identifier(node, "SPICE terminal")
+            if node != "0" and node.casefold() not in {item.casefold() for item in nodes}:
+                nodes.append(node)
+
+    return nodes, currents, unsupported
+
+
+def _find_element_tokens(source: str, element: str) -> list[str] | None:
+    matches = []
+    for line in source.splitlines():
+        tokens = line.strip().split()
+        if tokens and not tokens[0].startswith("*") and tokens[0].casefold() == element.casefold():
+            matches.append(tokens)
+    if len(matches) > 1:
+        raise SimulationError(f"SPICE element {element} appears more than once")
+    return matches[0] if matches else None
+
+
+def _validate_spice_identifier(value: str, label: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9_.$+-]+", value):
+        raise SimulationError(f"Unsupported {label} name {value!r}; use a simple SPICE identifier")
+
+
+def _safe_name(value: str) -> str:
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._-")
+    if not name:
+        raise SimulationError("run_name must contain a letter or number")
+    return name
+
+
+def _read_wrdata(path: Path, vector_columns: dict[str, str]) -> dict[str, list[float]]:
+    lines = [line.split() for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
+    if not lines:
+        raise SimulationError(f"Empty ngspice wrdata file: {path}")
+    headers = [item.casefold() for item in lines[0]]
+    if not headers or headers[0] != "time":
+        raise SimulationError(f"Unexpected ngspice wrdata header in {path}: {lines[0]}")
+    requested_indices = {}
+    for header, key in vector_columns.items():
+        if header.casefold() not in headers:
+            raise SimulationError(f"ngspice result is missing requested vector {header}")
+        requested_indices[key] = headers.index(header.casefold())
+    columns: dict[str, list[float]] = {"time_s": []}
+    columns.update({key: [] for key in requested_indices})
+    for row in lines[1:]:
+        if len(row) != len(headers):
+            raise SimulationError(f"Malformed ngspice data row in {path}")
+        try:
+            values = [float(item) for item in row]
+        except ValueError as exc:
+            raise SimulationError(f"Non-numeric ngspice data row in {path}") from exc
+        if not all(math.isfinite(item) for item in values):
+            raise SimulationError(f"Non-finite ngspice sample in {path}")
+        columns["time_s"].append(values[0])
+        for key, index in requested_indices.items():
+            columns[key].append(values[index])
+    if any(right <= left for left, right in zip(columns["time_s"], columns["time_s"][1:])):
+        raise SimulationError(f"ngspice time samples are not strictly increasing in {path}")
+    return columns
+
+
+def _write_csv(path: Path, columns: dict[str, list[float]]) -> None:
+    keys = list(columns)
+    length = len(columns["time_s"])
+    with path.open("w", newline="", encoding="utf-8") as output:
+        writer = csv.DictWriter(output, fieldnames=keys, lineterminator="\n")
+        writer.writeheader()
+        for index in range(length):
+            writer.writerow({key: columns[key][index] for key in keys})

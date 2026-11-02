@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .fault_models import SUPPORTED_FAULT_TYPES, create_scenario
 from .graph import build_graph, direct_candidates, find_paths, to_dot
+from .impact_analyzer import analyze_fault_impact
 from .netlist import load_netlist
 from .scenario_generator import generate_scenario_files
 
@@ -25,6 +26,8 @@ def main() -> None:
     parser.add_argument("--spice-base", type=Path, help="Baseline SPICE .cir file")
     parser.add_argument("--spice-mapping", type=Path, help="JSON mapping from KiCad references to SPICE elements")
     parser.add_argument("--output", type=Path, help="Directory for baseline, faulted .cir, and scenario metadata")
+    parser.add_argument("--simulate", action="store_true", help="Run baseline and faulted circuits using ngspice")
+    parser.add_argument("--probes", type=Path, help="JSON voltage-node and component probe configuration")
     args = parser.parse_args()
 
     spice_options = (args.fault_value, args.spice_base, args.spice_mapping, args.output)
@@ -33,6 +36,10 @@ def main() -> None:
             parser.error("--fault-type requires --spice-base, --spice-mapping, and --output")
     elif any(value is not None for value in spice_options):
         parser.error("SPICE scenario options require --fault-type")
+    if args.simulate and (not args.fault_type or not args.probes):
+        parser.error("--simulate requires --fault-type and --probes")
+    if args.probes and not args.simulate:
+        parser.error("--probes requires --simulate")
 
     circuit = load_netlist(args.netlist)
     candidates = direct_candidates(circuit, args.fault)
@@ -140,6 +147,30 @@ def main() -> None:
             "affected_candidates": [candidate.target_ref for candidate in candidates],
             "simulation_status": "not_run",
         }
+        if args.simulate:
+            probes = json.loads(args.probes.read_text(encoding="utf-8"))
+            if not isinstance(probes, dict):
+                parser.error("--probes must contain a JSON object")
+            analysis = analyze_fault_impact(
+                circuit,
+                record["scenario"],
+                generated["baseline_path"],
+                generated["scenario_paths"][0],
+                mapping,
+                probes,
+                args.output / "simulation_results" / scenario.scenario_id.lower(),
+            )
+            output["analysis_stage"] = "fault_impact_simulated"
+            output["warning"] = "Simulated changes are not a damage assessment; component ratings were not evaluated."
+            output["fault_scenario"]["simulation_status"] = "success"
+            output["fault_scenario"]["simulation_analysis"] = analysis["report"]
+            scenario_metadata = json.loads(Path(generated["metadata_path"]).read_text(encoding="utf-8"))
+            scenario_metadata["scenarios"][0]["simulation_status"] = "success"
+            scenario_metadata["scenarios"][0]["simulation_report"] = analysis["report"]["impact_report_json"]
+            Path(generated["metadata_path"]).write_text(
+                json.dumps(scenario_metadata, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 

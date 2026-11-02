@@ -18,9 +18,9 @@ Build a typed component–net bipartite graph with pin-preserving edges. Find di
 Add controlled resistor open/short/drift, ideal regulator output rise/drop/loss, and explicitly mapped voltage-controlled switch stuck-open/stuck-on models. Require an explicit KiCad-reference-to-SPICE-element mapping, retain the original baseline, and save scenario assumptions and change records.
 **Complete when:** three reproducible resistor scenarios and supported regulator/switch scenarios generate faulted SPICE netlists and metadata. Simulation is not run in this phase; the regulator output and switch are documented abstractions, not component-accurate failure mechanisms.
 
-## Phase 05 — Physics-backed propagation (Nov 7–9)
-Compare ngspice baseline vs fault case by pin: voltage, current, power, transients, time exposure.
-**Done when:** simulate one supported low-voltage circuit, show impact changes and simulator failures transparently.
+## Phase 05 — Physics-backed propagation (Nov 7–9) — Complete
+Run transient ngspice baseline and fault decks from temporary instrumented copies. Save logs and CSV samples; align differing time axes over their shared interval; report probe-node voltage deltas and supported component voltage/current/power changes. Resistor current and dissipation use measured terminal voltage and each deck's actual resistance; ideal voltage-source current uses ngspice's branch-current sign convention. Unsupported current/power stay null with a reason.
+**Complete when:** the supported 5 V divider runs in ngspice, R1 drift changes LOAD from 2.5 V to about 0.455 V, component changes are saved, and simulator failures cannot be marked successful. This is electrical simulation evidence, not proof of damage or a rating assessment.
 
 ## Phase 06 — Secondary-damage risk assessment (Nov 10–12)
 Read part-specific ratings and aggregate stress indicators; distinguish out-of-spec stress vs observed damage.
