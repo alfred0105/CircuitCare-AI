@@ -18,6 +18,7 @@ dev = ["pytest>=7.4"]
 [project.scripts]
 circuitcare = "circuitcare.cli:main"
 circuitcare-diagnose = "circuitcare.diagnosis_cli:main"
+circuitcare-advise = "circuitcare.repair_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

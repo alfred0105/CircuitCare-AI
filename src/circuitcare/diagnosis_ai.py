@@ -33,6 +33,7 @@ def run_diagnosis(
     diagnosis = {
         "assessment_mode": "posterior_updated" if result["used_measurements"] else "prior_only",
         "hypothesis_count": len(hypotheses),
+        "hypotheses_source": str(hypotheses_path),
         "available_measurement_nodes": available_measurements(hypotheses),
         "measurements_file": str(measurements_path) if measurements_path else None,
         **result,

@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–07 complete.** The CLI parses KiCad XML netlists, compares supported ngspice baseline/fault simulations, ranks inspection candidates against explicitly configured component ratings, and updates local Bayesian diagnoses from supplied measurements. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
+> **Status: Phases 01–08 complete.** The CLI parses KiCad XML netlists, compares supported ngspice baseline/fault simulations, ranks inspection candidates against explicitly configured component ratings, updates local Bayesian diagnoses from supplied measurements, and produces evidence-grounded repair advice with an optional local Ollama model. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -24,7 +24,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 05 | ngspice baseline/fault electrical comparisons | Complete; supported demo circuit verified |
 | 06 | Secondary-damage stress assessment and evidence | Complete; overvoltage demo flags C1 above its declared demo rating |
 | 07 | Local lightweight AI and active measurement ranking | Complete; simulated measurement updates hypothesis posterior |
-| 08 | Repair recommendations and audit trail | Planned |
+| 08 | Evidence-grounded repair recommendations and audit trail | Complete; local Ollama explanation plus deterministic fallback |
 | 09 | UI, benchmark, offline evaluation | Planned |
 | 10 | Stabilization, poster, reproducible demo | Planned |
 
@@ -108,9 +108,23 @@ circuitcare-diagnose --hypotheses data/diagnosis/demo_hypotheses.json \
 
 The three hypotheses reference saved 3 V, 6 V, and 8 V ngspice results; predicted node voltages are loaded from each `comparison.json`, not embedded in the diagnosis code. Priors are equal weights, and voltage measurement σ=0.2 V is a labeled demo assumption. The example 7.9 V observation is marked `simulated_demo`; it moves the 8 V hypothesis from 1/3 prior weight to approximately 1.0 conditional posterior. Before measurement, VOUT has the highest calculated information gain; after measuring VOUT it is excluded, and the remaining LOAD prediction is not informative enough to recommend another measurement. Outputs contain posterior history, measurement recommendations, and prior/posterior weighted inspection indices. These conditional values are not real-world failure probabilities, and measurement suggestions do not authorize live probing.
 
+For evidence-backed repair guidance, install Ollama separately and pull a local model (for example, `ollama pull qwen3:4b-instruct`). The advisor never sends data to a cloud API. It checks the local Ollama model list, uses only evidence JSON from the diagnosis, inspection ranking, measurement recommendation, and optional risk/stress reports, then writes `repair_advice.json`, `evidence.json`, and `llm_explanation.json`:
+
+```bash
+circuitcare-advise \
+  --diagnosis data/diagnosis/posterior_results/diagnosis.json \
+  --inspection-ranking data/diagnosis/posterior_results/inspection_ranking.json \
+  --measurement-recommendations data/diagnosis/posterior_results/measurement_recommendations.json \
+  --model qwen3:4b-instruct \
+  --question 'C1을 왜 먼저 점검해야 해?' \
+  --output data/repair_advice/example
+```
+
+Use `--no-llm` to produce deterministic isolation, inspection, replacement, and post-repair checks without model inference. An installed local model can be selected with `--model`; Phase 08 was exercised with `gemma4:12b` on Ollama 0.40.3. Ollama 0.40.3 does not support structured output for this model, so the client retries once in plain-text mode and validates the returned JSON and evidence references locally. Model explanations are rejected on invalid or unsupported claims, leaving the deterministic advice available. Output labels simulation/demo assumptions and unknowns separately; the model is not allowed to assert damage or convert conditional posterior weights into real failure probabilities.
+
 ## Current implementation and next phase
 
-Phases 01–07 are implemented: KiCad component/net data becomes a bipartite graph; the CLIs enumerate paths, run mapped ngspice scenarios, evaluate configured ratings, and perform local Gaussian Bayesian updates with information-gain measurement selection from stored results. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–08 are implemented: KiCad component/net data becomes a bipartite graph; the CLIs enumerate paths, run mapped ngspice scenarios, evaluate configured ratings, perform local Gaussian Bayesian updates with information-gain measurement selection from stored results, and produce evidence-grounded repair explanations with a deterministic fallback. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 ## Scope and caution
 

@@ -1,6 +1,7 @@
 {
   "assessment_mode": "prior_only",
   "hypothesis_count": 3,
+  "hypotheses_source": "data/diagnosis/demo_hypotheses.json",
   "available_measurement_nodes": [
     "LOAD",
     "SWITCH_OUT",
