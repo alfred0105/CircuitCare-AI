@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phase 01 complete; Phases 02–03 have initial implementations.** The current CLI parses KiCad XML netlists and reports direct connectivity candidates. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
+> **Status: Phases 01–02 complete; Phase 03 has an initial implementation.** The CLI parses KiCad XML netlists and reports direct connectivity candidates. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair. KiCad 10.0.6 export verification used the bundled Raspberry Pi HAT schematic.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -18,7 +18,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | Phase | Deliverable | State |
 |---|---|---|
 | 01 | Python environment, conventions, sample data | Complete |
-| 02 | KiCad netlist parser | Initial implementation |
+| 02 | KiCad netlist parser | Complete; verified with KiCad 10.0.6 export |
 | 03 | Component-net graph and affected-neighbor candidates | Initial implementation |
 | 04 | Failure modes and fault injection models | Planned |
 | 05 | ngspice baseline/fault electrical comparisons | Planned |
@@ -40,11 +40,17 @@ circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1
 python -m pytest -q
 ```
 
+To inspect parsed component metadata and pin-to-net connections, add `--show-pins`:
+
+```bash
+circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1 --show-pins
+```
+
 The included sample intentionally connects U1 to J1, U2 and C3; R4 is present as a non-directly-connected comparison. A shared net is **a candidate influence path, not evidence of damage**. The CLI reports the selected failed component, total component count, direct candidates, shared nets, and connectivity-only evidence level.
 
 ## Current implementation and next phase
 
-Phase 01 is complete: the Python 3.11+ package is installable, the KiCad XML fixture is available, and the CLI and existing offline tests run. The next planned work is Phase 02: strengthen KiCad XML ingestion and normalize extracted component, pin, and net data. Circuit connectivity alone will continue to be reported as an unverified candidate, not damage or risk.
+Phase 02 was verified with the repository fixture and an XML export from KiCad 10.0.6's bundled Raspberry Pi HAT schematic (6 components, 35 nets). The real export preserved component metadata and pin-to-net connections through the parser and `--show-pins` CLI. Phase 03 will build on this connection data. Circuit connectivity alone remains an unverified candidate, not damage or risk.
 
 ## Scope and caution
 

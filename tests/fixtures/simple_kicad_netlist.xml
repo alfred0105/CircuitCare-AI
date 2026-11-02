@@ -4,7 +4,7 @@
     <comp ref="J1"><value>Power input</value><libsource lib="Connector" part="Conn_01x02"/></comp>
     <comp ref="U1"><value>Regulator</value><libsource lib="Regulator_Linear" part="TestReg"/></comp>
     <comp ref="U2"><value>MCU</value><libsource lib="MCU" part="TestMCU"/></comp>
-    <comp ref="C3"><value>10u</value><libsource lib="Device" part="C"/></comp>
+    <comp ref="C3"><value>10u</value><footprint>Capacitor_SMD:C_0805_2012Metric</footprint><datasheet>https://example.invalid/capacitor.pdf</datasheet><libsource lib="Device" part="C"/><sheetpath names="/Root/" tstamps="/"/><fields><field name="ki_keywords">capacitor</field></fields></comp>
     <comp ref="R4"><value>1k</value><libsource lib="Device" part="R"/></comp>
   </components>
   <nets>

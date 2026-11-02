@@ -6,9 +6,9 @@
 Python 3.11+ package metadata, offline CLI, KiCad XML fixture, baseline connectivity models, README, roadmap, and Python 3.11 CI are in place. The fixture contains J1, U1, U2, C3, and R4; selecting U1 lists direct candidates and their shared nets without claiming damage.
 **Complete when:** editable package installation succeeds, the sample CLI runs, and the existing test suite passes. Verified against the Phase 01 fixture and existing offline tests. No additional runtime dependencies are needed.
 
-## Phase 02 — KiCad XML netlist ingestion (Nov 2–3)
-Parse components, values, refs, pin-to-net links; report missing and malformed data.
-**Done when:** deterministically extract components and nets from a sample KiCad-exported XML netlist. Do not infer electrical function from net names alone.
+## Phase 02 — KiCad XML netlist ingestion (Nov 2–3) — Complete
+Extract component references, values, library IDs, optional footprint and datasheet, pin-to-net connections, and net codes. Assign unique names to unnamed nets, deduplicate repeated identical pin links, reject conflicting pin assignments, and sort parsed data deterministically. Verified against the repository fixture and a KiCad 10.0.6 XML export from its bundled Raspberry Pi HAT schematic (6 components, 35 nets).
+**Complete when:** deterministic extraction from fixture and real KiCad XML is verified. Do not infer electrical function from net names alone.
 
 ## Phase 03 — Connectivity and candidate influence (Nov 4)
 Build a component–net bipartite graph and report direct connected candidates, ordered paths, and evidence.
