@@ -21,7 +21,19 @@ Example answer format: {"answer":"C1 우선 확인 근거는 [E011][E012][E013]�
 
 
 def build_messages(question: str, evidence: dict[str, Any], repair_advice: dict[str, Any]) -> list[dict[str, str]]:
-    references = set(re.findall(r"\b[A-Z][A-Z0-9]*\d+\b", question.upper()))
+    references = set(re.findall(r"(?<![A-Z0-9])[A-Z][A-Z0-9]*\d+(?![A-Z0-9])", question.upper()))
+    facts = evidence.get("facts", [])
+    if references:
+        facts = [item for item in facts if item.get("component_ref") in references]
+        # Preserve the active hypothesis and measurement facts that explain the
+        # selected component's scenario, while avoiding unrelated component rows.
+        facts += [
+            item for item in evidence.get("facts", [])
+            if item.get("metric") in {"selected_fault_hypothesis", "conditional_posterior", "observed_voltage", "simulated_prediction_for_measurement"}
+        ]
+        facts = list({item.get("evidence_id"): item for item in facts}.values())
+    else:
+        facts = evidence.get("facts", [])[:32]
     checks = repair_advice.get("recommended_checks", [])
     if references:
         relevant_checks = [item for item in checks if item.get("component_ref") in references]
@@ -29,9 +41,36 @@ def build_messages(question: str, evidence: dict[str, Any], repair_advice: dict[
         relevant_checks = checks
     else:
         relevant_checks = []
+    unknowns = evidence.get("unknowns", [])
+    if references:
+        unknowns = [item for item in unknowns if any(reference in item for reference in references)] + [
+            item for item in unknowns if any(token in item.casefold() for token in ("damage", "probability", "model", "손상", "고장 확률", "불일치"))
+        ]
+        unknowns = list(dict.fromkeys(unknowns))
+    context = evidence.get("analysis_context", {})
+    inspection_order = context.get("inspection_order", [])
+    if references:
+        inspection_order = [item for item in inspection_order if item.get("component_ref") in references]
+    else:
+        inspection_order = inspection_order[:3]
+    relevant_fact_ids = {item.get("evidence_id") for item in facts}
+    assumptions = [
+        item for item in evidence.get("assumptions", [])
+        if not item.get("evidence_ids") or any(identifier in relevant_fact_ids for identifier in item.get("evidence_ids", []))
+    ][:8]
     payload = {
         "user_question": question,
-        "evidence": evidence,
+        "evidence": {
+            **evidence,
+            "facts": facts,
+            "assumptions": assumptions,
+            "recommendations": relevant_checks,
+            "unknowns": unknowns,
+            "analysis_context": {
+                key: value for key, value in context.items()
+                if key not in {"inspection_order", "source_files", "measurement_recommendation"}
+            } | {"inspection_order": inspection_order, "measurement_recommendation": context.get("measurement_recommendation")},
+        },
         "deterministic_repair_advice": {
             "failed_component": repair_advice.get("failed_component"),
             "recommended_checks": relevant_checks,

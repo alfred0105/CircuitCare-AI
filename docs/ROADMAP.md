@@ -34,11 +34,12 @@ Load hypothesis-specific predictions and risk reports from saved Phase 05/06 JSO
 `circuitcare-advise` builds a traceable evidence packet from diagnosis, inspection ranking, measurement recommendations, and optional stress reports. It offers Korean, evidence-only explanations through the loopback Ollama API and always writes deterministic isolation, inspection, replacement, and post-repair checks. Invalid model output is rejected and the deterministic advice remains available. Output is split into `repair_advice.json`, `evidence.json`, and `llm_explanation.json`; facts, demo assumptions, unknowns, and suggestions remain distinct. No cloud inference is used.
 **Complete when:** a local model answers questions with valid evidence IDs and supported claims, and `--no-llm` produces a complete deterministic report. Verified with Ollama 0.40.3 and local `gemma4:12b` (12.4B, NVFP4); Ollama's structured output endpoint returns 501 for this model, so the client retries once without JSON mode and validates the JSON response locally.
 
-## Phase 09 — Integration, offline demo, benchmark (Nov 18–21)
-Build a minimal UI and evaluate 2–3 held-out circuit families; record latency/memory, top-k coverage and avoidable inspections.
-**Done when:** reproducible offline flow and non-leaky comparisons are available.
+## Phase 09 — Integration, offline demo, benchmark (Nov 18–21) — Complete
+Add an optional Streamlit UI for the saved regulator demo and supported mapped circuits. Five tabs expose connectivity, normal/fault waveforms, rating-limited stress findings, conditional Bayesian updates, and explicit on-demand local Ollama advice. Add independent divider and RC charging fixtures, SPICE decks/mappings/probes, rating assumptions, and a small evaluation script that records live ngspice comparisons, topology-only candidates versus physical stress ranking, Bayesian demo update, prior local Ollama inference timings, and evaluation-process peak RSS. Numeric claims in structured LLM facts are checked against cited evidence values, and prompt construction filters component-specific evidence while retaining the full audit packet.
 
-## Phase 10 — Release and presentation (Nov 22–27)
+**Complete when:** the UI displays cached regulator results, accepts a simulated demo measurement update, supports explicit local LLM questions with deterministic fallback, exports JSON/CSV/Markdown, and two distinct topologies complete live ngspice baseline/fault runs. The evaluation is a small engineering demonstration, not damage accuracy or generalization validation. No independent damaged-part labels exist, so Top-k damage coverage and avoidable inspections are not claimed. The recorded RSS excludes ngspice and Ollama child processes; Bayesian is a separate configured demo, not a held-out circuit benchmark.
+
+## Phase 10 — Release and presentation (Nov 22–27) — Next
 Freeze core demo, publish limitations, document test evidence, prepare poster by Nov 23 and five-minute explanation.
 **Done when:** project starts offline and no demonstrated result depends on invented data.
 

@@ -35,7 +35,8 @@ def validate_explanation(content: dict[str, Any], evidence: dict[str, Any], *, q
     for key in _REQUIRED_ARRAYS:
         if not isinstance(content.get(key), list):
             return f"The JSON response field {key!r} must be an array."
-    valid_ids = {item["evidence_id"] for item in evidence.get("facts", []) if item.get("evidence_id")}
+    evidence_by_id = {item["evidence_id"]: item for item in evidence.get("facts", []) if item.get("evidence_id")}
+    valid_ids = set(evidence_by_id)
     texts = [content["answer"]]
     for key in _REQUIRED_ARRAYS:
         for item in content[key]:
@@ -46,6 +47,10 @@ def validate_explanation(content: dict[str, Any], evidence: dict[str, Any], *, q
                 return f"The response contains a missing or unknown evidence ID in {key}."
             if key == "facts" and not cited:
                 return "Every factual response item must cite at least one evidence ID."
+            if key == "facts":
+                reason = _validate_fact_numeric_grounding(item["text"], cited, evidence_by_id)
+                if reason:
+                    return reason
             texts.append(item["text"])
     demo_rating_ids = {
         item.get("evidence_id") for item in evidence.get("facts", [])
@@ -87,6 +92,31 @@ def validate_explanation(content: dict[str, Any], evidence: dict[str, Any], *, q
             continue
         if not any(abs(number - value) <= max(1e-9, abs(value) * 1e-8) for value in allowed):
             return f"The response contains an unsupported numeric claim: {token}"
+    return None
+
+
+def _validate_fact_numeric_grounding(text: str, cited_ids: list[str], evidence_by_id: dict[str, dict]) -> str | None:
+    numbers = []
+    claim_text = _EVIDENCE_ID.sub("", text)
+    # Scenario/field identifiers (for example U1_OUTPUT_8V) contain digits
+    # that are labels, not numeric claims made by the sentence.
+    claim_text = re.sub(r"(?<![A-Za-z0-9])[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+(?![A-Za-z0-9])", "", claim_text)
+    for token in _NUMBERS.findall(claim_text):
+        try:
+            numbers.append(float(token.rstrip("%")))
+        except ValueError:
+            continue
+    if not numbers:
+        return None
+    cited = [evidence_by_id[item] for item in cited_ids if item in evidence_by_id]
+    # Evidence IDs such as E002 share the shape of component references; remove
+    # them before identifying refs mentioned in the factual claim.
+    mentioned_refs = set(re.findall(r"(?<![A-Z0-9])[A-Z][A-Z0-9]*\d+(?![A-Z0-9])", claim_text.upper()))
+    if mentioned_refs and not any(item.get("component_ref") in mentioned_refs for item in cited):
+        return "A numeric fact cites evidence for a different component."
+    values = [value for item in cited for value in _numeric_evidence_values(item.get("value"))]
+    if any(not any(abs(number - value) <= max(1e-9, abs(value) * 1e-8) for value in values) for number in numbers):
+        return "A numeric fact is not supported by the values in its cited evidence IDs."
     return None
 
 
