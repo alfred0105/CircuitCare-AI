@@ -1,0 +1,18 @@
+{
+  "R1": {
+    "spice_element": "R1",
+    "model_type": "resistor"
+  },
+  "U1": {
+    "spice_element": "VREG",
+    "model_type": "regulator_output"
+  },
+  "Q1": {
+    "spice_element": "S1",
+    "model_type": "switch",
+    "control_source": "VCTRL",
+    "switch_threshold": 2.5,
+    "open_control_voltage": 0,
+    "closed_control_voltage": 5
+  }
+}

@@ -4,8 +4,10 @@ import argparse
 import json
 from pathlib import Path
 
+from .fault_models import SUPPORTED_FAULT_TYPES, create_scenario
 from .graph import build_graph, direct_candidates, find_paths, to_dot
 from .netlist import load_netlist
+from .scenario_generator import generate_scenario_files
 
 
 def main() -> None:
@@ -18,7 +20,19 @@ def main() -> None:
     parser.add_argument("--net-types", type=Path, help="Optional JSON map of net names to ground, power, signal or unknown")
     parser.add_argument("--exclude-net-types", help="Comma-separated net types to exclude from path traversal")
     parser.add_argument("--export-dot", type=Path, help="Write the circuit connectivity graph as a Graphviz DOT file")
+    parser.add_argument("--fault-type", choices=sorted(SUPPORTED_FAULT_TYPES), help="Generate a faulted SPICE scenario")
+    parser.add_argument("--fault-value", help="Explicit drift resistance or regulator output voltage")
+    parser.add_argument("--spice-base", type=Path, help="Baseline SPICE .cir file")
+    parser.add_argument("--spice-mapping", type=Path, help="JSON mapping from KiCad references to SPICE elements")
+    parser.add_argument("--output", type=Path, help="Directory for baseline, faulted .cir, and scenario metadata")
     args = parser.parse_args()
+
+    spice_options = (args.fault_value, args.spice_base, args.spice_mapping, args.output)
+    if args.fault_type:
+        if not all((args.spice_base, args.spice_mapping, args.output)):
+            parser.error("--fault-type requires --spice-base, --spice-mapping, and --output")
+    elif any(value is not None for value in spice_options):
+        parser.error("SPICE scenario options require --fault-type")
 
     circuit = load_netlist(args.netlist)
     candidates = direct_candidates(circuit, args.fault)
@@ -100,6 +114,32 @@ def main() -> None:
         ]
     if args.export_dot:
         args.export_dot.write_text(to_dot(graph, args.fault, paths), encoding="utf-8")
+
+    if args.fault_type:
+        mapping = json.loads(args.spice_mapping.read_text(encoding="utf-8"))
+        if not isinstance(mapping, dict):
+            parser.error("--spice-mapping must contain a JSON object keyed by component reference")
+        parameters = {}
+        if args.fault_value is not None:
+            if args.fault_type == "resistance_drift":
+                parameters["fault_resistance"] = args.fault_value
+            elif args.fault_type in {"regulator_output_rise", "regulator_output_drop"}:
+                parameters["output_voltage"] = args.fault_value
+            else:
+                parser.error(f"--fault-value is not used by {args.fault_type}")
+        scenario = create_scenario(args.fault, args.fault_type, parameters)
+        generated = generate_scenario_files(args.spice_base, [scenario], mapping, args.output)
+        record = generated["scenarios"][0]
+        output["analysis_stage"] = "fault_scenario_generated"
+        output["fault_scenario"] = {
+            **record["scenario"],
+            "baseline_file": generated["baseline_path"],
+            "faulted_netlist": generated["scenario_paths"][0],
+            "metadata_file": generated["metadata_path"],
+            "changes": record["changes"],
+            "affected_candidates": [candidate.target_ref for candidate in candidates],
+            "simulation_status": "not_run",
+        }
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 

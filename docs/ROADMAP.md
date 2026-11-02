@@ -14,9 +14,9 @@ Extract component references, values, library IDs, optional footprint and datash
 Build a typed component–net bipartite graph with pin-preserving edges. Find direct and indirect simple paths up to the requested component-hop limit, keep candidate evidence at `connectivity_only`, and export fault/path-highlighted Graphviz DOT. Optional net types come only from user-supplied metadata; GND paths remain present unless explicitly filtered for traversal, and filtering is not a safety conclusion.
 **Complete when:** CLI path output distinguishes direct and indirect candidates, identifies path nets and hop counts, and DOT contains component/net nodes and pin-labeled edges.
 
-## Phase 04 — Failure-mode library (Nov 5–6)
-Add controlled fault templates: open/short, resistor drift, regulator output fault, and MOSFET switch fault. Require explicit scenario metadata and valid component model.
-**Done when:** at least three supported scenarios produce reproducible faulted SPICE netlists.
+## Phase 04 — Failure-mode library (Nov 5–6) — Complete
+Add controlled resistor open/short/drift, ideal regulator output rise/drop/loss, and explicitly mapped voltage-controlled switch stuck-open/stuck-on models. Require an explicit KiCad-reference-to-SPICE-element mapping, retain the original baseline, and save scenario assumptions and change records.
+**Complete when:** three reproducible resistor scenarios and supported regulator/switch scenarios generate faulted SPICE netlists and metadata. Simulation is not run in this phase; the regulator output and switch are documented abstractions, not component-accurate failure mechanisms.
 
 ## Phase 05 — Physics-backed propagation (Nov 7–9)
 Compare ngspice baseline vs fault case by pin: voltage, current, power, transients, time exposure.

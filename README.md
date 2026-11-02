@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–03 complete.** The CLI parses KiCad XML netlists and reports direct and indirect connectivity candidates. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
+> **Status: Phases 01–04 complete.** The CLI parses KiCad XML netlists, reports connectivity candidates, and generates explicitly mapped SPICE fault scenarios. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -20,7 +20,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 01 | Python environment, conventions, sample data | Complete |
 | 02 | KiCad netlist parser | Complete; verified with KiCad 10.0.6 export |
 | 03 | Component-net graph and affected-neighbor candidates | Complete |
-| 04 | Failure modes and fault injection models | Planned |
+| 04 | Failure modes and fault injection models | Complete; simulation not run |
 | 05 | ngspice baseline/fault electrical comparisons | Planned |
 | 06 | Secondary-damage stress assessment and evidence | Planned |
 | 07 | Local lightweight AI and active measurement ranking | Planned |
@@ -55,11 +55,23 @@ circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1 --expor
 
 Net types are unknown unless explicitly supplied in a JSON mapping such as `{"GND":"ground","VIN":"power","VOUT":"power","SIGNAL":"signal"}` using `--net-types net-types.json`. `--exclude-net-types ground` filters ground paths from path traversal while retaining them in the graph and direct connectivity results. This filter does not imply that a real effect cannot travel through GND.
 
+Generate a faulted SPICE circuit using the explicit KiCad-to-SPICE mapping and starter circuit:
+
+```bash
+circuitcare --netlist tests/fixtures/fault_demo_netlist.xml --fault R1 \
+  --fault-type resistance_drift --fault-value 10k \
+  --spice-base data/circuits/fault_demo.cir \
+  --spice-mapping data/circuits/fault_demo_mapping.json \
+  --output data/fault_scenarios
+```
+
+This writes `baseline.cir`, a faulted `.cir`, and `scenarios.json`. Supported scenarios include resistor open/short/drift, ideal regulator output rise/drop/loss, and mapped voltage-controlled switch stuck-open/stuck-on. These are stated approximations; scenario generation does not run a simulator. The committed `data/fault_scenarios/` files show resistor open, short, and 10 kΩ drift examples.
+
 The included sample intentionally connects U1 to J1, U2 and C3; R4 is present as a non-directly-connected comparison. A shared net is **a candidate influence path, not evidence of damage**. The CLI reports the selected failed component, total component count, direct candidates, shared nets, and connectivity-only evidence level.
 
 ## Current implementation and next phase
 
-Phases 01–03 are implemented: KiCad component/net data becomes a bipartite graph, and the CLI can enumerate simple direct and indirect connectivity paths and export the graph in DOT format. Optional net type metadata is user-supplied; no signal direction or electrical role is inferred. Paths remain connectivity evidence only, not damage or risk.
+Phases 01–04 are implemented: KiCad component/net data becomes a bipartite graph; the CLI enumerates direct and indirect paths, exports DOT, and injects explicit faults into a mapped SPICE starter circuit. Net roles remain user-supplied. Fault and path results are not damage assessments, and no simulation or electrical risk calculation runs in these phases.
 
 ## Scope and caution
 
