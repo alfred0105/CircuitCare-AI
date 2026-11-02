@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–09 complete.** The CLI and Streamlit UI parse KiCad XML netlists, compare supported ngspice baseline/fault simulations, ranks inspection candidates against explicitly configured component ratings, updates local Bayesian diagnoses from supplied measurements, and produces evidence-grounded repair advice with an optional local Ollama model. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
+> **Status: Phases 01–08 complete; Phase 09 integration is in progress.** The Streamlit dashboard displays saved analysis and provides the integration tabs, but its live ngspice button currently fails in this macOS Streamlit process with ngspice exit code `-11`. The same CLI simulations succeed when run directly. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -25,7 +25,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 06 | Secondary-damage stress assessment and evidence | Complete; overvoltage demo flags C1 above its declared demo rating |
 | 07 | Local lightweight AI and active measurement ranking | Complete; simulated measurement updates hypothesis posterior |
 | 08 | Evidence-grounded repair recommendations and audit trail | Complete; local Ollama explanation plus deterministic fallback |
-| 09 | UI, benchmark, offline evaluation | Complete; local Streamlit workflow and two independently structured ngspice cases |
+| 09 | UI, benchmark, offline evaluation | In progress; dashboard and two independent CLI evaluations work, UI live ngspice execution unresolved |
 | 10 | Stabilization, poster, reproducible demo | Planned |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -133,7 +133,7 @@ Use `--no-llm` to produce deterministic isolation, inspection, replacement, and 
 
 ## Current implementation and next phase
 
-Phases 01–09 are implemented: KiCad component/net data becomes a bipartite graph; the CLIs and Streamlit UI enumerate paths, run mapped ngspice scenarios, evaluate configured ratings, perform local Gaussian Bayesian updates with information-gain measurement selection from stored results, and produce evidence-grounded repair explanations with a deterministic fallback. Two distinct small circuit topologies (resistor divider and RC charging) have reproducible live ngspice evaluations. See [the Phase 09 summary](data/evaluations/phase09_summary.json) and run `python scripts/evaluate.py` to regenerate it. Timings and memory are local observations, not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–08 are implemented. Phase 09 adds the dashboard and two distinct small circuit topologies (resistor divider and RC charging) with reproducible live ngspice CLI evaluations. See [the Phase 09 summary](data/evaluations/phase09_summary.json) and run `python scripts/evaluate.py` to regenerate it. The dashboard’s live simulation action still fails with ngspice exit code `-11` in the current Streamlit process, although the same CLI runs succeed directly; therefore full UI end-to-end acceptance remains open. Timings and memory are local observations, not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 ## Scope and caution
 

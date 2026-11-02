@@ -62,17 +62,24 @@ def run_ngspice(
 
     runner_text = _instrument_deck(source, raw_path.name, expressions)
     runner_path.write_text(runner_text, encoding="utf-8")
-    try:
-        completed = subprocess.run(
-            [program, "-b", "-o", log_path.name, runner_path.name],
-            cwd=output,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise SimulationError(f"ngspice timed out for {source_path}; log: {log_path}") from exc
+    retried_after_segfault = False
+    while True:
+        try:
+            completed = subprocess.run(
+                [program, "-b", "-o", log_path.name, runner_path.name],
+                cwd=output,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise SimulationError(f"ngspice timed out for {source_path}; log: {log_path}") from exc
+        if completed.returncode != -11 or retried_after_segfault:
+            break
+        retried_after_segfault = True
+        raw_path.unlink(missing_ok=True)
+        log_path.unlink(missing_ok=True)
     if completed.stdout or completed.stderr:
         with log_path.open("a", encoding="utf-8") as log:
             if completed.stdout:
@@ -87,7 +94,8 @@ def run_ngspice(
         r"singular matrix|timestep too small|no convergence", log_text, flags=re.IGNORECASE
     ):
         raise SimulationError(f"ngspice reported an error; log: {log_path}")
-    log_path.write_text(log_text.rstrip() + "\n", encoding="utf-8")
+    retry_note = "[warning] ngspice exited with SIGSEGV once; the single retry succeeded.\n" if retried_after_segfault else ""
+    log_path.write_text(log_text.rstrip() + "\n" + retry_note, encoding="utf-8")
     if not raw_path.is_file() or raw_path.stat().st_size == 0:
         raise SimulationError(f"ngspice produced no probe data; log: {log_path}")
 

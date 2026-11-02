@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 import re
-import subprocess
 import sys
 import tempfile
 import time
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from circuitcare.conversation import answer_question
+from circuitcare.cli import main as cli_main
 from circuitcare.diagnosis_ai import run_diagnosis
 from circuitcare.evidence_builder import build_evidence
 from circuitcare.graph import build_graph, direct_candidates, find_paths, to_dot
@@ -96,8 +99,10 @@ def main() -> None:
             cmd.extend(["--fault-value", fault_value])
         with st.spinner("Fault Injection → ngspice → stress/rating assessment 실행 중…"):
             try:
-                completed = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=120, check=True)
-                json.loads(completed.stdout)
+                cli_output = io.StringIO()
+                with patch.object(sys, "argv", [cmd[2], *cmd[3:]]), redirect_stdout(cli_output):
+                    cli_main()
+                json.loads(cli_output.getvalue())
                 st.session_state.live_result_dir = str(output / "simulation_results" / f"fault_{selected_fault.lower()}_{fault_type}")
                 st.session_state.live_case = case_name
                 st.session_state.live_fault = selected_fault
@@ -105,7 +110,7 @@ def main() -> None:
                 st.session_state.live_fault_value = fault_value
                 st.success("새 시뮬레이션 완료")
                 st.rerun()
-            except (subprocess.SubprocessError, OSError, json.JSONDecodeError) as exc:
+            except (OSError, ValueError, RuntimeError, SystemExit, json.JSONDecodeError) as exc:
                 st.error(f"시뮬레이션 실패: {exc}")
     comparison_path = result_dir / "comparison.json"
     risk_path = result_dir / "risk_assessment.json"
