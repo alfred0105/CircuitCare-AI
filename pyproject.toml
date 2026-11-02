@@ -7,7 +7,7 @@ name = "circuitcare-ai"
 version = "0.1.0"
 description = "Local-first circuit fault influence and repair prioritization prototype"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "Proprietary - no license granted"}
 authors = [{name = "CircuitCare AI contributors"}]
 dependencies = []

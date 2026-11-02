@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phase 1–3 bootstrap.** The current CLI parses KiCad XML netlists and reports electrical connectivity candidates. It does **not** yet calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
+> **Status: Phase 01 complete; Phases 02–03 have initial implementations.** The current CLI parses KiCad XML netlists and reports direct connectivity candidates. It does **not** calculate electrical stress, actual damage, or failure probabilities. Do not use its output to approve a live repair.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -17,7 +17,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 
 | Phase | Deliverable | State |
 |---|---|---|
-| 01 | Python environment, conventions, sample data | Scaffold |
+| 01 | Python environment, conventions, sample data | Complete |
 | 02 | KiCad netlist parser | Initial implementation |
 | 03 | Component-net graph and affected-neighbor candidates | Initial implementation |
 | 04 | Failure modes and fault injection models | Planned |
@@ -32,7 +32,7 @@ Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Quick start
 
-Requires Python 3.10+.
+Requires Python 3.11+ (Python 3.11 is the CI baseline; Python 3.12 also works).
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -40,7 +40,11 @@ circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1
 python -m pytest -q
 ```
 
-The sample intentionally connects U1 to downstream components. A shared net is **a candidate influence path, not evidence of damage**.
+The included sample intentionally connects U1 to J1, U2 and C3; R4 is present as a non-directly-connected comparison. A shared net is **a candidate influence path, not evidence of damage**. The CLI reports the selected failed component, total component count, direct candidates, shared nets, and connectivity-only evidence level.
+
+## Current implementation and next phase
+
+Phase 01 is complete: the Python 3.11+ package is installable, the KiCad XML fixture is available, and the CLI and existing offline tests run. The next planned work is Phase 02: strengthen KiCad XML ingestion and normalize extracted component, pin, and net data. Circuit connectivity alone will continue to be reported as an unverified candidate, not damage or risk.
 
 ## Scope and caution
 
