@@ -12,7 +12,9 @@ from typing import Any
 
 def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assessment: dict | None,
                       risk_path: str, failed_component: str, fault_type: str,
-                      context_key: str, current_result_status: str) -> None:
+                      context_key: str, current_result_status: str,
+                      inspection_ranking: dict | None = None,
+                      selected_component: str | None = None) -> None:
     st.subheader("PCB 사진 인식")
     st.caption("선택 설치된 로컬 학습 모델은 사진의 부품 후보를 탐지하고, OCR은 실크스크린 Reference 후보를 읽습니다. 사진은 회로 연결이나 손상을 판정하지 않습니다. 위험 표시는 같은 회로임을 확인하고 부품 Reference까지 승인한 뒤에만 연결합니다.")
     try:
@@ -263,6 +265,12 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
         circuit_positions = [row for row in positions if row.reference in netlist_component_refs]
         locations = map_component_positions(circuit_positions, registration["homography"], board_side=side,
                                              image_size=(rectified_image.width, rectified_image.height), confirmed=True)
+        inspection_by_ref = {row["component_ref"]: row for row in (inspection_ranking or {}).get("posterior_weighted_inspection_order", [])}
+        for location in locations["components"]:
+            priority = inspection_by_ref.get(location["reference"])
+            location["inspection_priority"] = ({"rank": priority["priority_rank"],
+                                                  "score_not_probability": priority["posterior_weighted_priority_score"],
+                                                  "source": "bayesian_what_if_conditional_rank"} if priority else None)
         locations["netlist_reference_match"] = matching
         locations["scenario_context"] = {"context_key": context_key, "failed_component": failed_component,
                                           "fault_type": fault_type, "simulation_result_status": current_result_status,
@@ -272,6 +280,7 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
         return
     current_risks, risk_issue = risk_by_reference(risk_assessment, expected_fault=failed_component,
                                                   expected_fault_type=fault_type)
+    inspection_by_ref = {row["component_ref"]: row for row in (inspection_ranking or {}).get("posterior_weighted_inspection_order", [])}
     if current_result_status not in {"SUCCESS", "CACHED"}:
         risk_issue = "현재 조건에 성공 또는 저장된 위험 결과가 없어 위치만 표시합니다."
         current_risks = {}
@@ -285,11 +294,15 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
     st.caption(f"확정 정합 · {len(location_by_ref)}개 부품 중심이 이미지 안에 매핑됨 · 위험 결과: {'연결' if current_risks and not risk_issue else '미연결'} · {current_result_status}")
     if risk_issue:
         st.warning(f"위험도 색상은 연결하지 않았습니다: {risk_issue}")
-    selected_reference = st.selectbox("상세 정보 부품", sorted(location_by_ref), key=f"vision_detail_{board_key}_{csv_hash[:8]}_{side}")
+    ordered_refs = sorted(location_by_ref)
+    selected_index = ordered_refs.index(selected_component) if selected_component in ordered_refs else 0
+    selected_reference = st.selectbox("상세 정보 부품", ordered_refs, index=selected_index,
+                                      key=f"vision_detail_{board_key}_{csv_hash[:8]}_{side}_{selected_component or 'none'}")
     show_risk = st.checkbox("현재 분석의 위험도 표시", value=bool(current_risks), disabled=not bool(current_risks), key=f"vision_show_risk_{board_key}_{csv_hash[:8]}_{side}")
     overlay, overlay_meta = render_risk_overlay(rectified_image, locations, risk_assessment if current_risks else None,
                                                 expected_fault=failed_component, expected_fault_type=fault_type,
-                                                show_risk=show_risk, selected_reference=selected_reference)
+                                                show_risk=show_risk, selected_reference=selected_reference,
+                                                inspection_priority_by_reference=inspection_by_ref)
     if overlay_meta["without_risk_result"] and show_risk:
         st.caption("위치만 있고 현재 위험 보고서에 없는 Reference: " +
                    ", ".join(item["reference"] for item in overlay_meta["without_risk_result"]))
@@ -304,6 +317,8 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
             rectified_image, ai_state["detections"], confirmed_references=ai_reference_confirmations,
             risk_assessment=risk_assessment if current_risks else None,
             expected_fault=failed_component, expected_fault_type=fault_type, show_risk=show_risk,
+            inspection_priority_by_reference=inspection_by_ref,
+            selected_reference=selected_reference,
         )
         st.image(detector_overlay, caption="AI 검출 박스 · Reference를 개별 확인한 경우에만 현재 시나리오 위험 색상 표시", use_container_width=True)
         st.caption(f"AI 검출 {len(ai_state['detections'])}개 · 확인 Reference {detector_meta['confirmed_reference_count']}개 · 위험 결과 연결 {detector_meta['risk_mapped_count']}개 · {detector_meta['risk_issue'] or '현재 시나리오 위험 근거'}")

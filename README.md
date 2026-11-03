@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–11 complete; Phase 12 AI vision implementation and public-dataset evaluation complete.** Local ONNX object detection and PP-OCR reference candidates are optional. The detector was evaluated on a public dataset validation split, but that is not an independent CircuitCare board validation. No matching real-board photo/design data is available, so design-reference matching and physical risk overlay remain unverified. Risk levels, detector confidence, heuristic match scores, and Bayesian posterior weights do **not** determine actual damage or real-world failure probability.
+> **Status: Phases 01–13 implemented; local tests and Actions verification are in progress for the latest changes.** Optional local ONNX detection/OCR and a Component–Net influence map are available. The PCB detector has public validation-split metrics, but design-reference matching on a CircuitCare board is unverified. Risk levels, model scores, heuristic matches, and Bayesian posterior weights do **not** establish actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -29,6 +29,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 10 | Stabilization, poster, reproducible demo | Complete; evidence and limits recorded |
 | 11 | PCB photo input, manual registration, evidence-based risk overlay | Complete; synthetic fixture and KiCad CSV format verified, real board not verified |
 | 12 | Local PCB component detection, silkscreen OCR, design-aware matching | Complete; public validation split evaluated, matching CircuitCare board unavailable |
+| 13 | Interactive influence map and Bayesian What-if dashboard | Implemented; U1 virtual interaction and stress-data separation verified locally |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -61,6 +62,8 @@ streamlit run src/circuitcare/ui.py
 The **PCB 사진 인식** tab can run optional local detector/OCR candidates and, separately, align a photo to KiCad Component Position CSV using a manually confirmed homography. Risk is attached to a detection only after the user confirms the matching KiCad reference and board identity. See the [PCB Vision guide](docs/PCB_VISION_GUIDE.md). Model inference was evaluated on 13 images / 196 objects from a public validation split (mAP@0.5 0.509); this is not a board-independent or CircuitCare design-matching validation. No matching real-board photo/design data is available. The Phase 11 CI hotfix passed on Python 3.11 in [GitHub Actions](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41570036079) (29 tests).
 
 Optional AI setup: `python -m pip install -e ".[ui,vision,vision-ai,vision-ocr]"`, then `python scripts/prepare_pcb_detector.py`. The model exporter is installed separately by the user and is not part of the runtime package. See [setup and artifact provenance](docs/PCB_AI_DETECTION.md) and [evaluation limits](docs/PCB_AI_EVALUATION.md).
+
+The **분석 개요** tab provides a Component–Net fault influence candidate map with separate connectivity, electrical-stress, and conditional inspection-priority views. U1 What-if controls recalculate Bayesian outputs from a `simulated_demo` virtual measurement; they do not change actual measurement records or rerun SPICE. See the [fault map guide](docs/FAULT_MAP_GUIDE.md), [What-if guide](docs/WHAT_IF_DIAGNOSIS.md), and [Phase 13 verification record](docs/PHASE13_EVALUATION.md).
 
 The dashboard has circuit/fault, SPICE, rating risk, Bayesian diagnosis, local LLM, and optional PCB photo tabs. It opens the saved 5 V→8 V regulator demo by default; the divider and RC charging examples can also be run with ngspice. Simulation status distinguishes `CACHED`, `RUNNING`, `SUCCESS`, `FAILED`, and `NOT_RUN`; failed reruns do not keep a previous live result active. User measurements and simulated demo measurements are distinguished. The saved U1 3/6/8 V Bayesian set is shown only in its matching regulator demo context; it is identified as stored scenario evidence, separate from the selected live run. Ollama is called only after an explicit question. Without Ollama, deterministic advice remains available.
 
@@ -159,14 +162,14 @@ Use `--no-llm` to produce deterministic isolation, inspection, replacement, and 
 
 ## Current implementation and next phase
 
-Phases 01–10 provide the electrical-analysis workflow; Phase 11 adds manual PCB photo alignment, and Phase 12 adds optional local detector/OCR review. Electrical evaluation is in [the final evaluation record](docs/FINAL_EVALUATION.md), with the [Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. PCB model evidence and limits are in [the Phase 12 evaluation](docs/PCB_AI_EVALUATION.md). Evaluation and timing values describe the recorded local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–10 provide the electrical-analysis workflow; Phase 11 adds manual PCB photo alignment, Phase 12 adds optional local detector/OCR review, and Phase 13 adds interactive visualization and an isolated What-if preview. Electrical evaluation is in [the final evaluation record](docs/FINAL_EVALUATION.md), with the [Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. PCB model evidence and limits are in [the Phase 12 evaluation](docs/PCB_AI_EVALUATION.md). Evaluation and timing values describe the recorded local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 The figures in [the poster content](docs/POSTER_CONTENT.md) are generated from committed JSON/CSV evidence by `python scripts/make_poster_figures.py`. Evaluation is limited to two independent small circuit topologies and a separate regulator Bayesian demo. There are no independent damaged-part labels, so damage-detection accuracy, Top-k damage coverage, and avoidable inspections are not claimed. The RSS reported by the evaluation excludes ngspice and Ollama child processes.
 
 ## Scope and caution
 
 - The first supported input is a **KiCad XML netlist** (e.g. exported using KiCad's schematic netlist export).
-- Photos, automatic PCB localization, external cloud APIs, and automated energization of damaged boards are **out of scope** for the competition MVP.
+- Photo-derived electrical connectivity, external cloud APIs, and automated energization of damaged boards are **out of scope** for the competition MVP. Optional detector boxes remain visual candidates.
 - Distinguish **known failed**, **potentially affected**, **measured abnormal**, and **confirmed damaged** components.
 - Do not report calibrated failure percentages without real failure-rate/validation data.
 - Tests and simulations are not substitutes for safety checks, isolation, and current-limited professional measurement.
@@ -179,6 +182,9 @@ tests/                 offline parser/graph tests and KiCad XML fixture
 docs/ROADMAP.md        delivery plan and phase status
 docs/ARCHITECTURE.md   model assumptions, data contracts, evaluation
 docs/PCB_VISION_GUIDE.md manual PCB photo registration, AI review, and overlay guide
+docs/FAULT_MAP_GUIDE.md    interactive influence map and evidence guide
+docs/WHAT_IF_DIAGNOSIS.md  isolated virtual measurement workflow
+docs/PHASE13_EVALUATION.md hotfix, interaction, and regression record
 docs/POSTER_CONTENT.md Korean poster text and data figure
 docs/DEMO_SCRIPT.md    five-minute presentation and Q&A
 docs/RELEASE_CHECKLIST.md offline preflight and fallback procedures

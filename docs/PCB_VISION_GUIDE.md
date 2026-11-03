@@ -90,3 +90,5 @@ streamlit run src/circuitcare/ui.py
 6. 위험 색을 탐지 상자에 연결하려면 앞선 보드/회로 동일성 확인과 해당 검출의 Reference 확인 모두가 필요합니다. 그리고 기존 성공한 위험 분석과 고장 시나리오가 일치해야 합니다. 그래도 이는 계산상 스트레스 표시이지 사진이 손상을 판정한 결과가 아닙니다.
 
 공개 데이터셋 평가 결과와 실행 시간은 [PCB AI 평가 기록](PCB_AI_EVALUATION.md)에 있습니다. 사용 가능한 데이터에는 CircuitCare의 PCB 사진과 같은 설계의 `.kicad_pcb`, Position CSV, XML 넷리스트가 없으므로 실제 Reference 매칭과 실물 위험 오버레이는 **NOT VERIFIED** 상태입니다. 현재 평가 split에서의 부품 탐지 성능을 독립 보드 일반화로 간주하지 않습니다.
+
+Phase 13 What-if inspection ranking may appear as a separate `inspect #rank` label on an already user-confirmed KiCad/AI Reference match. It does not change the existing SPICE-based electrical risk color. See [the What-if guide](WHAT_IF_DIAGNOSIS.md).
