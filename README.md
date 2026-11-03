@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–16 implemented; Phase 17 benchmark validation in progress.** Phase 16 adds local repair case history and guarded prior adaptation; there are no real repair cases and no active learned prior. Phase 17 adds answer-separated datasets, hierarchical scoring, baseline runners, cluster statistics, runtime capture, and a read-only benchmark dashboard. Its independent synthetic holdout is not yet evaluated. Synthetic scores do not establish real repair accuracy. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: Phases 01–16 implemented; Phase 17 independent synthetic evaluation completed.** The Phase 17 holdout contains 10 SPICE-generated cases across five new topology groups. Rules, local LLM, Hybrid, and SPICE-ranking baselines were measured; the full report and immutable run data are in [Phase 17 evaluation](docs/PHASE17_EVALUATION.md) and `evaluation/phase17/results/`. This is synthetic evidence only: real repair accuracy, physical repair outcomes, and learned-prior benefit remain unevaluated. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.

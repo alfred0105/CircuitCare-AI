@@ -19,13 +19,13 @@ The existing fault catalog parameter grid constrains executable proposals. It is
 
 ## Metrics
 
-Component, fault mode, and exact hypothesis use distinct matching levels. Exact hypotheses require exact normalized parameter equality; numeric relative error is also reported separately with denominator `max(abs(target), tolerance, 1e-15)`. Unsupported ground truth is excluded from supported-only accuracy and counted separately. Precision, recall, F1, Top-1/Top-3, mean reciprocal rank, candidate counts, validation rates, simulation success/failure, coverage, wall-clock runtime, and simulation counts are stored where available. A missing metric is `NOT_EVALUATED`, not zero.
+Component, fault mode, and exact hypothesis use distinct matching levels. Exact hypotheses require exact normalized parameter equality; numeric relative error is also reported separately with denominator `max(abs(target), tolerance, 1e-15)`. The current relative-error summary selects the first proposal with matching component and fault mode; it is not a best-candidate error and may be nonzero even when another proposal is an exact match. Use the exact-hypothesis precision/recall for exact parameter matching. Unsupported ground truth is excluded from supported-only accuracy and counted separately. Precision, recall, F1, Top-1/Top-3, mean reciprocal rank, candidate counts, validation rates, simulation success/failure, coverage, wall-clock runtime, and simulation counts are stored where available. A missing metric is `NOT_EVALUATED`, not zero.
 
 SPICE end-to-end ranking counts a candidate-generation miss as a miss. Conditional ranking is separately restricted to cases where the true hypothesis was generated and simulated successfully. One-node and multiple-node strata are reported separately. The existing holdout contains only the configured node counts; absent strata remain unevaluated.
 
 ## Statistics and repeats
 
-LLM repeats measure output stability, not additional independent fault cases. Mean, median, standard deviation, minimum, and maximum are recorded for runtime and repeat-level metrics. Cluster bootstrap resamples topology groups, not individual cases. At least two groups are required; with few groups its interval is labeled exploratory and is not a population guarantee. Paired method comparisons use the same cases. No p-value or statistically significant improvement claim is made from the small synthetic dataset.
+LLM repeats measure output stability, not additional independent fault cases. Mean, median, standard deviation, minimum, and maximum are recorded for runtime and repeat-level metrics. Failed LLM calls may have missing latency when the adapter raises before returning timing metadata. Cluster bootstrap resamples topology groups, not individual cases. At least two groups are required; with few groups its interval is labeled exploratory and is not a population guarantee. Paired method comparisons use the same cases. No p-value or statistically significant improvement claim is made from the small synthetic dataset.
 
 ## Execution and reproducibility
 
