@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -147,3 +150,17 @@ def test_benchmark_dashboard_empty_state_does_not_run_benchmark(tmp_path):
     app = AppTest.from_file(str(script), default_timeout=20).run()
     assert not app.exception
     assert any("평가 결과가 없습니다" in item.value for item in app.info)
+
+
+def test_phase17_development_runner_scores_only_after_proposal_phase(tmp_path):
+    repository_root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "phase17-results"
+    completed = subprocess.run([sys.executable, "scripts/run_phase17_benchmark.py",
+        "--dataset", "evaluation/phase17/development", "--results", str(output)],
+        cwd=repository_root, capture_output=True, text=True, timeout=30)
+    assert completed.returncode == 0, completed.stderr
+    result_file = next(output.glob("*.json"))
+    result = json.loads(result_file.read_text(encoding="utf-8"))
+    assert result["status"] == "MEASURED_SYNTHETIC_DEVELOPMENT_REUSED"
+    assert result["input_audit"]["private_ground_truth_loaded_after_proposals_and_simulation"] is True
+    assert result["methods"]["LLM Only"]["status"] == "NOT_EVALUATED"

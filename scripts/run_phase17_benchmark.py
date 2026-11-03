@@ -68,8 +68,8 @@ def main() -> int:
     raw_simulation_runs = {name: [] for name in ("Rules + SPICE", "Hybrid + SPICE")}
 
     for repetition in range(model_repetitions):
-        method_cases = {name: [] for name in method_runs}
-        spice_cases = {name: [] for name in simulation_runs}
+        method_cases = {name: [] for name in raw_method_runs}
+        spice_cases = {name: [] for name in raw_simulation_runs}
         for public in cases:
             payload = public["diagnostic_input"]
             audit_public_payload(payload)
@@ -253,7 +253,11 @@ def main() -> int:
             "Only one observed node per case is currently evaluated.",
             "LLM prompt candidates are restricted to the existing preflighted catalog and parameter grid."]}
     target = save_result(ROOT / args.results, record)
-    print(json.dumps({"result": str(target.relative_to(ROOT)), "run_id": target.stem,
+    try:
+        result_label = str(target.relative_to(ROOT))
+    except ValueError:
+        result_label = str(target)
+    print(json.dumps({"result": result_label, "run_id": target.stem,
         "case_count": len(cases), "methods": {key: value["status"] for key, value in methods.items()},
         "holdout": record["holdout_status"]}, indent=2))
     return 0
