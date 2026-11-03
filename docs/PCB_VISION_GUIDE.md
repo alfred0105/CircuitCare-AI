@@ -64,6 +64,10 @@ PNG와 JSON을 내려받을 수 있으며, `Vision 결과를 로컬 data/vision_
 
 ## 확인 상태와 제한
 
-이 저장소에는 실물 PCB 사진이나 그에 대응하는 KiCad Position CSV/넷리스트가 없습니다. 자동 외곽 검출, 좌표 변환, 위험 매칭은 합성 fixture에서만 검증하며 **Synthetic Fixture Verified**입니다. **Real PCB Verified**로 표시하지 않습니다. 실제 사진이 없으므로 물리적 부품 중심 위치 정확도는 아직 확인되지 않았습니다.
+저장소와 이번 작업에서 확인한 프로젝트 작업공간에는 동일한 실물 보드에 대응하는 PCB 사진, `.kicad_pcb`, KiCad Position CSV, XML 넷리스트 자료가 없습니다. 따라서 실제 정합은 **NOT VERIFIED — MISSING REAL PCB DATA**이며, 독립 검증 오차를 계산하거나 해당 회로의 위험도를 사진에 검증 오버레이할 수 없습니다. 자동 외곽 검출, 좌표 변환, 사용자 확인 절차, 위험 매칭 로직은 합성 fixture에서 검증한 **Synthetic Fixture Verified** 상태입니다. KiCad 10.0.6 앱 내장 Raspberry Pi HAT 템플릿에서 내보낸 `Ref,Val,Package,PosX,PosY,Rot,Side` 형식의 한 부품 CSV를 파싱했지만, 이 자료는 CircuitCare 보드와 일치하지 않으므로 CSV 형식 확인에만 사용했습니다. **Real PCB Registered** 또는 **Real PCB Independently Validated**로 표시하지 않습니다.
+
+GitHub Actions run [41569204216](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41569204216)의 Python 3.11 테스트 수집에서 `numpy` 누락이 확인됐습니다. editable package 설치는 성공했지만 workflow가 `.[dev]`만 설치해 `tests/test_vision.py`의 선택 Vision 의존성이 빠졌습니다. CI는 `.[dev,vision]`을 설치하도록 수정했습니다. 해당 실패에서는 코드 테스트가 실행되기 전에 수집이 중단됐으며, 이 문서의 실물 정합 상태와는 별개입니다.
+
+핫픽스 후 로컬 Python 3.12에서 `.[dev,ui,vision]` 설치, pytest 29개 통과, 기본 U1 CLI 실행, Streamlit `AppTest`의 6개 탭 로드를 확인했습니다. Python 3.11 원격 Actions 결과는 수정 커밋 push 후 확인합니다.
 
 이번 단계는 딥러닝 부품 분류, 실크스크린 OCR, 사진만으로 하는 Reference 판독, 배선 역설계, 제조사 정격 탐색, 손상 판정을 하지 않습니다. Phase 12 이후에는 실물 사진 데이터 확보, 수동 기준점 편의 개선, 독립 검증점으로 정합 오차 평가, 필요 시 신뢰 가능한 부품 외곽 검출을 검토합니다.

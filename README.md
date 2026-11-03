@@ -36,10 +36,12 @@ Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 Requires Python 3.11+ (Python 3.11 is the CI baseline; Python 3.12 also works).
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,vision]"
 circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1
 python -m pytest -q
 ```
+
+CI는 Python 3.11에서 이 테스트 의존성 조합을 설치합니다. Vision은 실행 시 선택 기능이지만, 현재 전체 테스트 수집에는 NumPy/OpenCV/Pillow가 필요합니다.
 
 For the integrated dashboard, install the optional UI dependency and start Streamlit:
 
