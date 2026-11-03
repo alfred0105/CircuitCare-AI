@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–15 implemented.** Phase 15 adds local fault hypotheses, deterministic validation, and explicit ngspice verification. Local Gemma inference and synthetic SPICE cases were exercised. The four-document datasheet corpus was used to improve extraction and is now a development pilot, not an independent post-fix holdout. Broad accuracy and physical MPN-to-Reference matching remain unverified. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: Phases 01–15.1 implemented.** Phase 15.1 removes answer leakage from fault benchmark prompts and corrects datasheet evaluation scope. The previous answer-leaked fault metrics and incomplete-label datasheet precision/hallucination interpretations are preserved but invalid for performance claims. Corrected metrics remain development pilots; no independent holdout exists. Broad accuracy and physical MPN-to-Reference matching remain unverified. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.

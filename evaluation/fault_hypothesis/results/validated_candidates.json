@@ -1,7 +1,8 @@
 {
+  "evaluation_status": "LEAKAGE_FREE_DEVELOPMENT_RESULT",
   "run_metadata": {
-    "git_commit_sha": "8cc38925c73158573798b1aca35c3619e94ecd03",
-    "timestamp_utc": "2026-11-03T05:29:44.428226+00:00",
+    "git_commit_sha": "0abfd79a04b65ceeb337e0e3d944e65bed0e8c0a",
+    "timestamp_utc": "2026-11-03T06:01:08.635556+00:00",
     "python": "3.12.14",
     "os": "macOS-27.0.1-arm64-arm-64bit",
     "llm": {
@@ -19,72 +20,119 @@
       }
     },
     "model_requested": "gemma4:12b",
-    "prompt_version": "fault-hypothesis-v1",
+    "prompt_version": "fault-hypothesis-v2",
+    "seed": null,
+    "generation_options": null,
     "simulator": "******\n** ngspice-47 : Circuit level simulation program\n** Compiled with KLU Direct Linear Solver\n** The U. C. Berkeley CAD Group\n** Copyright 1985-1994, Regents of the University of California.\n** Copyright 2001-2026, The ngspice team.\n** Please get your ngspice manual from https://ngspice.sourceforge.io/docs.html\n** Please file your bug-reports at http://ngspice.sourceforge.net/bugrep.html\n******\n",
     "simulate": true,
-    "llm_enabled": true
+    "llm_enabled": true,
+    "repeat_count": 3
   },
   "method": "C_rules_llm_validator",
   "metrics": {
-    "status": "MEASURED_SYNTHETIC",
-    "case_count": 3,
-    "ground_truth_count": 3,
-    "candidate_count": 43,
-    "correct_candidate_count": 3,
-    "candidate_precision": 0.06976744186046512,
-    "candidate_recall": 1.0,
-    "candidate_f1": 0.13043478260869565,
-    "executable_hypothesis_rate": 1.0,
-    "unsupported_proposal_rate": 0.0,
-    "hallucinated_reference_rate": 0.0,
-    "top_k_accuracy": {
-      "1": 1.0,
-      "3": 1.0
+    "proposal_quality": {
+      "status": "MEASURED_SYNTHETIC",
+      "case_count": 3,
+      "ground_truth_count": 3,
+      "candidate_count": 45,
+      "correct_candidate_count": 3,
+      "candidate_precision": 0.06666666666666667,
+      "candidate_recall": 1.0,
+      "candidate_f1": 0.125,
+      "valid_proposal_rate": 0.9555555555555556,
+      "unsupported_proposal_rate": 0.044444444444444446,
+      "hallucinated_reference_rate": 0.0,
+      "per_case": [
+        {
+          "case_id": "REGULATOR_U1_RISE_8V",
+          "ground_truth_count": 1,
+          "candidate_count": 20,
+          "correct_candidate_count": 1
+        },
+        {
+          "case_id": "DIVIDER_R1_DRIFT_10K",
+          "ground_truth_count": 1,
+          "candidate_count": 13,
+          "correct_candidate_count": 1
+        },
+        {
+          "case_id": "RC_RCHARGE_DRIFT_100K",
+          "ground_truth_count": 1,
+          "candidate_count": 12,
+          "correct_candidate_count": 1
+        }
+      ]
     },
-    "precision_at_k": {
-      "1": 1.0,
-      "3": 0.3333333333333333
-    },
-    "top_k_evaluated_cases": {
-      "1": 3,
-      "3": 3
-    },
-    "simulation_attempt_count": 43,
-    "simulation_success_count": 43,
-    "simulation_success_rate": 1.0,
-    "mean_simulation_runtime_seconds": 0.021187511627906976,
-    "per_case": [
-      {
-        "case_id": "REGULATOR_U1_RISE_8V",
-        "truth_count": 1,
-        "candidate_count": 19,
-        "correct_candidate_count": 1,
-        "ranked_candidate_count": 19,
-        "correct_rank": 1
+    "diagnostic_ranking": {
+      "status": "MEASURED_SYNTHETIC",
+      "case_count": 3,
+      "ranked_case_count": 3,
+      "ranking_coverage": 1.0,
+      "top_k_accuracy": {
+        "1": 1.0,
+        "3": 1.0
       },
-      {
-        "case_id": "DIVIDER_R1_DRIFT_10K",
-        "truth_count": 1,
-        "candidate_count": 12,
-        "correct_candidate_count": 1,
-        "ranked_candidate_count": 12,
-        "correct_rank": 1
+      "precision_at_k": {
+        "1": 1.0,
+        "3": 0.3333333333333333
       },
-      {
-        "case_id": "RC_RCHARGE_DRIFT_100K",
-        "truth_count": 1,
-        "candidate_count": 12,
-        "correct_candidate_count": 1,
-        "ranked_candidate_count": 12,
-        "correct_rank": 1
-      }
-    ],
+      "top_k_evaluated_cases": {
+        "1": 3,
+        "3": 3
+      },
+      "per_case": [
+        {
+          "case_id": "REGULATOR_U1_RISE_8V",
+          "candidate_count": 20,
+          "ranked_candidate_count": 19,
+          "has_ranked_result": true,
+          "top_k_hits": {
+            "1": 1,
+            "3": 1
+          },
+          "correct_rank": 1
+        },
+        {
+          "case_id": "DIVIDER_R1_DRIFT_10K",
+          "candidate_count": 13,
+          "ranked_candidate_count": 12,
+          "has_ranked_result": true,
+          "top_k_hits": {
+            "1": 1,
+            "3": 1
+          },
+          "correct_rank": 1
+        },
+        {
+          "case_id": "RC_RCHARGE_DRIFT_100K",
+          "candidate_count": 12,
+          "ranked_candidate_count": 12,
+          "has_ranked_result": true,
+          "top_k_hits": {
+            "1": 1,
+            "3": 1
+          },
+          "correct_rank": 1
+        }
+      ]
+    },
+    "simulation": {
+      "candidate_count": 45,
+      "eligible_count": 43,
+      "unsupported_candidate_count": 2,
+      "attempted_count": 43,
+      "success_count": 43,
+      "failed_count": 0,
+      "eligible_not_run_count": 0,
+      "success_rate_of_attempted": 1.0,
+      "status": "MEASURED"
+    },
     "inference_latency_seconds": [
-      5.6962,
-      8.0968,
-      13.9776
+      4.3189,
+      4.1164,
+      3.9361
     ],
-    "mean_inference_latency_seconds": 9.256866666666667
+    "mean_inference_latency_seconds": 4.1238
   },
   "cases": {
     "REGULATOR_U1_RISE_8V": [
@@ -142,7 +190,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.017369,
+        "simulation_seconds": 0.018832,
         "observation_status": "CONSISTENT_WITH_OBSERVATIONS",
         "evidence_rank": 1,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -201,7 +249,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018441,
+        "simulation_seconds": 0.019379,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 2,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -259,7 +307,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019964,
+        "simulation_seconds": 0.026142,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 3,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -315,7 +363,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020335,
+        "simulation_seconds": 0.035013,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 4,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -373,7 +421,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020264,
+        "simulation_seconds": 0.01986,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 5,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -429,7 +477,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019211,
+        "simulation_seconds": 0.019074,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 6,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -487,7 +535,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019901,
+        "simulation_seconds": 0.02157,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 7,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -543,7 +591,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.041504,
+        "simulation_seconds": 0.036217,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 8,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -601,7 +649,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.02045,
+        "simulation_seconds": 0.021339,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 9,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -659,7 +707,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020245,
+        "simulation_seconds": 0.019947,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 10,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -715,7 +763,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018532,
+        "simulation_seconds": 0.033483,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 11,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -771,7 +819,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019895,
+        "simulation_seconds": 0.0195,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 12,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -829,7 +877,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019889,
+        "simulation_seconds": 0.041021,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 13,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -885,7 +933,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019911,
+        "simulation_seconds": 0.032523,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 14,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -943,7 +991,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020174,
+        "simulation_seconds": 0.020375,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 15,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1001,7 +1049,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019821,
+        "simulation_seconds": 0.020532,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 16,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1060,7 +1108,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019325,
+        "simulation_seconds": 0.018511,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 17,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1119,7 +1167,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018673,
+        "simulation_seconds": 0.018376,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 18,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1177,9 +1225,32 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018768,
+        "simulation_seconds": 0.02113,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 19,
+        "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
+      },
+      {
+        "component_ref": "U1",
+        "fault_type": "regulator_output_drop",
+        "parameters": {
+          "expected_voltage": 12.0,
+          "measured_voltage": 8.0
+        },
+        "reason": "The measured VOUT of 8.0V is significantly lower than the expected 12V input, suggesting a voltage drop in the regulator output.",
+        "supporting_observations": [
+          "VOUT = 8.0V"
+        ],
+        "generation_method": "local_llm",
+        "status": "proposed",
+        "validation_status": "INVALID_PARAMETERS",
+        "validation_reasons": [
+          "Parameters do not match the allowlisted schema for this fault type."
+        ],
+        "simulation_supported": false,
+        "simulation_status": "SIMULATION_NOT_RUN",
+        "observation_status": "NOT_SIMULATED",
+        "evidence_rank": null,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
       }
     ],
@@ -1235,7 +1306,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019912,
+        "simulation_seconds": 0.019708,
         "observation_status": "CONSISTENT_WITH_OBSERVATIONS",
         "evidence_rank": 1,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1291,7 +1362,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020272,
+        "simulation_seconds": 0.016515,
         "observation_status": "CONSISTENT_WITH_OBSERVATIONS",
         "evidence_rank": 2,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1345,7 +1416,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020253,
+        "simulation_seconds": 0.016344,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 3,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1399,7 +1470,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.021436,
+        "simulation_seconds": 0.017415,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 4,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1455,7 +1526,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020358,
+        "simulation_seconds": 0.017208,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 5,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1511,7 +1582,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.022211,
+        "simulation_seconds": 0.044326,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 6,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1567,7 +1638,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020336,
+        "simulation_seconds": 0.023097,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 7,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1623,7 +1694,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020451,
+        "simulation_seconds": 0.017076,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 8,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1679,7 +1750,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019342,
+        "simulation_seconds": 0.018278,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 9,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1735,7 +1806,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.03221,
+        "simulation_seconds": 0.016713,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 10,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1789,7 +1860,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.023464,
+        "simulation_seconds": 0.016377,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 11,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1843,9 +1914,31 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020515,
+        "simulation_seconds": 0.017225,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 12,
+        "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
+      },
+      {
+        "component_ref": "R1",
+        "fault_type": "resistance_drift",
+        "parameters": {
+          "value": 1000
+        },
+        "reason": "The measured VOUT of 0.45V is significantly lower than the expected 2.5V for a 1k/1k voltage divider, suggesting a change in R1 resistance.",
+        "supporting_observations": [
+          "VOUT = 0.454545455 V"
+        ],
+        "generation_method": "local_llm",
+        "status": "proposed",
+        "validation_status": "INVALID_PARAMETERS",
+        "validation_reasons": [
+          "Parameters do not match the allowlisted schema for this fault type."
+        ],
+        "simulation_supported": false,
+        "simulation_status": "SIMULATION_NOT_RUN",
+        "observation_status": "NOT_SIMULATED",
+        "evidence_rank": null,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
       }
     ],
@@ -1901,7 +1994,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018745,
+        "simulation_seconds": 0.018492,
         "observation_status": "CONSISTENT_WITH_OBSERVATIONS",
         "evidence_rank": 1,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -1955,7 +2048,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018098,
+        "simulation_seconds": 0.018077,
         "observation_status": "CONSISTENT_WITH_OBSERVATIONS",
         "evidence_rank": 2,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2009,7 +2102,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020574,
+        "simulation_seconds": 0.018076,
         "observation_status": "CONSISTENT_WITH_OBSERVATIONS",
         "evidence_rank": 3,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2065,7 +2158,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.018641,
+        "simulation_seconds": 0.018372,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 4,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2121,7 +2214,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.01898,
+        "simulation_seconds": 0.017843,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 5,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2177,7 +2270,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.02004,
+        "simulation_seconds": 0.01942,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 6,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2233,7 +2326,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.044115,
+        "simulation_seconds": 0.040562,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 7,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2289,7 +2382,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.020834,
+        "simulation_seconds": 0.018709,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 8,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2343,7 +2436,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019702,
+        "simulation_seconds": 0.018115,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 9,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2399,7 +2492,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019146,
+        "simulation_seconds": 0.017568,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 10,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2455,7 +2548,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019719,
+        "simulation_seconds": 0.018526,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 11,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"
@@ -2509,7 +2602,7 @@
           "model_mismatch_threshold_sigma": 4.0,
           "interpretation": "Fit to the selected model and observations only; this does not confirm a physical failure."
         },
-        "simulation_seconds": 0.019037,
+        "simulation_seconds": 0.017895,
         "observation_status": "MODEL_MISMATCH",
         "evidence_rank": 12,
         "ranking_basis": "minimum maximum absolute standardized residual; no failure-probability claim"

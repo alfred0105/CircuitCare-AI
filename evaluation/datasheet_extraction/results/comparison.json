@@ -373,5 +373,7 @@
     "PDFs are not stored in Git; local runs require exact SHA-matching files.",
     "The Phase 14 YAGEO RC0805FR-071KL development smoke document is excluded.",
     "No result generalizes to unseen manufacturers, merged tables, or scan-only documents."
-  ]
+  ],
+  "evaluation_status": "INVALID_EVALUATION",
+  "integrity_note": "Pre-hotfix full-candidate precision/hallucination interpretation is invalid because labels were not exhaustive; original numeric results are preserved for audit only."
 }
