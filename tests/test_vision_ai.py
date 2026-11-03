@@ -12,6 +12,7 @@ from circuitcare.vision.model_artifacts import CHECKPOINT_SHA256, CHECKPOINT_SIZ
 from circuitcare.vision.ocr_backend import extract_reference_candidates
 from circuitcare.vision.overlay import render_detection_risk_overlay
 from circuitcare.vision.reference_matcher import suggest_reference_matches
+from circuitcare.vision.vision_ai_ui import default_detector_model_path
 
 
 def test_detector_model_file_missing_is_explicit(tmp_path) -> None:
@@ -21,6 +22,14 @@ def test_detector_model_file_missing_is_explicit(tmp_path) -> None:
     assert CHECKPOINT_SIZE_BYTES > 80_000_000
     with pytest.raises(DetectorUnavailable, match="모델이 없습니다"):
         run_detector(Image.new("RGB", (10, 10)), tmp_path / "missing.onnx")
+
+
+def test_detector_ui_default_matches_preparation_script_output() -> None:
+    path = default_detector_model_path()
+    repository_root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    assert path == repository_root / "models" / "pcb_component_detector.onnx"
+    assert path.is_file()
+    assert model_file_info(path)["status"] == "READY"
 
 
 def test_letterbox_and_yolov8_decode_restore_source_coordinates() -> None:

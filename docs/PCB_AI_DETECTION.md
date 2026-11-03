@@ -5,7 +5,7 @@ This optional feature proposes PCB component boxes and silkscreen text locally. 
 ## Install and prepare
 
 ```bash
-python -m pip install -e "[ui,vision,vision-ai,vision-ocr]"
+python -m pip install -e ".[ui,vision,vision-ai,vision-ocr]"
 python scripts/prepare_pcb_detector.py
 streamlit run src/circuitcare/ui.py
 ```

@@ -11,15 +11,19 @@ from circuitcare.vision.component_detector import (
 )
 from circuitcare.vision.detection_postprocess import PCB_MODEL_CLASSES
 from circuitcare.vision.detector_backend import DetectorUnavailable, model_file_info
-from circuitcare.vision.model_artifacts import default_model_dir
 from circuitcare.vision.ocr_backend import OCRUnavailable, run_local_ocr
 from circuitcare.vision.reference_matcher import suggest_reference_matches
+
+
+def default_detector_model_path() -> Path:
+    """Return the repository-root model path used by the preparation script."""
+    return Path(__file__).resolve().parents[3] / "models" / "pcb_component_detector.onnx"
 
 
 def render_detection_section(st: Any, image: Any, *, image_sha256: str) -> dict[str, Any]:
     """Render image-scoped inference and return saved predictions for later matching."""
     st.markdown("#### AI 부품 탐지 및 실크스크린 OCR")
-    model_default = Path(__file__).resolve().parents[2] / "models" / "pcb_component_detector.onnx"
+    model_default = default_detector_model_path()
     model_path = st.text_input("로컬 ONNX 부품 탐지 모델 경로", value=str(model_default), key=f"vision_ai_model_path_{image_sha256[:12]}")
     model_info = model_file_info(model_path)
     if model_info["status"] == "MODEL_UNAVAILABLE":

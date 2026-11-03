@@ -75,7 +75,7 @@ GitHub Actions run [41569204216](https://github.com/alfred0105/CircuitCare-AI/ac
 아래 추가 설치와 모델 준비를 마치면 보정된 PCB 이미지에서 10개 범주의 부품 후보를 로컬 ONNX 모델로 검출하고, RapidOCR로 실크스크린 텍스트 후보를 읽을 수 있습니다.
 
 ```bash
-python -m pip install -e "[ui,vision,vision-ai,vision-ocr]"
+python -m pip install -e ".[ui,vision,vision-ai,vision-ocr]"
 python scripts/prepare_pcb_detector.py
 streamlit run src/circuitcare/ui.py
 ```
