@@ -21,6 +21,7 @@
 ## Local verification
 
 - `.venv/bin/python -m pytest -q`: **44 passed** locally (Phase 12 baseline 39 plus 1 detector path regression and 4 Phase 13 visualization/What-if tests). Tests cover stress/connection separation, mismatch, posterior-score changes, saved-SPICE immutability, selected indirect path highlighting, and PCB electrical-color/inspection-priority separation.
+- GitHub Actions run [41578966702](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41578966702) passed on Python 3.11 after a CI-discovered f-string compatibility fix.
 - Streamlit `AppTest`: overview tab, all existing tabs, VOUT slider 7.9→2.0 V, posterior change 8 V→3 V, mismatch warning state, reset, and preservation of the actual measurement list.
 - The local What-if diagnosis/Bayesian calculation measured about **0.0049 seconds** in this AppTest run, excluding Streamlit rerender and visualization.
 

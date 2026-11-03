@@ -62,10 +62,12 @@ Add an optional ONNX Runtime CPU detector backend, pinned third-party detector p
 
 **Complete when:** optional local model inference, OCR candidate extraction, correction/confirmation flow, guarded overlay, bounded evaluation, documentation, and CI are complete. Phase 13 may proceed for the next feature; real reference-match validation remains an independent data-dependent validation item.
 
-## Phase 13 — Interactive influence map and Bayesian What-if dashboard — Complete (local interaction verified)
+## Phase 13 — Interactive influence map and Bayesian What-if dashboard — Complete (local and CI verified)
 Add an evidence-separated Component–Net candidate map to a new overview tab. Reuse existing graph paths, scenario-matched SPICE/rating reports, Bayesian updates, expected-information-gain recommendations, and posterior-weighted inspection ranking. Provide connection, electrical stress, and inspection-priority views, component selection/path highlighting, details and JSON/DOT export. Add an isolated `simulated_demo` preview for the supported U1 hypothesis set; preserve real measurements and cached/live electrical stress, avoid automatic LLM calls, and gate PCB overlay priority labels behind existing confirmed Reference links.
 
 **Verified:** local Streamlit AppTest loaded all seven tabs and exercised VOUT 7.9→2.0 V: the top conditional hypothesis moved from `U1_OUTPUT_8V` to `U1_OUTPUT_3V`; 2.0 V showed model mismatch; reset restored 7.9 V and left actual measurements empty. The What-if calculation uses existing local Bayesian code without a simulator subprocess. The scenario's saved `component_stress.json` remained byte-identical across What-if calculations. At 7.9 V, C1's posterior-weighted inspection score changed 67.3267→98.93 while rank remained 1; at 2.0 V it changed to 33.35 and the configured rank order stayed the same. Existing electrical `EXCEEDED` PCB overlay color remains separate from the inspection-priority label. See [Phase 13 evaluation](PHASE13_EVALUATION.md), [map guide](FAULT_MAP_GUIDE.md), and [What-if guide](WHAT_IF_DIAGNOSIS.md).
+
+**CI:** Python 3.11 Actions run [41578966702](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41578966702) passed after fixing a graph-label f-string syntax incompatibility.
 
 **Limits:** map paths are connectivity candidates, not a schematic layout or directional stress propagation. Bayesian values are conditional on the configured demo hypotheses, not failure probabilities. No actual PCB/KiCad bundle was available, so physical photo registration and Reference-matching accuracy remain unverified.
 

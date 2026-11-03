@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–13 implemented; local tests and Actions verification are in progress for the latest changes.** Optional local ONNX detection/OCR and a Component–Net influence map are available. The PCB detector has public validation-split metrics, but design-reference matching on a CircuitCare board is unverified. Risk levels, model scores, heuristic matches, and Bayesian posterior weights do **not** establish actual damage or real-world failure probability.
+> **Status: Phases 01–13 implemented; 44 local tests pass and the latest GitHub Actions run passed.** Optional local ONNX detection/OCR and a Component–Net influence map are available. The PCB detector has public validation-split metrics, but design-reference matching on a CircuitCare board is unverified. Risk levels, model scores, heuristic matches, and Bayesian posterior weights do **not** establish actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
