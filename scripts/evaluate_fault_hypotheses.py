@@ -166,12 +166,14 @@ def main() -> int:
 def _method_metrics(cases, predictions):
     rows = [item for case in cases for item in predictions.get(case["case_id"], [])]
     attempted = [item for item in rows if item.get("simulation_status") in {"SIMULATION_SUCCESS", "SIMULATION_FAILED"}]
+    eligible = [item for item in rows if item.get("validation_status") == "VALIDATED_EXECUTABLE"]
     successes = sum(item.get("simulation_status") == "SIMULATION_SUCCESS" for item in attempted)
     return {"proposal_quality": score_fault_proposals(cases, predictions),
             "diagnostic_ranking": score_fault_rankings(cases, predictions),
-            "simulation": {"candidate_count": len(rows), "attempted_count": len(attempted),
+            "simulation": {"candidate_count": len(rows), "eligible_count": len(eligible),
+                "unsupported_candidate_count": len(rows) - len(eligible), "attempted_count": len(attempted),
                 "success_count": successes, "failed_count": len(attempted) - successes,
-                "not_run_count": len(rows) - len(attempted),
+                "eligible_not_run_count": len(eligible) - len(attempted),
                 "success_rate_of_attempted": successes / len(attempted) if attempted else None,
                 "status": "MEASURED" if attempted else "NOT_EVALUATED"}}
 
@@ -196,9 +198,11 @@ def _aggregate_methods(run_records, *, run_llm: bool):
         attempted = sum(row["attempted_count"] for row in sim_rows)
         successes = sum(row["success_count"] for row in sim_rows)
         result[name]["simulation"] = {"candidate_count": sum(row["candidate_count"] for row in sim_rows),
+            "eligible_count": sum(row["eligible_count"] for row in sim_rows),
+            "unsupported_candidate_count": sum(row["unsupported_candidate_count"] for row in sim_rows),
             "attempted_count": attempted, "success_count": successes,
             "failed_count": sum(row["failed_count"] for row in sim_rows),
-            "not_run_count": sum(row["not_run_count"] for row in sim_rows),
+            "eligible_not_run_count": sum(row["eligible_not_run_count"] for row in sim_rows),
             "success_rate_of_attempted": successes / attempted if attempted else None,
             "status": "MEASURED" if attempted else "NOT_EVALUATED"}
         if name == "A_rule_based" and run_llm and len(records) > 1:
