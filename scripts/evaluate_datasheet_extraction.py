@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import platform
+import shutil
 import subprocess
 import sys
 import time
@@ -69,12 +70,16 @@ def main() -> int:
             candidate["mpn"] = doc["mpn"]
             candidate["source_document_sha256"] = parsed["sha256"]
         # Apply the same page quote / value / unit validator to both methods.
-        rules_checked = [validate_candidate(dict(row), parsed["pages"], manufacturer=doc["manufacturer"], mpn=doc["mpn"]) for row in rules]
-        llm_checked = [validate_candidate(dict(row), parsed["pages"], manufacturer=doc["manufacturer"], mpn=doc["mpn"]) for row in llm_rows]
+        rules_checked = [{**validate_candidate(dict(row), parsed["pages"], manufacturer=doc["manufacturer"], mpn=doc["mpn"]),
+                          "document_id": document_id} for row in rules]
+        llm_checked = [{**validate_candidate(dict(row), parsed["pages"], manufacturer=doc["manufacturer"], mpn=doc["mpn"]),
+                        "document_id": document_id} for row in llm_rows]
         combined = _dedupe([*rules_checked, *llm_checked])
         truth = labels_by_doc.get(document_id, [])
-        rule_metrics = score_extractions(truth, rules_checked, latency_seconds=rule_latency)
-        combined_metrics = score_extractions(truth, combined, latency_seconds=rule_latency + (llm_latency or 0))
+        rule_metrics = score_extractions(truth, rules_checked, latency_seconds=rule_latency,
+            full_document_ground_truth_complete=manifest.get("ground_truth_complete") is True)
+        combined_metrics = score_extractions(truth, combined, latency_seconds=rule_latency + (llm_latency or 0),
+            full_document_ground_truth_complete=manifest.get("ground_truth_complete") is True)
         rule_all.extend({**row, "document_id": document_id} for row in rules_checked)
         combined_all.extend({**row, "document_id": document_id} for row in combined)
         documents.append({"document_id": document_id, "status": "EVALUATED",
@@ -88,9 +93,11 @@ def main() -> int:
     # Per-document metrics are the aggregate unit because a PDF can have many candidates.
     included_truth = [row for row in all_truth if any(doc.get("document_id") == row["document_id"] and doc.get("status") == "EVALUATED" for doc in documents)]
     result = {
-        "status": "MEASURED_PILOT" if included_truth else "NOT_EVALUATED",
+        "evaluation_status": "DEVELOPMENT_PILOT" if included_truth else "NOT_EVALUATED",
+        "status": "PARTIALLY_EVALUATED" if included_truth else "NOT_EVALUATED",
         "dataset_id": manifest.get("dataset_id"), "dataset_version": manifest.get("version"),
         "split": manifest.get("split"), "independent_holdout": manifest.get("independent_holdout", False),
+        "ground_truth_complete": manifest.get("ground_truth_complete", False),
         "run_metadata": {"git_commit_sha": _git_sha(), "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "python": platform.python_version(), "os": platform.platform(), "llm": model_metadata,
             "model_requested": args.model if args.run_llm else None, "prompt_version": "datasheet-rating-v1" if args.run_llm else None,
@@ -99,19 +106,36 @@ def main() -> int:
         "manufacturer_count": len({docs[item["document_id"]]["manufacturer"] for item in documents if item.get("status") == "EVALUATED"}),
         "component_families": {family: sum(1 for item in documents if item.get("status") == "EVALUATED" and docs[item["document_id"]]["component_family"] == family)
                                 for family in sorted({d["component_family"] for d in docs.values()})},
-        "ground_truth_rating_count": len(included_truth), "rule_only": score_extractions(included_truth, rule_all),
-        "rule_plus_llm": score_extractions(included_truth, combined_all), "documents": documents,
+        "ground_truth_rating_count": len(included_truth),
+        "rule_only": score_extractions(included_truth, rule_all,
+            full_document_ground_truth_complete=manifest.get("ground_truth_complete") is True),
+        "rule_plus_llm": score_extractions(included_truth, combined_all,
+            full_document_ground_truth_complete=manifest.get("ground_truth_complete") is True), "documents": documents,
         "excluded_documents": manifest.get("not_acquired", []),
-        "limitations": ["Small pilot, one document per scored family.", "PDFs are not stored in Git; local runs require exact SHA-matching files.",
+        "integrity_audit": {"status": "PASSED_TARGET_SCOPE_LABELS" if all(row.get("evaluation_scope", {}).get("complete_target_scope") is True for row in included_truth) else "PARTIALLY_EVALUATED",
+            "full_document_inventory_complete": manifest.get("ground_truth_complete", False),
+            "full_document_precision_evaluated": False,
+            "unsupported_claim_and_hallucination_require_human_adjudication": True},
+        "limitations": ["Target-rating metrics cover only a manually defined row/variant/cell, not all ratings in each PDF.",
+                        "No candidate-level independent human error adjudications are present; hallucination and unsupported-claim rates are NOT_EVALUATED.",
+                        "Small pilot, one document per scored family.", "PDFs are not stored in Git; local runs require exact SHA-matching files.",
                         "The Phase 14 YAGEO RC0805FR-071KL development smoke document is excluded.",
                         "No result generalizes to unseen manufacturers, merged tables, or scan-only documents."],
     }
     out = ROOT / args.output
     out.mkdir(parents=True, exist_ok=True)
-    path = out / "comparison.json"
+    _archive_legacy_results(out)
+    path = out / "corrected_scope_development_metrics.json"
     path.write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
-    (out / "rule_only.json").write_text(json.dumps({"candidates": rule_all}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (out / "rule_plus_llm.json").write_text(json.dumps({"candidates": combined_all}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "corrected_scope_rule_only.json").write_text(json.dumps({"evaluation_status": result["evaluation_status"], "candidates": rule_all}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "corrected_scope_rule_plus_llm.json").write_text(json.dumps({"evaluation_status": result["evaluation_status"], "candidates": combined_all}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    marked_old = out / "comparison.json"
+    if marked_old.is_file():
+        previous = json.loads(marked_old.read_text(encoding="utf-8"))
+        if previous.get("evaluation_status") != "INVALID_EVALUATION":
+            previous["evaluation_status"] = "INVALID_EVALUATION"
+            previous["integrity_note"] = "Pre-hotfix full-candidate precision/hallucination interpretation is invalid because labels were not exhaustive; original numeric results are preserved for audit only."
+            marked_old.write_text(json.dumps(previous, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(json.dumps({"output": str(path.relative_to(ROOT)), "status": result["status"], "rule_only": result["rule_only"], "rule_plus_llm": result["rule_plus_llm"], "documents": documents}, ensure_ascii=False, indent=2))
     return 0
 
@@ -124,6 +148,21 @@ def _dedupe(rows):
             seen.add(key)
             output.append(row)
     return output
+
+
+def _archive_legacy_results(output: Path) -> None:
+    archive = output / "pre_integrity_hotfix"
+    archive.mkdir(exist_ok=True)
+    for name in ("comparison.json", "rule_only.json", "rule_plus_llm.json"):
+        source = output / name
+        target = archive / name
+        if source.is_file() and not target.exists():
+            shutil.copy2(source, target)
+            if name == "comparison.json":
+                old = json.loads(target.read_text(encoding="utf-8"))
+                old["evaluation_status"] = "INVALID_EVALUATION"
+                old["integrity_note"] = "Preserved pre-hotfix run; incomplete ground truth made full-candidate precision and hallucination interpretation invalid."
+                target.write_text(json.dumps(old, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
 def _git_sha():

@@ -27,7 +27,16 @@
       },
       "verification_status": "verified",
       "verified_by": "manual_official_pdf_review",
-      "split": "development_pilot_after_feedback"
+      "split": "development_pilot_after_feedback",
+      "evaluation_scope": {
+        "scope_type": "target_rating",
+        "complete_target_scope": true,
+        "complete_document_inventory": false,
+        "component_variant": "MCT 0603",
+        "row_label": "Rated dissipation, P70",
+        "column_header": "STANDARD",
+        "allow_blank_column": true
+      }
     },
     {
       "document_id": "KEMET_C0603C104K4RACTU",
@@ -52,7 +61,14 @@
       },
       "verification_status": "verified",
       "verified_by": "manual_official_pdf_review",
-      "split": "development_pilot_after_feedback"
+      "split": "development_pilot_after_feedback",
+      "evaluation_scope": {
+        "scope_type": "target_rating",
+        "complete_target_scope": true,
+        "complete_document_inventory": false,
+        "row_label": "Voltage DC",
+        "source_anchor": "Voltage DC"
+      }
     },
     {
       "document_id": "VISHAY_1N4148",
@@ -79,7 +95,14 @@
       },
       "verification_status": "verified",
       "verified_by": "manual_official_pdf_review",
-      "split": "development_pilot_after_feedback"
+      "split": "development_pilot_after_feedback",
+      "evaluation_scope": {
+        "scope_type": "target_rating",
+        "complete_target_scope": true,
+        "complete_document_inventory": false,
+        "row_label": "Forward continuous current",
+        "source_anchor": "Forward continuous current"
+      }
     },
     {
       "document_id": "TI_LM7805_FAMILY",
@@ -89,7 +112,7 @@
       "source_sha256": "49391342cf3b05f89ae94607257ef03f678ae9f1a3bdd388252adb8b00da043d",
       "revision": "Rev. L, September 2016",
       "rating_key": "max_current_a",
-      "rating_kind": "continuous",
+      "rating_kind": "unknown",
       "value": 1.5,
       "unit": "A",
       "conditions": {},
@@ -99,7 +122,15 @@
       "table_context": null,
       "verification_status": "verified",
       "verified_by": "manual_official_pdf_review",
-      "split": "development_pilot_after_feedback"
+      "split": "development_pilot_after_feedback",
+      "evaluation_scope": {
+        "scope_type": "target_rating",
+        "complete_target_scope": true,
+        "complete_document_inventory": false,
+        "source_anchor": "Output Current up to 1.5 A"
+      },
+      "rating_kind_evidence": "The headline states output current up to 1.5 A; it does not define a rating class or complete operating conditions."
     }
-  ]
+  ],
+  "full_document_inventory_complete": false
 }

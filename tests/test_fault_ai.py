@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from circuitcare.datasheet.evaluation import score_extractions
-from circuitcare.fault_ai.evaluation import score_fault_cases
+from circuitcare.fault_ai.evaluation import score_fault_cases, score_fault_proposals, score_fault_rankings
 from circuitcare.fault_ai.fault_catalog import generate_rule_candidates
 from circuitcare.fault_ai.hypothesis_ranking import conditional_bayesian_update, rank_hypotheses
 from circuitcare.fault_ai.llm_hypothesis import propose_hypotheses
@@ -103,7 +103,8 @@ def test_bayesian_reuse_requires_two_simulations_and_explicit_uncertainty():
 
 
 def test_evaluation_metrics_do_not_turn_empty_set_into_perfect_accuracy():
-    assert score_fault_cases([], {})["candidate_precision"] is None
+    assert score_fault_proposals([], {})["candidate_precision"] is None
+    assert score_fault_rankings([], {})["top_k_accuracy"]["1"] is None
     assert score_extractions([], [])["status"] == "NOT_EVALUATED"
 
 
@@ -112,35 +113,47 @@ def test_synthetic_fault_metric_reports_case_recall_and_top_k():
     outputs = {"c1": [
         {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": 10000.0}, "validation_status": "VALIDATED_EXECUTABLE", "evidence_rank": 1},
     ]}
-    metrics = score_fault_cases(cases, outputs)
-    assert metrics["status"] == "MEASURED_SYNTHETIC"
-    assert metrics["candidate_precision"] == metrics["candidate_recall"] == 1.0
-    assert metrics["top_k_accuracy"]["1"] == 1.0
+    proposal = score_fault_proposals(cases, outputs)
+    ranking = score_fault_rankings(cases, outputs)
+    assert proposal["status"] == "MEASURED_SYNTHETIC"
+    assert proposal["candidate_precision"] == proposal["candidate_recall"] == 1.0
+    assert ranking["ranking_coverage"] == 1.0
+    assert ranking["top_k_accuracy"]["1"] == 1.0
 
 
 def test_datasheet_metrics_score_units_conditions_and_evidence_separately():
-    truth = [{"rating_key": "max_power_w", "value": 0.1, "unit": "W", "rating_kind": "continuous",
-              "conditions": {"temperature_c": 70}, "pdf_page_index": 0, "evidence_text": "Power 0.1 W"}]
-    candidate = {"rating_key": "max_power_w", "normalized_value": 0.1, "normalized_unit": "W", "rating_kind": "continuous",
+    truth = [{"document_id": "D1", "rating_key": "max_power_w", "value": 0.1, "unit": "W", "rating_kind": "continuous",
+              "conditions": {"temperature_c": 70}, "pdf_page_index": 0, "evidence_text": "Power 0.1 W",
+              "evaluation_scope": {"scope_type": "target_rating", "complete_target_scope": True,
+                                   "complete_document_inventory": False, "source_anchor": "Power"}}]
+    candidate = {"document_id": "D1", "rating_key": "max_power_w", "normalized_value": 0.1, "normalized_unit": "W", "rating_kind": "continuous",
                  "conditions": {"temperature_c": 70}, "pdf_page_index": 0, "source_text": "Power 0.1 W", "evidence_status": "SOURCE_MATCHED"}
     metrics = score_extractions(truth, [candidate])
-    assert metrics["precision"] == metrics["recall"] == 1.0
-    assert metrics["condition_accuracy"] == metrics["page_evidence_accuracy"] == 1.0
-    assert metrics["table_context_accuracy"] is None
+    target = metrics["target_rating_evaluation"]
+    assert target["precision"]["value"] == target["recall"]["value"] == 1.0
+    assert target["condition_accuracy"]["value"] == target["evidence_accuracy"]["value"] == 1.0
+    assert target["table_context_accuracy"]["value"] is None
+    assert metrics["full_document_evaluation"]["status"] == "NOT_EVALUATED"
+    assert metrics["hallucination_rate"]["value"] is None
 
 
 def test_datasheet_table_context_is_scored_separately_from_value_and_quote():
-    truth = [{"rating_key": "max_power_w", "value": 0.1, "unit": "W", "rating_kind": "continuous",
+    truth = [{"document_id": "D1", "rating_key": "max_power_w", "value": 0.1, "unit": "W", "rating_kind": "continuous",
               "conditions": {"temperature_c": 70}, "pdf_page_index": 1, "evidence_text": "P70 MCT 0603 0.100 W",
+              "evaluation_scope": {"scope_type": "target_rating", "complete_target_scope": True,
+                                   "complete_document_inventory": False, "component_variant": "MCT 0603",
+                                   "row_label": "Rated dissipation, P70", "column_header": "STANDARD", "allow_blank_column": True},
               "table_context": {"row_label": "Rated dissipation, P70", "variant": "MCT 0603",
-                                "column": "standard operation mode", "cell": "0.100 W"}}]
-    candidate = {"rating_key": "max_power_w", "normalized_value": 0.1, "normalized_unit": "W", "rating_kind": "continuous",
-                 "conditions": {"temperature_c": 70}, "pdf_page_index": 1, "source_text": "P70 MCT 0603 0.100 W",
+                                "column_header": "STANDARD", "cell_text": "0.100 W"}}]
+    candidate = {"document_id": "D1", "rating_key": "max_power_w", "normalized_value": 0.1, "normalized_unit": "W", "rating_kind": "continuous",
+                 "conditions": {"temperature_c": 70}, "pdf_page_index": 1, "source_text": "P70 MCT 0603 0.100 W", "evidence_status": "SOURCE_MATCHED",
                  "table_context": {"row_label": "Rated dissipation, P70", "variant": "MCT 0603",
-                                   "column": "standard operation mode", "cell": "0.100 W"}}
-    assert score_extractions(truth, [candidate])["table_context_accuracy"] == 1.0
+                                   "column_header": "STANDARD", "cell_text": "0.100 W"}}
+    assert score_extractions(truth, [candidate])["target_rating_evaluation"]["table_context_accuracy"]["value"] == 1.0
     candidate["table_context"]["variant"] = "MCT 0204"
-    assert score_extractions(truth, [candidate])["table_context_accuracy"] == 0.0
+    res = score_extractions(truth, [candidate])
+    assert res["wrong_component_variant_count"] == 1
+    assert res["target_rating_evaluation"]["precision"]["value"] is None
 
 
 def test_simulation_bridge_never_runs_unvalidated_hypothesis(tmp_path):

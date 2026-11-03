@@ -119,8 +119,8 @@ def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, ca
 
 def _render_eval_section(st: Any, root: Path) -> None:
     with st.expander("개발자용 평가 상태"):
-        for label, relative in (("Fault Hypothesis Evaluation", "evaluation/fault_hypothesis/results/metrics.json"),
-                                ("Datasheet Extraction Benchmark", "evaluation/datasheet_extraction/results/comparison.json")):
+        for label, relative in (("Fault Hypothesis Evaluation · leakage-free development", "evaluation/fault_hypothesis/results/leakage_free_development_metrics.json"),
+                                ("Datasheet Target Rating Pilot · partial", "evaluation/datasheet_extraction/results/corrected_scope_development_metrics.json")):
             result = _read_json(root / relative)
             st.markdown(f"**{label}**")
             st.json(result or {"status": "NOT_EVALUATED", "reason": "No evaluation result has been recorded."})
