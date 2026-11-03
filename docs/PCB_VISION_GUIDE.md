@@ -68,6 +68,6 @@ PNG와 JSON을 내려받을 수 있으며, `Vision 결과를 로컬 data/vision_
 
 GitHub Actions run [41569204216](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41569204216)의 Python 3.11 테스트 수집에서 `numpy` 누락이 확인됐습니다. editable package 설치는 성공했지만 workflow가 `.[dev]`만 설치해 `tests/test_vision.py`의 선택 Vision 의존성이 빠졌습니다. CI는 `.[dev,vision]`을 설치하도록 수정했습니다. 해당 실패에서는 코드 테스트가 실행되기 전에 수집이 중단됐으며, 이 문서의 실물 정합 상태와는 별개입니다.
 
-핫픽스 후 로컬 Python 3.12에서 `.[dev,ui,vision]` 설치, pytest 29개 통과, 기본 U1 CLI 실행, Streamlit `AppTest`의 6개 탭 로드를 확인했습니다. Python 3.11 원격 Actions 결과는 수정 커밋 push 후 확인합니다.
+핫픽스 후 로컬 Python 3.12에서 `.[dev,ui,vision]` 설치, pytest 29개 통과, 기본 U1 CLI 실행, Streamlit `AppTest`의 6개 탭 로드를 확인했습니다. 수정 커밋의 [Python 3.11 GitHub Actions run 41570036079](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41570036079)도 Vision 의존성 설치와 pytest 29개 통과로 완료됐습니다.
 
 이번 단계는 딥러닝 부품 분류, 실크스크린 OCR, 사진만으로 하는 Reference 판독, 배선 역설계, 제조사 정격 탐색, 손상 판정을 하지 않습니다. Phase 12 이후에는 실물 사진 데이터 확보, 수동 기준점 편의 개선, 독립 검증점으로 정합 오차 평가, 필요 시 신뢰 가능한 부품 외곽 검출을 검토합니다.
