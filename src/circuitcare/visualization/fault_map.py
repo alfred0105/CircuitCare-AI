@@ -110,7 +110,8 @@ def render_fault_map_dot(payload: dict[str, Any]) -> str:
         lines.append(f"  {_q('c:' + ref)} [label={_q(label)}, shape=box, fillcolor={_q(color)}{extra}];")
     for row in payload["nets"]:
         fill = "#D6EAF8" if row["name"] in highlighted_nets else "#F2F3F4"
-        lines.append(f"  {_q('n:' + row['name'])} [label={_q(row['name'] + '\\n(' + row['net_type'] + ')')}, shape=diamond, fillcolor={_q(fill)}];")
+        net_label = row["name"] + "\\n(" + row["net_type"] + ")"
+        lines.append(f"  {_q('n:' + row['name'])} [label={_q(net_label)}, shape=diamond, fillcolor={_q(fill)}];")
     for edge in payload["edges"]:
         attrs = [f'label={_q("pins " + ", ".join(edge["pins"]))}']
         if (edge["component_ref"], edge["net"]) in highlighted_edges:
