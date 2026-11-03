@@ -64,8 +64,9 @@ def main() -> int:
     if not code_sha or not benchmark_sources_match_commit(ROOT, code_sha):
         raise SystemExit("Benchmark source files must be committed and unchanged before holdout generation.")
     output_dir = ROOT / args.output
-    if output_dir.exists() and any(output_dir.iterdir()) and not args.force:
-        raise SystemExit(f"Refusing to overwrite existing evaluation data at {output_dir}; use --force deliberately.")
+    generated_files = ("public_cases.json", "private_ground_truth.json", "split_manifest.json")
+    if output_dir.exists() and any((output_dir / name).exists() for name in generated_files) and not args.force:
+        raise SystemExit(f"Refusing to overwrite existing evaluation data at {output_dir}; choose a new output directory.")
     if output_dir == DEFAULT_OUTPUT and args.force:
         raise SystemExit("The published holdout is immutable. Choose a new output directory to rebuild it.")
     output_dir.mkdir(parents=True, exist_ok=True)
