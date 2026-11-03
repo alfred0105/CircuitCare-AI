@@ -426,5 +426,13 @@ def _simulator_version():
         return None
 
 
+def _git_sha():
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+            text=True, check=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
