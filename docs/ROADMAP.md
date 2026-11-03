@@ -1,4 +1,4 @@
-# CircuitCare AI — 13-phase plan
+# CircuitCare AI — Development roadmap
 
 **Competition:** poster due 2026-11-23; presentation 2026-11-27. Dates are planning targets, not progress claims.
 
@@ -80,10 +80,18 @@ Add optional `pypdf`/`pdfplumber` processing and bounded local Ollama extraction
 
 **Not evaluated / not verified:** one PDF is not an extraction-accuracy dataset; overall precision/recall and rules-only versus rules-plus-LLM comparison remain `NOT EVALUATED`. The repository has a 1 kΩ KiCad value for RLOAD but no physical board proof that its installed MPN is the YAGEO part. No real user approval or physical Reference match is claimed. Datasheet OCR and complex condition/derating analysis are not implemented.
 
-**Phase 15 direction:** build a licensed multi-family ground-truth corpus, improve rating-row/condition association, independently measure candidate errors, and verify MPN-to-Reference mapping on a known board before making broader accuracy claims.
+Phase 15 adds local fault hypothesis generation and a separate datasheet evaluation pilot. The corpus exposed table row/column association issues, so the parser was improved against those same documents. Current post-fix measurements are development results; new untouched documents are required for an independent holdout. See [Phase 15 evaluation](PHASE15_EVALUATION.md) and [Datasheet benchmark](DATASHEET_EXTRACTION_BENCHMARK.md).
 
 ## Explicit future scope
 Image-derived connectivity, instrument control, broad IC model ingestion, and probabilistically calibrated field-failure forecasts remain out of scope. A matched CircuitCare PCB photo/design dataset and independent board-level Reference-matching evaluation are still needed.
 
 ## Development practice
 Implement → focused test → commit → next phase. Prioritize end-to-end execution over excessive pre-implementation checks. Do not mark a phase complete solely because scaffolding exists.
+
+## Phase 15 — AI fault hypotheses, physics verification, and evaluation — Implemented
+
+Add deterministic proposals from explicitly supported fault models, constrained local Ollama proposals, validation against real references and SPICE mappings, explicit-user-selected ngspice runs, observation residual matching, evidence ranking, and an AI hypothesis tab. The existing Bayesian engine is reused only when predictions cover the same observed nodes with explicit uncertainty. The UI retains unsupported candidates with their reasons and displays separate developer evaluation records.
+
+**Verified locally:** real Ollama `gemma4:12b` inference generated proposals for the three available example circuits; supported hypotheses were validated and run with ngspice. Fault ground truth consists of three injected synthetic examples only. The dataset is not an independent set of real repair cases, and the measured Top-K scores are development diagnostics. The four-family datasheet pilot was scored with rules-only and rules-plus-local-LLM methods; because the same pilot informed parser fixes, current scores are not independent holdout accuracy. See [fault AI guide](FAULT_HYPOTHESIS_AI.md), [Phase 15 evaluation](PHASE15_EVALUATION.md), and [datasheet benchmark](DATASHEET_EXTRACTION_BENCHMARK.md).
+
+**Still needed:** multiple untouched official data sheets per family; unseen fault topologies with confirmed labels; real repair outcomes; and physical MPN-to-Reference confirmation.

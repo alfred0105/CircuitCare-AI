@@ -95,7 +95,8 @@ def render_datasheet_tab(st: Any, *, root: Path, circuit: Any, context_key: str,
         st.write("로컬 LLM 제안 — 아직 승인되지 않음" if any(row.get("extraction_method") == "local_ollama" for row in candidates)
                  else "규칙 기반 후보 — 아직 승인되지 않음")
         st.dataframe([{"정격": row["rating_type"], "값": row["raw_value"], "종류": row["rating_kind"],
-                       "페이지(0부터)": row["pdf_page_index"], "근거": row["source_text"]} for row in candidates], hide_index=True)
+                       "페이지(0부터)": row["pdf_page_index"], "근거": row["source_text"],
+                       "표 행·열 문맥": row.get("table_context")} for row in candidates], hide_index=True)
     if client and models and model_name:
         if st.button("로컬 LLM으로 정격 구조화", disabled=not candidates, key=f"ds_extract_{context_key}"):
             try:
@@ -156,6 +157,9 @@ def render_datasheet_tab(st: Any, *, root: Path, circuit: Any, context_key: str,
               "source_text": selected.get("source_text"), "source_page_index": selected.get("pdf_page_index"),
               "manufacturer": manufacturer, "mpn": mpn, "revision": revision,
               "llm_model": (ds_state.get("llm") or {}).get("model") if selected.get("extraction_method") == "local_ollama" else None})
+    if selected.get("table_context"):
+        st.caption("표 기반 후보는 숫자 인용뿐 아니라 동일 표의 행·열·부품 모델 문맥을 함께 검토합니다.")
+        st.json({"table_context": selected["table_context"]})
     if selected.get("evidence_status") in {None, "PENDING_REVIEW"}:
         selected = _attach_document(validate_candidate({**selected, "source_document_sha256": document["sha256"]}, document["pages"],
                                                        manufacturer=manufacturer, mpn=mpn), document)
@@ -215,7 +219,7 @@ def render_datasheet_tab(st: Any, *, root: Path, circuit: Any, context_key: str,
     if review_cols[2].button("문서 미검증 수동 입력으로 보관", key=f"ds_manual_{state_id}_{selected_index}"):
         manual = {**selected, "component_reference": component_ref, "manufacturer": manufacturer.strip(),
                   "mpn": mpn.strip(), "source_document_sha256": document["sha256"],
-                  "original_candidate": {key: selected.get(key) for key in ("rating_key", "rating_type", "rating_kind", "normalized_value", "normalized_unit", "source_text", "pdf_page_index")},
+                   "original_candidate": {key: selected.get(key) for key in ("rating_key", "rating_type", "rating_kind", "normalized_value", "normalized_unit", "source_text", "table_context", "pdf_page_index")},
                   "raw_value": f"{value:g} {unit}", "normalized_value": float(value) * unit_scale[unit],
                   "normalized_unit": unit_options[0], "rating_kind": rating_kind,
                   "decision": "manual_input", "extraction_status": "manual_user_input",
