@@ -43,3 +43,18 @@ class RegistrationResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ComponentDetection:
+    detection_id: str
+    class_name: str
+    confidence: float
+    bbox_xyxy: tuple[float, float, float, float]
+    source: str = "trained_object_detector"
+    model_id: str = ""
+    reference: str | None = None
+    identification_status: str = "class_candidate"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

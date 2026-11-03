@@ -14,7 +14,7 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
                       risk_path: str, failed_component: str, fault_type: str,
                       context_key: str, current_result_status: str) -> None:
     st.subheader("PCB 사진 인식")
-    st.caption("사진에서 부품 종류나 연결을 추론하지 않습니다. KiCad 좌표와 수동 대응점을 사용하며 위험 표시는 확인된 정합 후에만 연결합니다.")
+    st.caption("선택 설치된 로컬 학습 모델은 사진의 부품 후보를 탐지하고, OCR은 실크스크린 Reference 후보를 읽습니다. 사진은 회로 연결이나 손상을 판정하지 않습니다. 위험 표시는 같은 회로임을 확인하고 부품 Reference까지 승인한 뒤에만 연결합니다.")
     try:
         from circuitcare.vision.overlay import RISK_COLORS, render_risk_overlay, risk_by_reference
         from circuitcare.vision.pcb_positions import ComponentPosition, match_netlist_references, parse_position_csv
@@ -125,6 +125,10 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
     rectified_image = _image_from_png(rectified_state["image_bytes"])
     st.image(rectified_image, caption=f"확정된 기판 영역 · 원근 보정 미리보기 {rectified_image.width}×{rectified_image.height} px · 실제 mm 비율: {'반영' if rectified_state['physical_size_mm'] else '미상, 촬영 모서리로 비율 근사'}", use_container_width=True)
 
+    from circuitcare.vision.vision_ai_ui import render_detection_section
+    rectified_sha256 = hashlib.sha256(rectified_state["image_bytes"]).hexdigest()
+    ai_state = render_detection_section(st, rectified_image, image_sha256=rectified_sha256)
+
     st.markdown("#### KiCad 부품 위치 CSV")
     pos_file = st.file_uploader("`kicad-cli pcb export pos`로 만든 CSV", type=["csv"], key=f"vision_pos_{context_key}_{image_key}_{side}")
     if pos_file is None:
@@ -224,6 +228,15 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
     neutral = _draw_pending_locations(rectified_image, preview_positions)
     st.image(neutral, caption="미확정 정합 미리보기 · 중립 중심점만 표시 · 위험도 비활성", use_container_width=True)
     st.caption("기준점 표시가 실제 부품 중심과 맞는지 사진에서 확인하세요. 기준점 4개일 때 계산 오차는 0에 가까울 수 있어 독립 검증점이 더 유용합니다.")
+    from circuitcare.vision.vision_ai_ui import render_reference_confirmation
+    ai_reference_state = render_reference_confirmation(
+        st, ai_state, registered_locations=preview_positions,
+        image_size=(rectified_image.width, rectified_image.height),
+        state_suffix=f"{context_key}_{board_key}_{csv_hash[:10]}_{side}_{rectified_sha256[:10]}_"
+                     f"{(ai_state.get('model') or {}).get('sha256', 'missing')[:10]}_"
+                     f"{hashlib.sha256(json.dumps(registration['homography'], sort_keys=True).encode()).hexdigest()[:10]}",
+    )
+    ai_reference_confirmations = ai_reference_state["confirmed_references"]
     st.warning("Reference 이름이 겹친다는 사실만으로 사진·Position CSV·선택 회로가 같은 PCB라고 증명되지 않습니다. 아래에서 실제 같은 KiCad 보드/회로인지 직접 확인해야 위험도를 연결합니다.")
     board_identity = st.text_input("KiCad 프로젝트/보드 이름 및 Revision", key=f"vision_board_identity_{board_key}_{csv_hash[:8]}_{side}")
     user_confirmed = st.checkbox("사진 기준점과 부품 중심이 맞고, 이 사진·CSV가 현재 선택 회로와 같은 실제 PCB 설계임을 확인했습니다", key=f"vision_user_confirmed_{board_key}_{csv_hash[:8]}_{side}")
@@ -285,6 +298,15 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
         st.image(rectified_image, caption="원근 보정 이미지", use_container_width=True)
     with right:
         st.image(overlay, caption="위험 오버레이 · 부품 중심점만 표시", use_container_width=True)
+    if ai_state.get("detections"):
+        from circuitcare.vision.overlay import render_detection_risk_overlay
+        detector_overlay, detector_meta = render_detection_risk_overlay(
+            rectified_image, ai_state["detections"], confirmed_references=ai_reference_confirmations,
+            risk_assessment=risk_assessment if current_risks else None,
+            expected_fault=failed_component, expected_fault_type=fault_type, show_risk=show_risk,
+        )
+        st.image(detector_overlay, caption="AI 검출 박스 · Reference를 개별 확인한 경우에만 현재 시나리오 위험 색상 표시", use_container_width=True)
+        st.caption(f"AI 검출 {len(ai_state['detections'])}개 · 확인 Reference {detector_meta['confirmed_reference_count']}개 · 위험 결과 연결 {detector_meta['risk_mapped_count']}개 · {detector_meta['risk_issue'] or '현재 시나리오 위험 근거'}")
     legend = [{"상태": name, "표시": f"RGB{color}"} for name, color in RISK_COLORS.items()]
     st.dataframe(legend, use_container_width=True, hide_index=True)
     risk_map, _ = risk_by_reference(risk_assessment if current_risks else None,
@@ -324,6 +346,23 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
                      "overlay": {"image_file": "pcb_risk_overlay.png", "risk_source_file": risk_path,
                                  "scenario_id": risk_assessment.get("scenario_id") if risk_assessment else None,
                                  "metadata": overlay_meta}}
+    if ai_state.get("detections"):
+        suggestions = ai_reference_state["suggestions"].get("assignments", {})
+        result_bundle["ai_component_detection"] = {
+            "model": ai_state.get("model"), "runtime": "onnxruntime-cpu",
+            "image_sha256": rectified_sha256, "ocr": {"status": ai_state.get("ocr", {}).get("status"),
+                                                           "records": ai_state.get("ocr_records", [])},
+            "score_kind": ai_reference_state["suggestions"].get("score_kind"),
+            "detections": [{**row, "confirmed_reference": ai_reference_confirmations.get(row["detection_id"]),
+                            "reference_status": "user_confirmed" if row["detection_id"] in ai_reference_confirmations else "suggested_or_unmatched",
+                            "reference_suggestions": suggestions.get(row["detection_id"], [])}
+                           for row in ai_state["detections"]],
+            "verification_level": "model_inference_performed_reference_requires_user_confirmation",
+        }
+    final_json = json.dumps(result_bundle, ensure_ascii=False, indent=2).encode()
+    st.download_button("PCB 정합·AI 매칭 결과 JSON 다운로드", final_json,
+                       file_name="pcb_vision_ai_result.json", mime="application/json",
+                       key=f"vision_ai_final_download_{board_key}_{csv_hash[:8]}_{side}")
     st.download_button("Vision 결과 JSON 다운로드", json.dumps(result_bundle, ensure_ascii=False, indent=2).encode(),
                        file_name="pcb_vision_result.json", mime="application/json")
     if st.button("Vision 결과를 로컬 data/vision_results에 저장", key=f"vision_save_{board_key}_{csv_hash[:8]}_{side}"):
@@ -334,6 +373,9 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
         (folder / "board_detection.json").write_text(json.dumps(board_record, ensure_ascii=False, indent=2), encoding="utf-8")
         (folder / "registration.json").write_text(json.dumps(registration_record, ensure_ascii=False, indent=2), encoding="utf-8")
         (folder / "component_locations.json").write_text(json.dumps(locations, ensure_ascii=False, indent=2), encoding="utf-8")
+        if result_bundle.get("ai_component_detection"):
+            (folder / "ai_component_detection.json").write_text(
+                json.dumps(result_bundle["ai_component_detection"], ensure_ascii=False, indent=2), encoding="utf-8")
         (folder / "pcb_risk_overlay.png").write_bytes(png)
         st.success(f"원본 사진을 제외한 결과를 `{folder.relative_to(root)}`에 저장했습니다.")
 

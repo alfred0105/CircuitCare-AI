@@ -70,3 +70,42 @@ def render_risk_overlay(image: Image.Image, component_locations: dict[str, Any],
             unmatched.append(location)
     return output, {"matched": matched, "without_risk_result": unmatched, "risk_issue": risk_issue,
                     "risk_overlay_enabled": show_risk and risk_issue is None}
+
+
+def render_detection_risk_overlay(image: Image.Image, detections: list[dict[str, Any]], *,
+                                  confirmed_references: dict[str, str],
+                                  risk_assessment: dict[str, Any] | None = None,
+                                  expected_fault: str | None = None,
+                                  expected_fault_type: str | None = None,
+                                  show_risk: bool = True) -> tuple[Image.Image, dict[str, Any]]:
+    """Draw model boxes; only user-confirmed Reference assignments can carry risk."""
+    risks, risk_issue = risk_by_reference(
+        risk_assessment, expected_fault=expected_fault, expected_fault_type=expected_fault_type,
+    ) if show_risk else ({}, None)
+    output = image.convert("RGB").copy()
+    draw = ImageDraw.Draw(output)
+    font = ImageFont.load_default()
+    mapped, unmatched = [], []
+    for detection in detections:
+        detection_id = detection["detection_id"]
+        reference = confirmed_references.get(detection_id)
+        risk = risks.get(reference) if reference else None
+        color = RISK_COLORS.get(risk.get("risk_level"), RISK_COLORS["UNKNOWN"]) if risk else (80, 170, 205)
+        x1, y1, x2, y2 = (float(value) for value in detection["bbox_xyxy"])
+        draw.rectangle((x1, y1, x2, y2), outline=color, width=4 if risk else 2)
+        label = f"{detection.get('corrected_class') or detection['class_name']} {detection['confidence']:.2f}"
+        if reference:
+            label += f" · {reference}"
+        if risk:
+            label += f" · {risk.get('risk_level', 'UNKNOWN')}"
+        label_box = draw.textbbox((x1, max(0, y1 - 15)), label, font=font)
+        draw.rectangle(label_box, fill=color)
+        draw.text((x1, max(0, y1 - 15)), label, fill=(255, 255, 255), font=font)
+        record = {**detection, "confirmed_reference": reference,
+                  "reference_status": "user_confirmed" if reference else "unmatched",
+                  "risk": risk if risk else None}
+        (mapped if reference and risk else unmatched).append(record)
+    return output, {"confirmed_reference_count": sum(bool(value) for value in confirmed_references.values()),
+                    "risk_mapped_count": len(mapped), "unmatched_or_no_risk_count": len(unmatched),
+                    "risk_issue": risk_issue, "risk_overlay_enabled": show_risk and risk_issue is None,
+                    "source": "current_scenario_risk_report_only"}

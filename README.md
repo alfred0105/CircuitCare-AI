@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–10 complete; Phase 11 complete with synthetic-fixture verification.** The Streamlit dashboard runs ngspice analyses in an isolated Python subprocess, validates fresh results before displaying them, and keeps measurements and outputs scoped to the selected circuit and fault conditions. Phase 10 includes an offline preflight, evaluation record, release checklist, poster content, and presentation script. Phase 11 adds optional local PCB photo alignment; it does not identify components from pixels. No matching real-board photo/design data was available, so physical placement accuracy is unverified. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
+> **Status: Phases 01–11 complete; Phase 12 AI vision implementation and public-dataset evaluation complete.** Local ONNX object detection and PP-OCR reference candidates are optional. The detector was evaluated on a public dataset validation split, but that is not an independent CircuitCare board validation. No matching real-board photo/design data is available, so design-reference matching and physical risk overlay remain unverified. Risk levels, detector confidence, heuristic match scores, and Bayesian posterior weights do **not** determine actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -28,6 +28,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 09 | UI, benchmark, offline evaluation | Complete; divider and RC live runs verified in the dashboard, with fault-scoped session state and accumulated Bayesian measurements |
 | 10 | Stabilization, poster, reproducible demo | Complete; evidence and limits recorded |
 | 11 | PCB photo input, manual registration, evidence-based risk overlay | Complete; synthetic fixture and KiCad CSV format verified, real board not verified |
+| 12 | Local PCB component detection, silkscreen OCR, design-aware matching | Complete; public validation split evaluated, matching CircuitCare board unavailable |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -57,7 +58,9 @@ python -m pip install -e ".[ui,vision]"
 streamlit run src/circuitcare/ui.py
 ```
 
-The **PCB 사진 인식** tab accepts a camera capture or JPG/PNG, proposes a board contour for user confirmation, rectifies perspective, reads KiCad Component Position CSV, and fits a manual four-or-more-point homography. Component centers and the current matching risk report are overlaid only after explicit registration confirmation. The original photo remains in session memory unless the user saves it elsewhere; the app saves only the generated overlay and JSON when asked. See the [PCB Vision guide](docs/PCB_VISION_GUIDE.md). No matched real-board photo and design dataset is currently available, so this feature is verified only with generated synthetic fixtures. The Phase 11 CI hotfix passed on Python 3.11 in [GitHub Actions](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41570036079) (29 tests).
+The **PCB 사진 인식** tab can run optional local detector/OCR candidates and, separately, align a photo to KiCad Component Position CSV using a manually confirmed homography. Risk is attached to a detection only after the user confirms the matching KiCad reference and board identity. See the [PCB Vision guide](docs/PCB_VISION_GUIDE.md). Model inference was evaluated on 13 images / 196 objects from a public validation split (mAP@0.5 0.509); this is not a board-independent or CircuitCare design-matching validation. No matching real-board photo/design data is available. The Phase 11 CI hotfix passed on Python 3.11 in [GitHub Actions](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41570036079) (29 tests).
+
+Optional AI setup: `python -m pip install -e ".[ui,vision,vision-ai,vision-ocr]"`, then `python scripts/prepare_pcb_detector.py`. The model exporter is installed separately by the user and is not part of the runtime package. See [setup and artifact provenance](docs/PCB_AI_DETECTION.md) and [evaluation limits](docs/PCB_AI_EVALUATION.md).
 
 The dashboard has circuit/fault, SPICE, rating risk, Bayesian diagnosis, local LLM, and optional PCB photo tabs. It opens the saved 5 V→8 V regulator demo by default; the divider and RC charging examples can also be run with ngspice. Simulation status distinguishes `CACHED`, `RUNNING`, `SUCCESS`, `FAILED`, and `NOT_RUN`; failed reruns do not keep a previous live result active. User measurements and simulated demo measurements are distinguished. The saved U1 3/6/8 V Bayesian set is shown only in its matching regulator demo context; it is identified as stored scenario evidence, separate from the selected live run. Ollama is called only after an explicit question. Without Ollama, deterministic advice remains available.
 
@@ -156,7 +159,7 @@ Use `--no-llm` to produce deterministic isolation, inspection, replacement, and 
 
 ## Current implementation and next phase
 
-Phases 01–10 provide the electrical-analysis workflow; the final phase stabilizes analysis/advisor state, verifies the offline path, refreshes the small local evaluation, and prepares the presentation files. See [the evaluation record](docs/FINAL_EVALUATION.md) and [the Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. Evaluation and timing values describe this local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–10 provide the electrical-analysis workflow; Phase 11 adds manual PCB photo alignment, and Phase 12 adds optional local detector/OCR review. Electrical evaluation is in [the final evaluation record](docs/FINAL_EVALUATION.md), with the [Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. PCB model evidence and limits are in [the Phase 12 evaluation](docs/PCB_AI_EVALUATION.md). Evaluation and timing values describe the recorded local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 The figures in [the poster content](docs/POSTER_CONTENT.md) are generated from committed JSON/CSV evidence by `python scripts/make_poster_figures.py`. Evaluation is limited to two independent small circuit topologies and a separate regulator Bayesian demo. There are no independent damaged-part labels, so damage-detection accuracy, Top-k damage coverage, and avoidable inspections are not claimed. The RSS reported by the evaluation excludes ngspice and Ollama child processes.
 
@@ -175,7 +178,7 @@ src/circuitcare/       parser, graph, CLI
 tests/                 offline parser/graph tests and KiCad XML fixture
 docs/ROADMAP.md        delivery plan and phase status
 docs/ARCHITECTURE.md   model assumptions, data contracts, evaluation
-docs/PCB_VISION_GUIDE.md manual PCB photo registration and overlay guide
+docs/PCB_VISION_GUIDE.md manual PCB photo registration, AI review, and overlay guide
 docs/POSTER_CONTENT.md Korean poster text and data figure
 docs/DEMO_SCRIPT.md    five-minute presentation and Q&A
 docs/RELEASE_CHECKLIST.md offline preflight and fallback procedures

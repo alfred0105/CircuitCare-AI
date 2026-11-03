@@ -13,4 +13,6 @@ build/
 data/private/
 data/ui_runs/
 data/vision_results/
+models/*.pt
+models/*.onnx
 reports/

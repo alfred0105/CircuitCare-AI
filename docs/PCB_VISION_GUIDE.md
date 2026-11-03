@@ -70,4 +70,23 @@ GitHub Actions run [41569204216](https://github.com/alfred0105/CircuitCare-AI/ac
 
 핫픽스 후 로컬 Python 3.12에서 `.[dev,ui,vision]` 설치, pytest 29개 통과, 기본 U1 CLI 실행, Streamlit `AppTest`의 6개 탭 로드를 확인했습니다. 수정 커밋의 [Python 3.11 GitHub Actions run 41570036079](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41570036079)도 Vision 의존성 설치와 pytest 29개 통과로 완료됐습니다.
 
-이번 단계는 딥러닝 부품 분류, 실크스크린 OCR, 사진만으로 하는 Reference 판독, 배선 역설계, 제조사 정격 탐색, 손상 판정을 하지 않습니다. Phase 12 이후에는 실물 사진 데이터 확보, 수동 기준점 편의 개선, 독립 검증점으로 정합 오차 평가, 필요 시 신뢰 가능한 부품 외곽 검출을 검토합니다.
+## 선택 기능: AI 부품 후보와 실크스크린 OCR
+
+아래 추가 설치와 모델 준비를 마치면 보정된 PCB 이미지에서 10개 범주의 부품 후보를 로컬 ONNX 모델로 검출하고, RapidOCR로 실크스크린 텍스트 후보를 읽을 수 있습니다.
+
+```bash
+python -m pip install -e "[ui,vision,vision-ai,vision-ocr]"
+python scripts/prepare_pcb_detector.py
+streamlit run src/circuitcare/ui.py
+```
+
+기본 변환기는 모델 가중치와 ONNX 파일을 저장소 밖 사용자 캐시에 보관합니다. `--output models/pcb_component_detector.onnx`로 저장소 내부 경로를 고르면 `.gitignore`가 파일을 제외합니다. 변환을 위해 Ultralytics 설치가 별도로 필요하며, 이 패키지는 앱 실행 의존성에 포함되지 않습니다. 출처, 해시, 별도 라이선스와 exporter 주의 사항은 [PCB AI 탐지 안내](PCB_AI_DETECTION.md)를 확인하세요.
+
+1. `실제 모델로 부품 탐지`와 `로컬 OCR 실행`은 사용자가 각각 직접 눌러 실행합니다. 모델 파일이 없으면 `MODEL_UNAVAILABLE`로 표시합니다.
+2. 모델 상자·종류·confidence는 학습 모델의 후보 결과입니다. 낮은 점수 후보는 `unknown_component`로 표시할 수 있으며, confidence를 정답률이나 손상 확률로 해석하지 않습니다.
+3. 오검출을 제외하거나 종류를 수정하고, 누락된 부품 상자를 수동 추가할 수 있습니다. 원래 모델 예측과 사용자 수정은 결과 JSON에서 구분됩니다.
+4. OCR은 원문과 상자 좌표를 보존합니다. `U26` 같은 Reference 모양의 문자열도 읽기 제안일 뿐 자동 교정이나 부품 식별 확정이 아닙니다.
+5. 탐지 상자와 KiCad footprint 위치는 위치·OCR·종류 호환성의 heuristic 점수로 정렬 제안합니다. 각 Reference는 사용자가 직접 확정해야 하며 두 상자를 하나의 Reference로 확정할 수 없습니다.
+6. 위험 색을 탐지 상자에 연결하려면 앞선 보드/회로 동일성 확인과 해당 검출의 Reference 확인 모두가 필요합니다. 그리고 기존 성공한 위험 분석과 고장 시나리오가 일치해야 합니다. 그래도 이는 계산상 스트레스 표시이지 사진이 손상을 판정한 결과가 아닙니다.
+
+공개 데이터셋 평가 결과와 실행 시간은 [PCB AI 평가 기록](PCB_AI_EVALUATION.md)에 있습니다. 사용 가능한 데이터에는 CircuitCare의 PCB 사진과 같은 설계의 `.kicad_pcb`, Position CSV, XML 넷리스트가 없으므로 실제 Reference 매칭과 실물 위험 오버레이는 **NOT VERIFIED** 상태입니다. 현재 평가 split에서의 부품 탐지 성능을 독립 보드 일반화로 간주하지 않습니다.

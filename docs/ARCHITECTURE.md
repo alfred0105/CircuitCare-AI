@@ -9,6 +9,7 @@
 6. Rank inspection candidates using interpretable features and/or lightweight local inference.
 7. Suggest next safe diagnostic measurement; update ranking only when real measurements are provided.
 8. Optionally align a user-supplied PCB photo with KiCad component-position coordinates using manually confirmed board corners and at least four component correspondences; render existing risk results only after explicit registration confirmation.
+9. Optionally run a local ONNX PCB object detector and local OCR. Treat boxes and text as candidates; use design coordinates and heuristic scores only to suggest a review mapping. Require user confirmation for each detector-to-Reference link before risk overlay.
 
 ## Integrity requirements
 - Electrical connectivity is not directional. Power flow and damaging fault propagation require device models, topology, current paths, and boundary conditions.
@@ -40,3 +41,10 @@ Planned extensions: `FaultScenario`, `ElectricalStress`, `Measurement`, `RiskAss
 
 ## Repair safety
 Default to power-off inspection. Avoid powering damaged boards until basic isolation and short-circuit checks are complete. Physical test procedures should be scoped to suitable low-voltage laboratory circuits and safe, current-limited supplies.
+
+## Optional PCB AI
+- The optional `vision-ai` extra supplies ONNX Runtime CPU; `vision-ocr` supplies RapidOCR and ONNX Runtime. Neither is required for the electrical workflow. Model downloads and ONNX conversion are explicit user actions, weights are kept outside Git, and the Ultralytics exporter is not an application dependency.
+- Detection confidence is a model score, not calibrated correctness or damage likelihood. OCR output preserves raw text; Reference-shaped tokens are not automatically corrected or confirmed. Position/OCR/class compatibility scores are heuristic ordering indices, not probabilities.
+- A trained detector can return no detections or unknown/low-confidence classes. Unsupported or missing model artifacts produce `MODEL_UNAVAILABLE`; no fallback result is invented. Manual additions and corrections remain separately tagged as user-provided evidence.
+- Detection-to-risk overlays require a current, successful scenario-matched risk result, a user assertion that the image/design/circuit identify the same board, and per-detection Reference confirmation. A public generic model evaluation does not validate CircuitCare design matching or real-world board registration.
+- The pinned detector source, dataset/model licensing distinctions, evaluation setup, and limitations are recorded in [PCB AI detection](PCB_AI_DETECTION.md) and [PCB AI evaluation](PCB_AI_EVALUATION.md).

@@ -1,4 +1,4 @@
-# CircuitCare AI — 10-phase plan
+# CircuitCare AI — 12-phase plan
 
 **Competition:** poster due 2026-11-23; presentation 2026-11-27. Dates are planning targets, not progress claims.
 
@@ -53,8 +53,17 @@ Add an optional local vision extra and a separate Streamlit tab. Load JPG/PNG wi
 **Verified:** the synthetic image/CSV Streamlit flow ran through upload, contour candidate and perspective correction, KiCad position parsing, four-point registration, user board-identity confirmation, risk overlay, and download controls. Unit tests cover EXIF, limits, contour detection, perspective, units/sides, CSV matching, known-coordinate homography, independent validation error, confirmation gating, and risk-source matching. The Phase 11 baseline recorded 29 passing tests and a complete generated-fixture `AppTest` flow. KiCad CLI 10.0.6 exported its bundled Raspberry Pi HAT template to actual position CSV (`Ref,Val,Package,PosX,PosY,Rot,Side`); the parser read its one footprint row (`J1`, side `bottom`). The repository and surrounding project workspace contain no matching CircuitCare PCB photograph, `.kicad_pcb`, Position CSV, or XML netlist set. The KiCad template export validates CSV format only, not registration. Status remains **Synthetic Fixture Verified**; **Real PCB Registered** and **Real PCB Independently Validated** are **NOT VERIFIED — MISSING REAL PCB DATA**. Real-board marker accuracy and a design-matched risk overlay remain unverified. The package CLI is available inside `/Applications/KiCad.app/Contents/MacOS/kicad-cli` on this machine, though it is not on PATH.
 **Complete when:** optional UI flow, synthetic fixture verification, existing test suite, and documentation are complete. Real PCB validation is separate and awaits matching source data.
 
+## Phase 12 — Local PCB detection, OCR, and design-aware review — Complete (public validation split evaluated)
+Add an optional ONNX Runtime CPU detector backend, pinned third-party detector preparation path, local RapidOCR, conservative literal Reference extraction, heuristic design-position matching, user class/box/reference corrections, and risk overlay gating on both board identity and per-detection Reference confirmation. Keep model/runtime artifacts out of Git and keep external exporter licensing separate from the app runtime.
+
+**Verified:** actual pinned YOLOv8s checkpoint was converted to ONNX with the optional external exporter and run locally with ONNX Runtime CPU. On the source dataset validation split (13 images, 196 labeled objects), evaluation produced precision 0.498, recall 0.612 at confidence 0.25 and mAP@0.5 0.509. First call including model load was 2,687 ms; steady per-image mean/median were 1,285/1,305 ms on the recorded Apple Silicon M5 / Python 3.12 environment. This split is not asserted to be board-independent. A real public PCB image also produced 16 inference candidates; that demonstrates inference only. RapidOCR ran locally on that image and emitted six text lines, including one literal `U26` reference-shaped token; no OCR ground truth exists, so OCR accuracy is not claimed. The 39-test suite and compile checks pass.
+
+**Not verified:** no CircuitCare photo matched to its PCB design, KiCad Position CSV, and XML netlist was available. Design-aware matching quality, real-board alignment, and physical risk overlay remain **NOT VERIFIED**. Synthetic mechanics and a public generic PCB validation split do not establish those claims.
+
+**Complete when:** optional local model inference, OCR candidate extraction, correction/confirmation flow, guarded overlay, bounded evaluation, documentation, and CI are complete. Phase 13 may proceed for the next feature; real reference-match validation remains an independent data-dependent validation item.
+
 ## Explicit future scope
-Deep-learning component identification, silkscreen OCR, image-based connectivity inference, instrument control, broad IC model ingestion, and probabilistically calibrated field-failure forecasts.
+Image-derived connectivity, instrument control, broad IC model ingestion, and probabilistically calibrated field-failure forecasts remain out of scope. A matched CircuitCare PCB photo/design dataset and independent board-level Reference-matching evaluation are still needed.
 
 ## Development practice
 Implement → focused test → commit → next phase. Prioritize end-to-end execution over excessive pre-implementation checks. Do not mark a phase complete solely because scaffolding exists.
