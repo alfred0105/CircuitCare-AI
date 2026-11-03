@@ -14,6 +14,7 @@ from pathlib import Path
 
 from circuitcare.diagnosis_ai import run_diagnosis
 from circuitcare.graph import direct_candidates, find_paths
+from circuitcare.local_llm import LocalLLMError, OllamaClient
 from circuitcare.netlist import load_netlist
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +86,7 @@ def main() -> None:
     summary = {
         "phase": "09",
         "evaluation_type": "small local engineering evaluation; not generalization or damage-accuracy validation",
-        "environment": {"python": sys.version.split()[0], "platform": platform.platform(), "cpu": platform.processor(), "ngspice": _ngspice_version(), "ollama_model": "gemma4:12b (Phase 08 local run; Ollama reports NVFP4 via local show command)", "peak_process_memory_mb": round(peak_memory_mb, 2), "memory_scope": "evaluation script process peak RSS via resource.getrusage; excludes Ollama/ngspice child process peaks"},
+        "environment": {"python": sys.version.split()[0], "platform": platform.platform(), "cpu": platform.processor(), "ngspice": _ngspice_version(), "local_ollama_models_detected": _ollama_models(), "peak_process_memory_mb": round(peak_memory_mb, 2), "memory_scope": "evaluation script process peak RSS via resource.getrusage; excludes Ollama/ngspice child process peaks"},
         "independent_circuits": records,
         "graph_only_vs_physics_only": "Graph ranks topological neighbors; physics adds ngspice stress and configured rating comparisons. Candidate sets/targets differ by topology, and neither output is physical damage ground truth.",
         "physics_plus_bayesian": bayesian_summary,
@@ -127,6 +128,22 @@ def _ngspice_version() -> str | None:
         return match.group(0) if match else output.splitlines()[0].strip()
     except (OSError, subprocess.SubprocessError):
         return None
+
+
+def _ollama_models() -> list[dict]:
+    try:
+        models = OllamaClient(timeout_seconds=2).list_models()
+    except (LocalLLMError, ValueError):
+        return []
+    return [
+        {
+            "name": item.get("name"),
+            "size_bytes": item.get("size"),
+            "runner": (item.get("details") or {}).get("runner"),
+            "quantization_level": (item.get("details") or {}).get("quantization_level"),
+        }
+        for item in models
+    ]
 
 
 def _read_wall_time(item: dict) -> float | None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import subprocess
@@ -67,6 +68,7 @@ def main() -> None:
     needs_value = fault_type in {"resistance_drift", "regulator_output_rise", "regulator_output_drop"}
     fault_value = st.sidebar.text_input("고장 파라미터 (SPICE 숫자 표기)", value=case["value"] if fault_type == case["fault_type"] else ("10k" if fault_type == "resistance_drift" else "8"), disabled=not needs_value, key=f"fault_value_{case_name}_{fault_type}")
     context_key = _analysis_context_key(case_name, case, selected_fault, fault_type, fault_value if needs_value else None)
+    bayesian_supported = _supports_bayesian_demo(case_name, selected_fault, fault_type, fault_value if needs_value else None)
     if st.session_state.get("analysis_context_key") != context_key:
         for key in ("live_result_dir", "diagnosis_result", "measurements", "last_advisor", "live_error"):
             st.session_state.pop(key, None)
@@ -76,6 +78,7 @@ def main() -> None:
     st.sidebar.caption("시연 데이터는 저장된 결과이며, 새 시뮬레이션은 버튼을 눌렀을 때만 실행합니다.")
 
     run_col, state_col = st.sidebar.columns(2)
+    state_display = state_col.empty()
     run_live = run_col.button("ngspice 실행", disabled=not _command_exists("ngspice"), use_container_width=True)
     live_matches = bool(st.session_state.get("live_result_dir")) and st.session_state.get("live_context_key") == context_key
     if not live_matches:
@@ -92,6 +95,13 @@ def main() -> None:
         if needs_value and not _valid_parameter(fault_value):
             st.sidebar.error("파라미터는 양수 숫자 또는 10k 같은 SPICE 숫자 표기만 허용합니다.")
             st.stop()
+        state_display.markdown("🟡 RUNNING")
+        st.session_state.simulation_status = "RUNNING"
+        st.session_state.pop("live_result_dir", None)
+        st.session_state.pop("live_context_key", None)
+        st.session_state.pop("last_advisor", None)
+        live_used = False
+        result_dir = ROOT / case["cached"] if _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value) else ROOT / "data/no_cached_results" / case_name.replace(" ", "_") / selected_fault
         slug = {"U1": "regulator_8v", "R1": "divider_r1_drift", "RCHARGE": "rc_rcharge_drift"}.get(selected_fault, "scenario")
         output = ROOT / "data/ui_runs" / f"{slug}-{time.time_ns()}"
         cmd = [sys.executable, "-m", "circuitcare.cli", "--netlist", str(netlist_path), "--fault", selected_fault,
@@ -107,6 +117,8 @@ def main() -> None:
                 st.session_state.live_result_dir = str(result_dir)
                 st.session_state.live_context_key = context_key
                 st.session_state.pop("live_error", None)
+                st.session_state.pop("last_advisor", None)
+                st.session_state.simulation_status = "SUCCESS"
                 st.success("새 시뮬레이션 완료")
                 st.rerun()
             except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
@@ -114,6 +126,8 @@ def main() -> None:
                 if isinstance(exc, SimulationRunError):
                     details = exc.details
                 st.session_state.live_error = details
+                st.session_state.simulation_status = "FAILED"
+                live_used = False
                 st.error(f"시뮬레이션 실패 · 성공 결과로 등록하지 않았습니다.\n\n{details}")
     comparison_path = result_dir / "comparison.json"
     risk_path = result_dir / "risk_assessment.json"
@@ -121,13 +135,16 @@ def main() -> None:
     comparison = _json_if_exists(comparison_path)
     risk = _json_if_exists(risk_path)
     stress = _json_if_exists(stress_path)
-    is_cached_selection = selected_fault == case["fault"] and fault_type == case["fault_type"] and fault_value == case["value"]
-    if live_used:
-        state_col.markdown("🟢 Live Simulation")
-    elif st.session_state.get("live_error"):
-        state_col.markdown("🔴 Live Simulation 실패" + (" · 저장된 기본 결과 표시" if is_cached_selection else ""))
-    else:
-        state_col.markdown("🔵 Cached Simulation Result" if is_cached_selection else "⚪ 분석 준비 · 미실행")
+    is_cached_selection = _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value)
+    status = _simulation_status(live_used, st.session_state.get("live_error"), is_cached_selection)
+    if status != "RUNNING":
+        st.session_state.simulation_status = status
+        state_display.markdown({
+            "SUCCESS": "🟢 SUCCESS · Live Simulation",
+            "FAILED": "🔴 FAILED" + (" · Cached fallback" if is_cached_selection else ""),
+            "CACHED": "🔵 CACHED · 저장된 시연 결과",
+            "NOT_RUN": "⚪ NOT_RUN · 분석 준비 · 미실행",
+        }[status])
     st.sidebar.markdown("🟢 ngspice 사용 가능" if _command_exists("ngspice") else "🟠 ngspice 없음 · 저장 결과 조회 가능")
     client, models = _ollama_models()
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
@@ -188,7 +205,8 @@ def main() -> None:
 
     with tabs[3]:
         st.subheader("Bayesian 진단")
-        if case.get("prior"):
+        if bayesian_supported:
+            st.caption("저장된 U1 3/6/8 V 시나리오 Bayesian 데모입니다. 현재 ngspice 실행에서 계산한 진단 결과와는 별도로 표시합니다. 가상 측정은 simulated_demo로 구분됩니다.")
             measurements = st.session_state.setdefault("measurements", [])
             current = st.session_state.get("diagnosis_result") or (_run_diagnosis(measurements) if measurements else _load_diagnosis(case))
             if st.button("저장된 7.9 V simulated_demo 측정으로 예시 갱신"):
@@ -198,6 +216,7 @@ def main() -> None:
                 st.session_state.measurements = measurements
                 current = _run_diagnosis(measurements)
                 st.session_state.diagnosis_result = current
+                st.session_state.pop("last_advisor", None)
             with st.form("measurement_form"):
                 node = st.selectbox("측정 노드", current["diagnosis"].get("available_measurement_nodes", []), index=0)
                 value = st.number_input("측정 전압 (V)", value=7.9, format="%.4f")
@@ -209,6 +228,7 @@ def main() -> None:
                 st.session_state.measurements = measurements
                 current = _run_diagnosis(measurements)
                 st.session_state.diagnosis_result = current
+                st.session_state.pop("last_advisor", None)
             if measurements:
                 st.caption("같은 노드를 다시 입력하면 기존 값을 교체합니다.")
                 st.dataframe(measurements, use_container_width=True, hide_index=True)
@@ -217,6 +237,7 @@ def main() -> None:
                 st.session_state.measurements = []
                 current = _run_diagnosis([])
                 st.session_state.diagnosis_result = current
+                st.session_state.pop("last_advisor", None)
             diagnosis = current["diagnosis"]
             if diagnosis.get("model_mismatch"):
                 st.error("Model mismatch: 현재 측정값을 설정된 시뮬레이션 가설이 설명하지 못합니다. 최상위 posterior를 확정 진단으로 해석하지 마세요.")
@@ -248,9 +269,9 @@ def main() -> None:
             # based on the text input would make the form impossible to submit.
             ask = st.form_submit_button("질문 제출")
         if ask:
-            diagnosis, inspection, recommendations = _advisor_inputs(case)
+            diagnosis, inspection, recommendations = _advisor_inputs(case) if bayesian_supported else ({}, {}, {})
             active_diagnosis = st.session_state.get("diagnosis_result")
-            if active_diagnosis and case.get("prior"):
+            if active_diagnosis and bayesian_supported:
                 diagnosis, inspection, recommendations = active_diagnosis["diagnosis"], active_diagnosis["inspection_ranking"], active_diagnosis["recommendations"]
             evidence = build_evidence(diagnosis, inspection, recommendations, risk or {}, stress or {}, source_files={"diagnosis": case.get("prior") or "unavailable", "risk_assessment": str(risk_path), "component_stress": str(stress_path)})
             advice = build_repair_advice(evidence, question)
@@ -268,8 +289,20 @@ def main() -> None:
             result["fallback_used"] = result.get("status") != "success"
             if result["fallback_used"]:
                 result["fallback_explanation"] = _fallback_text(evidence)
-            st.session_state.last_advisor = {"result": result, "evidence": evidence, "advice": advice}
+            active_measurements = st.session_state.get("measurements", []) if bayesian_supported else []
+            st.session_state.last_advisor = {
+                "analysis_context_key": context_key,
+                "measurement_set_id": _measurement_set_id(active_measurements),
+                "simulation_result_id": _simulation_result_id(result_dir),
+                "result": result,
+                "evidence": evidence,
+                "advice": advice,
+            }
         saved = st.session_state.get("last_advisor")
+        active_measurements = st.session_state.get("measurements", []) if bayesian_supported else []
+        if saved and not _advisor_matches(saved, context_key, active_measurements, result_dir):
+            st.session_state.pop("last_advisor", None)
+            saved = None
         if saved:
             result = saved["result"]
             st.caption(f"상태: {result['status']} · 응답 시간: {result['elapsed_seconds']} s · " + ("Deterministic Fallback" if result["fallback_used"] else f"Local LLM · {result.get('model', selected_model)}"))
@@ -323,6 +356,47 @@ def _analysis_context_key(case_name: str, case: dict, fault: str, fault_type: st
             identity = (str(path.resolve()), None, None)
         files.append((name, identity))
     return (case_name, fault, fault_type, fault_value, tuple(files))
+
+
+def _supports_bayesian_demo(case_name: str, fault: str, fault_type: str, fault_value: str | None) -> bool:
+    return (case_name == "Regulator + divider + switch (cached demo)"
+            and fault == "U1" and fault_type == "regulator_output_rise" and fault_value == "8")
+
+
+def _is_cached_case(case: dict, fault: str, fault_type: str, fault_value: str, needs_value: bool) -> bool:
+    return (fault == case["fault"] and fault_type == case["fault_type"]
+            and (not needs_value or fault_value == case["value"]))
+
+
+def _simulation_status(live_matches: bool, live_error: str | None, is_cached_selection: bool) -> str:
+    if live_matches:
+        return "SUCCESS"
+    if live_error:
+        return "FAILED"
+    return "CACHED" if is_cached_selection else "NOT_RUN"
+
+
+def _measurement_set_id(measurements: list[dict]) -> str:
+    serialized = json.dumps(measurements, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _simulation_result_id(result_dir: Path) -> tuple:
+    identity = [str(result_dir.resolve())]
+    for name in ("comparison.json", "component_stress.json", "risk_assessment.json"):
+        path = result_dir / name
+        try:
+            stat = path.stat()
+            identity.append((name, stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            identity.append((name, None, None))
+    return tuple(identity)
+
+
+def _advisor_matches(saved: dict, context_key: tuple, measurements: list[dict], result_dir: Path) -> bool:
+    return (saved.get("analysis_context_key") == context_key
+            and saved.get("measurement_set_id") == _measurement_set_id(measurements)
+            and saved.get("simulation_result_id") == _simulation_result_id(result_dir))
 
 
 def _upsert_measurement(measurements: list[dict], measurement: dict) -> list[dict]:

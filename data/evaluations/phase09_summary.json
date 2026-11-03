@@ -6,8 +6,15 @@
     "platform": "macOS-27.0.1-arm64-arm-64bit",
     "cpu": "arm",
     "ngspice": "ngspice-47",
-    "ollama_model": "gemma4:12b (Phase 08 local run; Ollama reports NVFP4 via local show command)",
-    "peak_process_memory_mb": 20.67,
+    "local_ollama_models_detected": [
+      {
+        "name": "gemma4:12b",
+        "size_bytes": 7714091504,
+        "runner": "mlx",
+        "quantization_level": ""
+      }
+    ],
+    "peak_process_memory_mb": 26.69,
     "memory_scope": "evaluation script process peak RSS via resource.getrusage; excludes Ollama/ngspice child process peaks"
   },
   "independent_circuits": [
@@ -66,11 +73,11 @@
         }
       },
       "timings_seconds": {
-        "netlist_parse": 0.000259,
-        "graph_paths": 5.4e-05,
-        "fault_injection_ngspice_risk_cli_end_to_end": 0.115169
+        "netlist_parse": 0.000238,
+        "graph_paths": 6e-05,
+        "fault_injection_ngspice_risk_cli_end_to_end": 0.099875
       },
-      "end_to_end_wall_seconds": 0.115169,
+      "end_to_end_wall_seconds": 0.099875,
       "result_files": {
         "comparison": "data/evaluations/divider/simulation_results/fault_r1_resistance_drift/comparison.json",
         "risk_assessment": "data/evaluations/divider/simulation_results/fault_r1_resistance_drift/risk_assessment.json"
@@ -138,11 +145,11 @@
         }
       },
       "timings_seconds": {
-        "netlist_parse": 0.000329,
-        "graph_paths": 8.2e-05,
-        "fault_injection_ngspice_risk_cli_end_to_end": 0.112799
+        "netlist_parse": 0.000186,
+        "graph_paths": 6.1e-05,
+        "fault_injection_ngspice_risk_cli_end_to_end": 0.083346
       },
-      "end_to_end_wall_seconds": 0.112799,
+      "end_to_end_wall_seconds": 0.083346,
       "result_files": {
         "comparison": "data/evaluations/rc_charge/simulation_results/fault_rcharge_resistance_drift/comparison.json",
         "risk_assessment": "data/evaluations/rc_charge/simulation_results/fault_rcharge_resistance_drift/risk_assessment.json"
@@ -169,7 +176,7 @@
       }
     ],
     "model_mismatch": false,
-    "time_seconds": 0.005127,
+    "time_seconds": 0.004179,
     "interpretation": "Conditional on configured scenarios/measurement model; not failure probability. Simulated demo measurement is not an instrument measurement."
   },
   "local_llm_recorded_runs": [

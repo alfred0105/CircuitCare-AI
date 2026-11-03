@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–09 complete.** The Streamlit dashboard runs live ngspice analyses in an isolated Python subprocess, validates fresh results before displaying them, and keeps measurements and outputs scoped to the selected circuit and fault conditions. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
+> **Status: Phases 01–10 complete.** The Streamlit dashboard runs ngspice analyses in an isolated Python subprocess, validates fresh results before displaying them, and keeps measurements and outputs scoped to the selected circuit and fault conditions. Phase 10 includes an offline preflight, evaluation record, release checklist, poster content, and presentation script. Poster content is prepared; it has not been submitted. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -26,7 +26,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 07 | Local lightweight AI and active measurement ranking | Complete; simulated measurement updates hypothesis posterior |
 | 08 | Evidence-grounded repair recommendations and audit trail | Complete; local Ollama explanation plus deterministic fallback |
 | 09 | UI, benchmark, offline evaluation | Complete; divider and RC live runs verified in the dashboard, with fault-scoped session state and accumulated Bayesian measurements |
-| 10 | Stabilization, poster, reproducible demo | Planned |
+| 10 | Stabilization, poster, reproducible demo | Complete; evidence and limits recorded |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -47,7 +47,18 @@ python -m pip install -e ".[ui]"
 streamlit run src/circuitcare/ui.py
 ```
 
-The dashboard has circuit/fault, SPICE, rating risk, Bayesian diagnosis, and local LLM tabs. It opens the saved 5 V→8 V regulator demo by default; the divider and RC charging examples can also be run with ngspice. The app labels cached results separately from live runs. User measurements and simulated demo measurements are distinguished, and Ollama is called only after an explicit question. Without Ollama, deterministic advice remains available.
+The dashboard has circuit/fault, SPICE, rating risk, Bayesian diagnosis, and local LLM tabs. It opens the saved 5 V→8 V regulator demo by default; the divider and RC charging examples can also be run with ngspice. Simulation status distinguishes `CACHED`, `RUNNING`, `SUCCESS`, `FAILED`, and `NOT_RUN`; failed reruns do not keep a previous live result active. User measurements and simulated demo measurements are distinguished. The saved U1 3/6/8 V Bayesian set is shown only in its matching regulator demo context; it is identified as stored scenario evidence, separate from the selected live run. Ollama is called only after an explicit question. Without Ollama, deterministic advice remains available.
+
+For an offline presentation, install the package, ngspice, and (if desired) an Ollama model before disconnecting from the internet. Ollama models are not committed to this repository. Run `python scripts/demo_check.py` before the event to verify local prerequisites and cached data without repeating circuit simulations.
+
+### Fixed demonstration sequence
+
+1. **U1 overvoltage:** select the default cached regulator case. Compare 5 V baseline and 8 V fault, inspect C1 at 8 V / 6.3 V = 1.2698 utilization (`EXCEEDED`) and RLOAD at 16 mW / 125 mW = 0.128 (`WITHIN_LIMIT`). These are configured demonstration ratings, not datasheet-verified values.
+2. **Bayesian example:** use the saved `simulated_demo` VOUT 7.9 V ± 0.2 V observation; the conditional 8 V hypothesis weight becomes approximately 1.0. This is not an instrument reading or a real failure probability.
+3. **Independent resistor divider:** R1 changes from 1 kΩ to 10 kΩ; the saved/live ngspice VOUT changes from 2.5000 V to 0.4545 V.
+4. **Independent RC charging:** RCHARGE changes from 10 kΩ to 100 kΩ; the committed transient has 545 samples across 0–50 ms, with VC at the final sample changing from 0.24325 V to 0.02488 V.
+
+Stored results can be displayed when ngspice is unavailable. `scripts/demo_check.py` reports ngspice and Ollama availability separately and always identifies the deterministic fallback. See [the five-minute script](docs/DEMO_SCRIPT.md), [the release checklist](docs/RELEASE_CHECKLIST.md), and [poster content](docs/POSTER_CONTENT.md). To regenerate the poster figure, install the optional plotting extra with `python -m pip install -e ".[poster]"` and run `python scripts/make_poster_figures.py`.
 
 To inspect parsed component metadata and pin-to-net connections, add `--show-pins`:
 
@@ -133,7 +144,9 @@ Use `--no-llm` to produce deterministic isolation, inspection, replacement, and 
 
 ## Current implementation and next phase
 
-Phases 01–09 are implemented. Phase 09 adds the dashboard and two distinct small circuit topologies (resistor divider and RC charging) with reproducible live ngspice evaluations. The dashboard runs each analysis in a separate Python subprocess using a unique output directory, and activates a result only after checking the process status, scenario identity, simulation status, and newly written reports. Divider R1 drift and RC RCHARGE drift were both run successfully from the dashboard; the divider showed LOAD changing from 2.5 V to about 0.455 V, and the RC view showed its normal/fault waveform. Session data is keyed to the circuit files and fault settings; measurements accumulate by node, replace earlier values for the same node, and can be cleared to recompute prior-only results. See [the Phase 09 summary](data/evaluations/phase09_summary.json) and run `python scripts/evaluate.py` to regenerate it. Timings and memory are local observations, not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–10 provide the working system; the final phase stabilizes analysis/advisor state, verifies the offline path, refreshes the small local evaluation, and prepares the presentation files. See [the evaluation record](docs/FINAL_EVALUATION.md) and [the Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. Evaluation and timing values describe this local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+
+The figures in [the poster content](docs/POSTER_CONTENT.md) are generated from committed JSON/CSV evidence by `python scripts/make_poster_figures.py`. Evaluation is limited to two independent small circuit topologies and a separate regulator Bayesian demo. There are no independent damaged-part labels, so damage-detection accuracy, Top-k damage coverage, and avoidable inspections are not claimed. The RSS reported by the evaluation excludes ngspice and Ollama child processes.
 
 ## Scope and caution
 
@@ -150,6 +163,9 @@ src/circuitcare/       parser, graph, CLI
 tests/                 offline parser/graph tests and KiCad XML fixture
 docs/ROADMAP.md        10-phase delivery plan
 docs/ARCHITECTURE.md   model assumptions, data contracts, evaluation
+docs/POSTER_CONTENT.md Korean poster text and data figure
+docs/DEMO_SCRIPT.md    five-minute presentation and Q&A
+docs/RELEASE_CHECKLIST.md offline preflight and fallback procedures
 ```
 
 Future version: align a PCB photo with known EDA coordinates and overlay prioritized test/repair points.
