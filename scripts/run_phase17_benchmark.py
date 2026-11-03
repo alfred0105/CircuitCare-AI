@@ -46,11 +46,15 @@ def main() -> int:
     parser.add_argument("--llm-runs", type=int, default=1)
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--spice-budget", type=int, default=40, help="Maximum runs per method per case.")
+    parser.add_argument("--reuse-existing-holdout", action="store_true",
+                        help="Explicitly reevaluate an immutable old holdout with new metrics; never claim a fresh independent run.")
     args = parser.parse_args()
+    benchmark_started = time.perf_counter()
     if args.llm_runs < 1 or args.spice_budget < 0:
         parser.error("--llm-runs must be >= 1 and --spice-budget must be >= 0")
     bundle = load_public_dataset(ROOT / args.dataset)
-    if bundle.manifest.get("independent_holdout"):
+    reevaluating_existing_holdout = bool(bundle.manifest.get("independent_holdout") and args.reuse_existing_holdout)
+    if bundle.manifest.get("independent_holdout") and not args.reuse_existing_holdout:
         expected_fingerprint = bundle.manifest.get("benchmark_code_fingerprint", {}).get("sha256")
         actual_fingerprint = benchmark_code_fingerprint(ROOT)["sha256"]
         if not expected_fingerprint or expected_fingerprint != actual_fingerprint:
@@ -59,6 +63,14 @@ def main() -> int:
             raise SystemExit("Git SHA differs from the holdout code-freeze revision; create a fresh holdout.")
         if not benchmark_sources_match_commit(ROOT, str(bundle.manifest.get("code_freeze_sha"))):
             raise SystemExit("Benchmark sources have changed since the holdout was frozen; refusing evaluation.")
+    elif bundle.manifest.get("code_freeze_sha") and not args.reuse_existing_holdout:
+        if bundle.manifest["code_freeze_sha"] != _git_sha():
+            raise SystemExit("Dataset code-freeze SHA differs from HEAD; refuse benchmark execution.")
+        expected_fingerprint = bundle.manifest.get("benchmark_code_fingerprint", {}).get("sha256")
+        if expected_fingerprint and expected_fingerprint != benchmark_code_fingerprint(ROOT)["sha256"]:
+            raise SystemExit("Dataset benchmark fingerprint differs from the committed code.")
+        if not benchmark_sources_match_commit(ROOT, str(bundle.manifest["code_freeze_sha"])):
+            raise SystemExit("Benchmark sources changed after dataset freeze.")
     cases = list(bundle.public_cases)
     public_rows = []
     llm_client = OllamaClient() if args.run_llm else None
@@ -85,27 +97,32 @@ def main() -> int:
             rule_rows = preflight_candidates(rule_raw, component_refs=set(circuit.components),
                                              component_mapping=mapping, spice_text=spice_text)
             rule_seconds = time.perf_counter() - started
-            llm_rows, llm_seconds, llm_error = [], None, None
+            llm_rows, llm_seconds, llm_model_reported_seconds, llm_error = [], None, None, None
             prompt_audit = {"status": "NOT_RUN", "payload_sha256": None}
             if args.run_llm:
+                llm_started = time.perf_counter()
+                captured_audit = []
                 blind = build_blind_diagnostic_input({"llm_case_id": public["llm_case_id"]},
                     components=payload["components"], observations=observations,
                     executable_catalog=rule_rows)
                 try:
-                    captured_audit = []
                     generated = propose_hypotheses(llm_client, args.model,
                         circuit_id=blind["circuit_id"], components=blind["components"],
                         observations=blind["observations"], symptoms=blind["symptoms"],
                         executable_catalog=rule_rows, include_candidate_parameters=False,
                         pre_call_audit=lambda prompt_payload: captured_audit.append(audit_public_payload(prompt_payload)))
                     prompt_audit = captured_audit[-1] if captured_audit else {"status": "FAILED", "payload_sha256": None}
-                    llm_seconds = generated["latency_seconds"]
+                    llm_model_reported_seconds = generated.get("latency_seconds")
                     model_info = generated.get("model_info") or model_info
                     llm_rows = validate_hypotheses(generated["hypotheses"],
                         component_refs=set(circuit.components), component_mapping=mapping,
                         spice_text=spice_text, allowed_catalog=rule_rows)
                 except (ValueError, RuntimeError, OSError, KeyError, TypeError) as exc:
                     llm_error = f"{type(exc).__name__}: {str(exc)[:300]}"
+                finally:
+                    llm_seconds = time.perf_counter() - llm_started
+                    if captured_audit:
+                        prompt_audit = captured_audit[-1]
 
             merged = _dedupe([*rule_rows, *llm_rows])
             score_case = public
@@ -140,7 +157,9 @@ def main() -> int:
                 "diagnostic_input_sha256": prompt_audit.get("payload_sha256") or audit_public_payload(payload)["payload_sha256"],
                 "prompt_audit": {"status": prompt_audit.get("status"), "payload_sha256": prompt_audit.get("payload_sha256")},
                 "candidate_counts": {"rules": len(rule_rows), "llm": len(llm_rows), "hybrid": len(merged)},
+                "llm_attempted": bool(args.run_llm), "llm_success": bool(args.run_llm and llm_error is None),
                 "llm_error": llm_error, "llm_seconds": llm_seconds,
+                "llm_wall_seconds": llm_seconds, "llm_model_reported_seconds": llm_model_reported_seconds,
                 "rule_generation_seconds": rule_seconds})
 
         for name, rows in method_cases.items():
@@ -179,19 +198,18 @@ def main() -> int:
             simulation_runs[name].append(_score_ranked_method(scored_rows, truths))
 
     methods = {}
+    evaluation_status = _evaluation_status(bundle.manifest, reevaluating_existing_holdout)
     for name, runs in method_runs.items():
-        status = "MEASURED_SYNTHETIC_DEVELOPMENT_REUSED"
-        if name == "LLM Only" and not args.run_llm:
-            status = "NOT_EVALUATED"
-        if name == "Hybrid" and not args.run_llm:
-            status = "NOT_EVALUATED"
-        methods[name] = {"status": status, "runs": runs if status != "NOT_EVALUATED" else [],
-                         "run_count": len(runs), "candidate_seconds": _summarize([run["candidate_seconds"] for run in runs]),
+        available = not (name in {"LLM Only", "Hybrid"} and not args.run_llm)
+        status = evaluation_status if available else "NOT_EVALUATED"
+        methods[name] = {"status": status, "runs": runs if available else [],
+                         "run_count": len(runs) if available else 0,
+                         "candidate_seconds": _summarize([run["candidate_seconds"] for run in runs]) if available else {"status": "NOT_EVALUATED", "mean": None},
                          "generation_metrics": _mean_metrics(runs) if status != "NOT_EVALUATED" else {"status": "NOT_EVALUATED"},
                          "repeat_stability": _repeat_stability(runs) if status != "NOT_EVALUATED" else {"status": "NOT_EVALUATED"}}
     for name, runs in simulation_runs.items():
         available = args.simulate and bool(runs) and (name != "Hybrid + SPICE" or args.run_llm)
-        methods[name] = {"status": "MEASURED_SYNTHETIC_DEVELOPMENT_REUSED" if available else "NOT_EVALUATED",
+        methods[name] = {"status": evaluation_status if available else "NOT_EVALUATED",
             "runs": runs if available else [], "run_count": len(runs) if available else 0,
             "ranking": _mean_rankings(runs) if available else {"status": "NOT_EVALUATED", "top_k_accuracy": {"1": None, "3": None}},
             "conditional_ranking": _mean_rankings(runs, metric="conditional_ranking") if available else {"status": "NOT_EVALUATED", "top_k_accuracy": {"1": None, "3": None}}}
@@ -203,8 +221,14 @@ def main() -> int:
             top1 = methods[name]["ranking"]["top_k_accuracy"].get("1")
             correct = round((top1 or 0) * supported_n)
             spice_count = sum(run["simulation_runs"] for run in runs)
-            methods[name]["efficiency"] = efficiency_metrics(correct_cases=correct,
-                elapsed_seconds=proposal_time * len(runs) + spice_time, spice_runs=spice_count)
+            total_elapsed = proposal_time * len(runs) + spice_time
+            methods[name]["efficiency"] = {**efficiency_metrics(correct_cases=correct,
+                elapsed_seconds=total_elapsed, spice_runs=spice_count),
+                "proposal_wall_seconds": proposal_time * len(runs),
+                "spice_wall_seconds": spice_time,
+                "total_wall_seconds": total_elapsed}
+            methods[name]["ranking_by_measurement_node_count"] = _mean_node_rankings(runs)
+    paired_comparisons = _paired_method_comparisons(method_runs, simulation_runs)
     cluster_summary = {name: _cluster_interval(runs, supported_cases, iterations=2000, seed=1701 + index)
                        for index, (name, runs) in enumerate(method_runs.items()) if runs}
     metadata = reproducibility_metadata(dataset_id=bundle.manifest.get("dataset_id", "unknown"),
@@ -214,16 +238,39 @@ def main() -> int:
         model_digest=model_info.get("digest") if isinstance(model_info, dict) else None,
         simulator_version=_simulator_version() if args.simulate else None, seed=None)
     metadata["benchmark_code_fingerprint"] = benchmark_code_fingerprint(ROOT)["sha256"]
-    independent_synthetic_holdout = bool(bundle.manifest.get("independent_holdout"))
-    evaluation_status = "MEASURED_INDEPENDENT_SYNTHETIC_HOLDOUT" if independent_synthetic_holdout else "MEASURED_SYNTHETIC_DEVELOPMENT_REUSED"
+    independent_synthetic_holdout = bool(bundle.manifest.get("independent_holdout")) and not reevaluating_existing_holdout
+    grid_analysis = _candidate_grid_analysis(cases, truths, raw_method_runs.get("Rules Only", []), supported)
+    node_counts = {}
+    for case in cases:
+        node_counts[str(len(case.get("diagnostic_input", {}).get("observations", [])))] = node_counts.get(str(len(case.get("diagnostic_input", {}).get("observations", []))), 0) + 1
+    llm_attempts = [row for row in public_rows if row.get("llm_attempted")]
+    llm_successful_times = [row["llm_wall_seconds"] for row in llm_attempts
+                            if row.get("llm_success") and isinstance(row.get("llm_wall_seconds"), (int, float))]
+    llm_attempt_times = [row["llm_wall_seconds"] for row in llm_attempts
+                         if isinstance(row.get("llm_wall_seconds"), (int, float))]
+    method_spice_failures = sum(run.get("simulation_failures", 0) for values in simulation_runs.values() for run in values)
     record = {"status": evaluation_status,
+        "metric_schema_version": "phase17-metrics-v2",
         "dataset_id": bundle.manifest.get("dataset_id"), "split": bundle.manifest.get("split"),
         "independent_holdout": independent_synthetic_holdout,
-        "holdout_status": "EVALUATED_SYNTHETIC_NOT_PHYSICAL" if independent_synthetic_holdout else "INDEPENDENT_SYNTHETIC_HOLDOUT_NOT_EVALUATED",
+        "source_dataset_was_independent_holdout": bool(bundle.manifest.get("independent_holdout")),
+        "reevaluation_of_existing_holdout": reevaluating_existing_holdout,
+        "holdout_status": ("EVALUATED_SYNTHETIC_NOT_PHYSICAL" if independent_synthetic_holdout else
+                           "REUSED_SYNTHETIC_DATASET_REEVALUATED_NOT_FRESH" if reevaluating_existing_holdout else
+                           "SYNTHETIC_OFF_GRID_REUSED_TOPOLOGY" if bundle.manifest.get("off_grid") else
+                           "INDEPENDENT_SYNTHETIC_HOLDOUT_NOT_EVALUATED"),
         "real_repair_status": "NOT_EVALUATED", "supported_case_count": sum(supported.values()),
         "unsupported_ground_truth_case_count": len(supported) - sum(supported.values()),
+        "case_count": len(cases), "independent_case_count": len(cases),
         "topology_group_count": len({case["topology_group"] for case in cases}),
-        "case_count": len(cases), "llm_enabled": args.run_llm,
+        "repeated_run_count": model_repetitions, "llm_attempt_count": len(llm_attempts),
+        "llm_success_count": sum(row.get("llm_success", False) for row in llm_attempts),
+        "llm_failure_count": sum(not row.get("llm_success", False) for row in llm_attempts),
+        "simulation_attempt_count": sum(run.get("simulation_runs", 0) for runs in simulation_runs.values() for run in runs),
+        "simulation_failure_count": method_spice_failures,
+        "candidate_grid_analysis": grid_analysis,
+        "paired_method_comparisons": paired_comparisons,
+        "llm_enabled": args.run_llm,
         "llm_repeat_count": args.llm_runs if args.run_llm else 0,
         "spice_enabled": args.simulate, "spice_run_budget_per_method_case": args.spice_budget,
         "methods": methods, "input_audit": {"status": "PASSED",
@@ -232,6 +279,13 @@ def main() -> int:
             "private_ground_truth_loaded_after_proposals_and_simulation": True},
         "case_runs": public_rows, "metadata": metadata,
         "performance_environment": {"process_peak_rss_bytes": _max_rss_bytes(),
+            "benchmark_command_wall_seconds": time.perf_counter() - benchmark_started,
+            "llm_latency": {"status": "MEASURED" if llm_attempts else "NOT_EVALUATED",
+                "attempt_count": len(llm_attempts), "success_count": len(llm_successful_times),
+                "failure_count": len(llm_attempts) - len(llm_successful_times),
+                "mean_successful_seconds": _average(llm_successful_times),
+                "mean_attempted_seconds": _average(llm_attempt_times),
+                "total_attempted_wall_seconds": sum(llm_attempt_times) if llm_attempt_times else None},
             "memory_note": "Process high-water RSS during this benchmark command; not method-isolated.",
             "llm_token_counts": "NOT_AVAILABLE_FROM_OLLAMA_ADAPTER",
             "warmup_runs": 0, "cache_policy": "Normal local Ollama/ngspice cache state; not controlled or separated."},
@@ -242,8 +296,9 @@ def main() -> int:
             "spice_budget_per_method_per_case": args.spice_budget if args.simulate else None},
         "statistics": {"exact_recall_cluster_bootstrap_95ci": cluster_summary,
             "note": "Exploratory cluster bootstrap; intervals are unstable with few topology groups."},
-        "measurement_node_count_comparison": {"1": "MEASURED_FOR_EXISTING_CASES",
-            "2": "NOT_EVALUATED", "3_or_more": "NOT_EVALUATED"},
+        "measurement_node_count_comparison": {"observed_case_counts": node_counts,
+            "intervention_status": "NOT_EVALUATED",
+            "note": "Observed strata are descriptive; this is not a same-case node-count intervention."},
         "phase16_prior_status": "REAL_REPAIR_PRIOR_PERFORMANCE_NOT_EVALUATED",
         "bayesian_posterior_runtime": "NOT_EVALUATED",
         "datasheet_independent_holdout_status": "NOT_EVALUATED",
@@ -271,6 +326,10 @@ def _score_method(rows, truths):
     return {"levels": levels, "candidate_seconds": sum(row["seconds"] or 0 for row in rows),
             "candidate_count": sum(len(row["rows"]) for row in rows),
             "error_count": sum(row["error"] is not None for row in rows),
+            "candidate_details": [{"case_id": row["case"]["case_id"], "candidates": [
+                {key: candidate.get(key) for key in ("hypothesis_id", "component_ref", "fault_type",
+                 "parameters", "validation_status", "simulation_status")} for candidate in row["rows"]]}
+                for row in rows],
             "per_case": levels["per_case"]}
 
 
@@ -279,6 +338,11 @@ def _score_ranked_method(rows, truths):
     ranked = {row["case"]["case_id"]: row["rows"] for row in rows}
     truth = {case["case_id"]: truths[case["case_id"]] for case in cases}
     rank = score_ranked_hypotheses(cases, truth, ranked)
+    selected_predictions = {case["case_id"]: [
+        {**row, "selected_for_diagnosis": row.get("evidence_rank") == 1}
+        for row in ranked.get(case["case_id"], [])] for case in cases}
+    parameter_scores = score_hypothesis_levels(cases, truth, selected_predictions)
+    oracle_scores = score_hypothesis_levels(cases, truth, ranked)
     conditional_cases = []
     conditional_ranked = {}
     for case in cases:
@@ -307,10 +371,73 @@ def _score_ranked_method(rows, truths):
     return {"ranking": rank, "seconds": sum(row["seconds"] for row in rows),
             "conditional_ranking": conditional,
             "end_to_end_ranking": rank,
+            "selected_parameter_error": parameter_scores["parameter_error"]["selected_candidate"],
+            "oracle_best_candidate_parameter_error": oracle_scores["parameter_error"]["oracle_best_candidate"],
+            "candidate_details": [{"case_id": case["case_id"], "candidates": [
+                {key: candidate.get(key) for key in ("hypothesis_id", "component_ref", "fault_type",
+                 "parameters", "validation_status", "simulation_status", "evidence_rank", "observation_match")}
+                for candidate in ranked.get(case["case_id"], [])]} for case in cases],
             "ranking_by_measurement_node_count": by_node_count,
             "simulation_runs": sum(row["spice_runs"] for row in rows),
             "simulation_successes": sum(row["simulation_successes"] for row in rows),
             "simulation_failures": sum(row["simulation_failures"] for row in rows)}
+
+
+def _evaluation_status(manifest, reusing_existing):
+    if reusing_existing:
+        return "MEASURED_EXISTING_HOLDOUT_REEVALUATION"
+    if manifest.get("independent_holdout"):
+        return "MEASURED_INDEPENDENT_SYNTHETIC_HOLDOUT"
+    if manifest.get("off_grid"):
+        return "MEASURED_SYNTHETIC_OFF_GRID_REUSED_TOPOLOGY"
+    return "MEASURED_SYNTHETIC_DEVELOPMENT"
+
+
+def _candidate_grid_analysis(cases, truths, rule_runs, supported):
+    by_case = {}
+    unique_status = {}
+    for repetition, rows in enumerate(rule_runs, 1):
+        generated = {row["case"]["case_id"]: row["rows"] for row in rows}
+        for case in cases:
+            cid = case["case_id"]
+            labels = []
+            for truth in truths.get(cid, []):
+                included = any(_hypothesis_matches(truth, candidate) for candidate in generated.get(cid, []))
+                status = ("UNSUPPORTED_FAULT_MODEL" if not supported.get(cid, False) else
+                          "IN_CATALOG_GRID" if included else "OUT_OF_CATALOG_GRID")
+                label = {"component_ref": truth.get("component_ref"), "fault_type": truth.get("fault_type"),
+                         "status": status}
+                labels.append(label)
+                unique_status.setdefault(cid, label["status"])
+            by_case[f"run_{repetition}:{cid}"] = labels
+    values = [label["status"] for labels in by_case.values() for label in labels]
+    independent_values = list(unique_status.values())
+    return {"status": "MEASURED" if values else "NOT_EVALUATED", "case_level_truth_count": len(values),
+            "in_catalog_grid_count": values.count("IN_CATALOG_GRID"),
+            "out_of_catalog_grid_count": values.count("OUT_OF_CATALOG_GRID"),
+            "independent_case_count": len(independent_values),
+            "independent_in_catalog_grid_count": independent_values.count("IN_CATALOG_GRID"),
+            "independent_out_of_catalog_grid_count": independent_values.count("OUT_OF_CATALOG_GRID"),
+            "unsupported_fault_model_count": values.count("UNSUPPORTED_FAULT_MODEL"),
+            "per_case_repetition": by_case,
+            "note": "IN_CATALOG_GRID means an exact generated Rules candidate matched the private label."}
+
+
+def _hypothesis_matches(left, right):
+    if left.get("component_ref") != right.get("component_ref") or left.get("fault_type") != right.get("fault_type"):
+        return False
+    left_params, right_params = left.get("parameters", {}), right.get("parameters", {})
+    if set(left_params) != set(right_params):
+        return False
+    for key, value in left_params.items():
+        try:
+            a, b = float(value), float(right_params[key])
+            if abs(a - b) > 1e-9 * max(abs(a), abs(b), 1.0):
+                return False
+        except (TypeError, ValueError):
+            if str(value).casefold() != str(right_params[key]).casefold():
+                return False
+    return True
 
 
 def _parameters_equal(left, right):
@@ -336,7 +463,17 @@ def _mean_metrics(runs):
             values = [run["levels"]["levels"][level][metric] for run in runs
                       if run["levels"]["levels"][level][metric] is not None]
             levels[level][metric] = sum(values) / len(values) if values else None
-    return {"status": "MEASURED", "recall": levels}
+    candidate_fields = ("raw_candidate_count", "unique_component_count", "unique_fault_mode_count",
+                        "unique_exact_hypothesis_count", "duplicate_component_candidate_count",
+                        "duplicate_fault_mode_candidate_count", "duplicate_exact_candidate_count")
+    candidate_counts = {field: _summarize([run["levels"].get(field, 0) for run in runs])
+                        for field in candidate_fields}
+    raw_values = [run["levels"].get("raw_candidate_levels", {}).get("exact_hypothesis", {}).get("precision")
+                  for run in runs]
+    raw_values = [value for value in raw_values if value is not None]
+    raw_exact = sum(raw_values) / len(raw_values) if raw_values else None
+    return {"status": "MEASURED", "recall": levels, "candidate_counts": candidate_counts,
+            "raw_candidate_precision": raw_exact}
 
 
 def _repeat_stability(runs):
@@ -345,6 +482,10 @@ def _repeat_stability(runs):
     fields = {"candidate_count": [run["candidate_count"] for run in runs],
               "candidate_generation_seconds": [run["candidate_seconds"] for run in runs],
               "error_count": [run["error_count"] for run in runs]}
+    for key in ("raw_candidate_count", "unique_component_count", "unique_fault_mode_count",
+                "unique_exact_hypothesis_count", "duplicate_component_candidate_count",
+                "duplicate_fault_mode_candidate_count", "duplicate_exact_candidate_count"):
+        fields[key] = [run["levels"].get(key, 0) for run in runs]
     for level in ("component", "fault_mode", "exact_hypothesis"):
         for metric in ("precision", "recall", "f1"):
             fields[f"{level}_{metric}"] = [run["levels"]["levels"][level][metric]
@@ -383,9 +524,87 @@ def _mean_rankings(runs, *, metric="ranking"):
         result.setdefault("top_k_accuracy", {})[key] = sum(values) / len(values) if values else None
     mrrs = [run.get(metric, {}).get("mean_reciprocal_rank") for run in runs
             if run.get(metric, {}).get("mean_reciprocal_rank") is not None]
+    for field in ("strict_top1", "tie_aware_top1"):
+        values = [run[metric].get(field) for run in runs if run.get(metric, {}).get(field) is not None]
+        result[field] = sum(values) / len(values) if values else None
     result.update(status="MEASURED", case_count=sum(run[metric].get("case_count", 0) for run in runs),
-                  mean_reciprocal_rank=sum(mrrs) / len(mrrs) if mrrs else None)
+                  mean_reciprocal_rank=sum(mrrs) / len(mrrs) if mrrs else None,
+                  tie_case_count=sum(run[metric].get("tie_case_count", 0) for run in runs),
+                  ambiguous_case_count=sum(run[metric].get("ambiguous_case_count", 0) for run in runs),
+                  independent_case_count=max((run[metric].get("independent_case_count", 0) for run in runs), default=0),
+                  repeated_run_count=len(runs))
     return result
+
+
+def _paired_method_comparisons(method_runs, simulation_runs):
+    pairs = (("Rules Only", "LLM Only", "exact_hypothesis"),
+             ("Rules Only", "Hybrid", "exact_hypothesis"),
+             ("Rules + SPICE", "Hybrid + SPICE", "strict_top1"))
+    report = {}
+    for left, right, metric in pairs:
+        left_runs = method_runs.get(left, []) if "SPICE" not in left else simulation_runs.get(left, [])
+        right_runs = method_runs.get(right, []) if "SPICE" not in right else simulation_runs.get(right, [])
+        if not left_runs or not right_runs:
+            report[f"{left} vs {right}"] = {"status": "NOT_EVALUATED"}
+            continue
+        per_case = {}
+        for run_index, (a, b) in enumerate(zip(left_runs, right_runs), 1):
+            if metric == "exact_hypothesis":
+                a_rows, b_rows = a.get("per_case", []), b.get("per_case", [])
+                a_values = {row["case_id"]: int(row.get("correct", {}).get(metric, 0) > 0)
+                            for row in a_rows if row.get("status") == "SCORED"}
+                b_values = {row["case_id"]: int(row.get("correct", {}).get(metric, 0) > 0)
+                            for row in b_rows if row.get("status") == "SCORED"}
+            else:
+                a_values = {row["case_id"]: int(row.get("strict_top1", False))
+                            for row in a.get("ranking", {}).get("per_case", []) if row.get("status") == "SCORED"}
+                b_values = {row["case_id"]: int(row.get("strict_top1", False))
+                            for row in b.get("ranking", {}).get("per_case", []) if row.get("status") == "SCORED"}
+            for case_id in sorted(set(a_values) & set(b_values)):
+                per_case.setdefault(case_id, []).append({"run": run_index,
+                    "left": a_values[case_id], "right": b_values[case_id],
+                    "difference_right_minus_left": b_values[case_id] - a_values[case_id]})
+        paired = [item for rows in per_case.values() for item in rows]
+        delta = [item["difference_right_minus_left"] for item in paired]
+        report[f"{left} vs {right}"] = {
+            "status": "MEASURED_DESCRIPTIVE_PAIRED",
+            "metric": metric, "independent_case_count": len(per_case),
+            "repeated_run_count": max((len(rows) for rows in per_case.values()), default=0),
+            "paired_case_run_count": len(paired),
+            "mean_difference_right_minus_left": _average(delta),
+            "right_wins": sum(value > 0 for value in delta),
+            "ties": sum(value == 0 for value in delta),
+            "left_wins": sum(value < 0 for value in delta),
+            "significance_claim": "NONE; small synthetic sample, descriptive only",
+            "per_case_repetitions": per_case}
+    return report
+
+
+def _mean_node_rankings(runs):
+    strata = {}
+    for run in runs:
+        for count, values in run.get("ranking_by_measurement_node_count", {}).items():
+            strata.setdefault(count, []).append(values)
+    result = {}
+    for count, items in strata.items():
+        measured = [item for item in items if item.get("status") == "MEASURED"]
+        if not measured:
+            result[count] = {"status": "NOT_EVALUATED", "independent_case_count": 0}
+            continue
+        result[count] = {"status": "MEASURED",
+            "independent_case_count": max(item.get("case_count", 0) for item in measured),
+            "repeated_case_count": sum(item.get("case_count", 0) for item in measured),
+            "top_k_accuracy": {key: _average([item.get("top_k_accuracy", {}).get(key) for item in measured])
+                               for key in ("1", "3")},
+            "mean_reciprocal_rank": _average([item.get("mean_reciprocal_rank") for item in measured]),
+            "strict_top1": _average([item.get("strict_top1") for item in measured]),
+            "tie_aware_top1": _average([item.get("tie_aware_top1") for item in measured])}
+    return result
+
+
+def _average(values):
+    values = [value for value in values if isinstance(value, (int, float))]
+    return sum(values) / len(values) if values else None
 
 
 def _summarize(values):

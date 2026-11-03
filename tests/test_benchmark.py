@@ -90,6 +90,109 @@ def test_parameter_exact_zero_policy_is_stable():
     assert result["parameter_error"]["mean"] == 0
 
 
+def test_metric_v2_deduplicates_predictions_at_each_label_level():
+    case = [{"case_id": "a"}]
+    truth = {"a": [{"component_ref": "R1", "fault_type": "resistance_drift",
+                    "parameters": {"fault_resistance": 2000}}]}
+    predictions = {"a": [
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": 2000}},
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": 5000}},
+        {"component_ref": "R1", "fault_type": "resistor_open", "parameters": {}},
+    ]}
+    result = score_hypothesis_levels(case, truth, predictions)
+    assert result["levels"]["component"]["precision"] == 1.0
+    assert result["levels"]["fault_mode"]["precision"] == 0.5
+    assert result["levels"]["exact_hypothesis"]["precision"] == pytest.approx(1 / 3)
+    assert result["raw_candidate_count"] == 3
+    assert result["duplicate_component_candidate_count"] == 2
+    assert result["duplicate_fault_mode_candidate_count"] == 1
+
+
+def test_metric_v2_counts_false_component_and_fault_once():
+    case = [{"case_id": "a"}]
+    truth = {"a": [{"component_ref": "R1", "fault_type": "resistance_drift",
+                    "parameters": {"fault_resistance": 2000}}]}
+    predictions = {"a": [
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": 2000}},
+        {"component_ref": "R2", "fault_type": "resistance_drift", "parameters": {"fault_resistance": 2000}},
+    ]}
+    result = score_hypothesis_levels(case, truth, predictions)
+    assert result["levels"]["component"]["precision"] == 0.5
+    assert result["levels"]["fault_mode"]["precision"] == 0.5
+    assert result["levels"]["exact_hypothesis"]["precision"] == 0.5
+
+
+def test_metric_v2_duplicate_exact_candidate_does_not_change_unique_precision():
+    case = [{"case_id": "a"}]
+    row = {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": "2k"}}
+    result = score_hypothesis_levels(case, {"a": [row]}, {"a": [row, dict(row)]})
+    assert result["raw_candidate_count"] == 2
+    assert result["duplicate_exact_candidate_count"] == 1
+    assert result["levels"]["exact_hypothesis"]["precision"] == 1
+    assert result["raw_candidate_levels"]["exact_hypothesis"]["precision"] == 0.5
+
+
+def test_metric_v2_multilabel_matching_is_one_to_one():
+    case = [{"case_id": "a"}]
+    truths = {"a": [
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"x": 1}},
+        {"component_ref": "R1", "fault_type": "resistor_open", "parameters": {}},
+    ]}
+    predictions = {"a": [
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"x": 1}},
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"x": 1}},
+    ]}
+    result = score_hypothesis_levels(case, truths, predictions)
+    assert result["levels"]["component"]["tp"] == 1
+    assert result["levels"]["fault_mode"]["tp"] == 1
+    assert result["levels"]["exact_hypothesis"]["tp"] == 1
+    assert result["levels"]["exact_hypothesis"]["fn"] == 1
+
+
+def test_parameter_v2_separates_oracle_from_unselected_candidate_and_parses_units():
+    case = [{"case_id": "a"}]
+    truths = {"a": [{"component_ref": "R1", "fault_type": "resistance_drift",
+                     "parameters": {"fault_resistance": 2000}}]}
+    predictions = {"a": [
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": "5k"}},
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"fault_resistance": "2K"}},
+    ]}
+    result = score_hypothesis_levels(case, truths, predictions)
+    assert result["parameter_error"]["legacy_first_candidate"]["mean"] == 1.5
+    assert result["parameter_error"]["oracle_best_candidate"]["mean"] == 0
+    assert result["parameter_error"]["selected_candidate"]["status"] == "NOT_EVALUATED"
+
+
+def test_parameter_v2_selected_error_requires_explicit_selection():
+    case = [{"case_id": "a"}]
+    truth = {"a": [{"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"x": 10}}]}
+    rows = {"a": [
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"x": 8},
+         "selected_for_diagnosis": True},
+        {"component_ref": "R1", "fault_type": "resistance_drift", "parameters": {"x": 10}},
+    ]}
+    result = score_hypothesis_levels(case, truth, rows)
+    assert result["parameter_error"]["selected_candidate"]["mean"] == pytest.approx(0.2)
+    assert result["parameter_error"]["oracle_best_candidate"]["mean"] == 0
+
+
+def test_spice_tie_aware_rank_keeps_strict_top1_and_marks_ambiguity():
+    case = [{"case_id": "a"}]
+    truth = {"a": [{"component_ref": "R2", "fault_type": "resistor_open", "parameters": {}}]}
+    rows = {"a": [
+        {"component_ref": "R1", "fault_type": "resistor_open", "parameters": {},
+         "simulation_status": "SIMULATION_SUCCESS", "evidence_rank": 1,
+         "observation_match": {"max_absolute_normalized_residual": 0.2}},
+        {"component_ref": "R2", "fault_type": "resistor_open", "parameters": {},
+         "simulation_status": "SIMULATION_SUCCESS", "evidence_rank": 2,
+         "observation_match": {"max_absolute_normalized_residual": 0.25}},
+    ]}
+    result = score_ranked_hypotheses(case, truth, rows, residual_tie_tolerance=0.1)
+    assert result["strict_top1"] == 0
+    assert result["tie_aware_top1"] == 1
+    assert result["ambiguous_case_count"] == 1
+
+
 def test_rank_metrics_count_misses_when_truth_is_not_ranked():
     result = score_ranked_hypotheses([{"case_id": "a"}], {"a": [{"component_ref": "R1"}]}, {"a": []})
     assert result["top_k_accuracy"]["1"] == 0
@@ -161,6 +264,26 @@ def test_phase17_development_runner_scores_only_after_proposal_phase(tmp_path):
     assert completed.returncode == 0, completed.stderr
     result_file = next(output.glob("*.json"))
     result = json.loads(result_file.read_text(encoding="utf-8"))
-    assert result["status"] == "MEASURED_SYNTHETIC_DEVELOPMENT_REUSED"
+    assert result["status"] == "MEASURED_SYNTHETIC_DEVELOPMENT"
     assert result["input_audit"]["private_ground_truth_loaded_after_proposals_and_simulation"] is True
     assert result["methods"]["LLM Only"]["status"] == "NOT_EVALUATED"
+    assert result["methods"]["Rules Only"]["status"] == result["status"]
+    assert result["metric_schema_version"] == "phase17-metrics-v2"
+    assert result["methods"]["Rules Only"]["runs"][0]["levels"]["unique_component_count"] > 0
+
+
+def test_existing_holdout_rerun_is_labeled_non_fresh_and_preserves_method_state(tmp_path):
+    repository_root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "reevaluated-holdout"
+    completed = subprocess.run([sys.executable, "scripts/run_phase17_benchmark.py",
+        "--dataset", "evaluation/phase17/holdout", "--results", str(output),
+        "--reuse-existing-holdout"], cwd=repository_root, capture_output=True, text=True, timeout=30)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(next(output.glob("*.json")).read_text(encoding="utf-8"))
+    assert result["status"] == "MEASURED_EXISTING_HOLDOUT_REEVALUATION"
+    assert result["independent_holdout"] is False
+    assert result["source_dataset_was_independent_holdout"] is True
+    assert result["methods"]["Rules Only"]["status"] == result["status"]
+    assert result["methods"]["LLM Only"]["status"] == "NOT_EVALUATED"
+    assert result["candidate_grid_analysis"]["independent_in_catalog_grid_count"] == 10
+    assert result["candidate_grid_analysis"]["independent_out_of_catalog_grid_count"] == 0

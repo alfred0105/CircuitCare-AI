@@ -10,6 +10,7 @@ import subprocess
 BENCHMARK_SOURCE_FILES = (
     "scripts/run_phase17_benchmark.py",
     "scripts/build_phase17_synthetic_holdout.py",
+    "scripts/build_phase17_1_off_grid.py",
     "src/circuitcare/fault_ai/evaluation.py",
     "src/circuitcare/local_llm.py",
     "src/circuitcare/benchmark/dataset.py",
