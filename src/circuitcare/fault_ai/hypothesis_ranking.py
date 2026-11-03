@@ -29,7 +29,9 @@ def rank_hypotheses(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(output, key=lambda item: (item.get("evidence_rank") is None, item.get("evidence_rank") or 0, item.get("hypothesis_id", "")))
 
 
-def conditional_bayesian_update(rows: list[dict[str, Any]], observations: list[dict[str, Any]]) -> dict[str, Any]:
+def conditional_bayesian_update(rows: list[dict[str, Any]], observations: list[dict[str, Any]], *,
+                                prior_weights: dict[str, float] | None = None,
+                                prior_model_version: str | None = None) -> dict[str, Any]:
     """Reuse the existing engine only for a shared, uncertainty-qualified prediction set."""
     measured = []
     for item in observations:
@@ -50,7 +52,11 @@ def conditional_bayesian_update(rows: list[dict[str, Any]], observations: list[d
         simulation_source=row.get("simulation_result_key", "fault_ai_transient"), risk_assessment_source="",
         scenario_id=row.get("hypothesis_id", ""), source_base="fault_ai_session") for row in eligible]
     try:
+        if prior_weights is not None:
+            from circuitcare.repair_feedback.diagnosis_feedback import apply_prior_map
+            hypotheses = apply_prior_map(hypotheses, prior_weights)
         result = update_posteriors(hypotheses, measured)
     except (ValueError, TypeError, ZeroDivisionError) as exc:
         return {"status": "INACTIVE", "reason": f"Existing Bayesian engine rejected this set: {exc}"}
-    return {"status": "ACTIVE_CONDITIONAL", **result}
+    return {"status": "ACTIVE_CONDITIONAL", "prior_source": "APPROVED_LEARNED" if prior_weights is not None else "DEFAULT_EQUAL",
+            "prior_model_version": prior_model_version if prior_weights is not None else None, **result}

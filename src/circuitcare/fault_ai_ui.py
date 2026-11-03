@@ -14,6 +14,8 @@ from .fault_ai.hypothesis_ranking import conditional_bayesian_update, rank_hypot
 from .fault_ai.llm_hypothesis import propose_hypotheses
 from .fault_ai.simulation_bridge import preflight_candidates, simulate_selected
 from .fault_ai.observation_matcher import compare_observations
+from .repair_feedback.case_repository import RepairCaseRepository
+from .repair_feedback.prior_registry import active_prior
 
 
 def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, case: dict[str, Any],
@@ -107,8 +109,15 @@ def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, ca
                 pass
     bayes = state.get("bayesian_result")
     if bayes:
+        learned_model = active_prior(RepairCaseRepository(root / "data/private/repair_feedback/repair_cases.sqlite3"), case_name)
+        selected_prior_mode = st.radio("Bayesian Prior", ["Default Prior"] + (["Approved Learned Prior"] if learned_model else []),
+            horizontal=True, key=f"repair_prior_mode_{context_key}")
+        if selected_prior_mode == "Approved Learned Prior" and learned_model:
+            bayes = conditional_bayesian_update(state["hypotheses"], state["observations"],
+                prior_weights=learned_model["prior_weights"], prior_model_version=learned_model["version"])
         with st.expander("기존 Bayesian 엔진 · 조건부 비교"):
             if bayes.get("status") == "ACTIVE_CONDITIONAL":
+                st.caption(f"Prior source: {bayes.get('prior_source', 'DEFAULT_EQUAL')} · Version: {bayes.get('prior_model_version') or 'default'}")
                 st.write("**조건부 가설 순위:**")
                 st.dataframe(bayes.get("posterior", []), use_container_width=True, hide_index=True)
                 st.caption(bayes.get("probability_interpretation", ""))

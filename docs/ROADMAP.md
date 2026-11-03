@@ -101,3 +101,10 @@ Add deterministic proposals from explicitly supported fault models, constrained 
 Blinded the local fault-proposal payload with an explicit allowlist, preserved measured observations, redacted parameter catalogs from the LLM, and added leakage regression tests. Split proposal metrics from simulation ranking and retained only method-generated candidates in each ranking. Datasheet metrics now separate target-rating scope from complete-document inventory; incomplete full-document metrics and unadjudicated hallucination rates are `NOT_EVALUATED`. The old results are preserved and labeled invalid for their former interpretation. Development reruns do not constitute independent holdout validation.
 
 **Still needed:** an independently prepared holdout with unseen topologies and confirmed fault labels; exhaustive rating inventories or clearly bounded target scopes for unseen datasheets; real repair outcomes; and physical MPN-to-Reference confirmation.
+
+
+## Phase 16 — Verified repair feedback and controlled prior adaptation — Implemented
+
+Adds a local SQLite repair-case history, immutable diagnosis snapshots, evidence and outcome review, duplicate screening, explicit training eligibility, smoothed prior proposals, approval and rollback, Bayesian comparison, and evaluation leakage checks. The Streamlit dashboard includes the **수리 이력 및 AI 학습** tab. Synthetic fixtures verify the workflow and estimator only; they are not activated as real repair priors.
+
+**Current evidence status:** repair feedback implementation complete; synthetic workflow verified; real repair cases `0`; eligible real cases `0`; active learned prior `NONE`; real-repair performance `NOT_EVALUATED`. Independent holdout improvement remains unevaluated. Details and method are recorded in [Phase 16 evaluation](PHASE16_EVALUATION.md), [Repair Feedback guide](REPAIR_FEEDBACK_GUIDE.md), and [Prior Learning guide](PRIOR_LEARNING_GUIDE.md).
