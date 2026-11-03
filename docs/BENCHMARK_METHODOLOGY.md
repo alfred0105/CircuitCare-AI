@@ -44,3 +44,9 @@ Record Python, OS, Git SHA, dataset and ground-truth hashes, split, prompt versi
 ## Scope exclusions
 
 Synthetic SPICE injection is not physical fault validation. Results do not establish actual repair accuracy, real component failure probability, safety of probe locations, broad topology generalization, datasheet extraction accuracy, PCB reference matching, or benefit from Phase 16 repair priors. Those tracks require separate physical and untouched datasets.
+
+## Phase 17.1 metric schema
+
+The original Phase 17 run uses its original scoring and remains immutable. New and rescored runs use `phase17-metrics-v2`: deduplicate at each identity level before one-to-one scoring; preserve raw-candidate metrics and duplicate counts; and report selected-candidate, oracle-best, and legacy-first parameter errors separately. Oracle-best is post-hoc and cannot be interpreted as the system's selected value. If no explicit selection/rank exists, selected error is `NOT_EVALUATED`.
+
+Run status, per-method status, split, and metric schema must agree; methods not run are `NOT_EVALUATED`. LLM wall time includes failed attempts measured externally around the call. SPICE strict Top-1 remains distinct from tie-aware Top-1; a true candidate in a tied best set is reported as ambiguous, not uniquely identified. Observed node-count strata are descriptive unless identical cases are separately evaluated under different measurement sets. See [Phase 17.1 results](PHASE17_1_EVALUATION_HOTFIX.md) for dataset hashes and observed values.

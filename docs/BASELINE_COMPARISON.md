@@ -27,3 +27,5 @@ P = precision; R = recall; MRR = mean reciprocal rank. Proposal runtimes are the
 - All results are generated from synthetic ngspice circuits. They do not measure physical repair accuracy or real-world damage probability.
 
 See [benchmark methodology](BENCHMARK_METHODOLOGY.md) for input boundaries, scoring definitions, uncertainty, and exclusions.
+
+> **Metric version note:** This table is the original Phase 17 report and is retained as recorded. Corrected unique-level metrics and the reused-holdout v2 rerun are in [Phase 17.1 evaluation integrity hotfix](PHASE17_1_EVALUATION_HOTFIX.md). The changed component precision is a scoring correction, not a system-performance gain.

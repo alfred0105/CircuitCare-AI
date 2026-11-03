@@ -49,7 +49,7 @@ def render_benchmark_tab(st: Any, *, root: Path) -> None:
                 "Exact Precision": recall.get("exact_hypothesis", {}).get("precision"),
                 "Exact Recall": recall.get("exact_hypothesis", {}).get("recall"),
                 "Strict Top-1": ranking.get("strict_top1", top_k.get("1")),
-                "Tie-Aware Top-1": ranking.get("tie_aware_top1", "NOT_EVALUATED"),
+                "Tie-Aware Top-1": ranking.get("tie_aware_top1"),
                 "Top-3": top_k.get("3")})
         if table:
             st.dataframe(table, use_container_width=True, hide_index=True)

@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–16 implemented; Phase 17 independent synthetic evaluation completed.** The Phase 17 holdout contains 10 SPICE-generated cases across five new topology groups. Rules, local LLM, Hybrid, and SPICE-ranking baselines were measured; the full report and immutable run data are in [Phase 17 evaluation](docs/PHASE17_EVALUATION.md) and `evaluation/phase17/results/`. This is synthetic evidence only: real repair accuracy, physical repair outcomes, and learned-prior benefit remain unevaluated. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: Phases 01–17.1 implemented; synthetic evaluation integrity hotfix completed.** Phase 17 measured 10 SPICE-generated cases in five new topology groups. Phase 17.1 corrected unique-level precision, parameter errors, failed-call timing, and SPICE tie reporting, then reevaluated the existing holdout and added 10 off-grid faults on reused topology templates. The reused-holdout run is not a new independent result, and off-grid data adds no new topology. See [Phase 17.1 evaluation](docs/PHASE17_1_EVALUATION_HOTFIX.md). This is synthetic evidence only: real repair accuracy, physical repair outcomes, and learned-prior benefit remain unevaluated. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -33,7 +33,8 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 14 | Local datasheet extraction and evidence-gated rating review | Implemented; one YAGEO PDF and local Ollama smoke-checked; broad accuracy and physical Reference match not evaluated |
 | 15 | Local AI fault hypotheses, physics verification, separate evaluation tracks | Implemented; local Gemma and ngspice exercised on three synthetic development cases; datasheet results are a development pilot after parser feedback |
 | 16 | Verified repair history, controlled prior adaptation, longitudinal evaluation | Implemented; synthetic workflow verified; no real repair records, active learned prior, or independent improvement evaluation |
-| 17 | Independent benchmark, fair baselines, statistical validation, efficiency | Benchmark infrastructure implemented; new five-topology synthetic holdout and final evaluation pending |
+| 17 | Independent benchmark, fair baselines, statistical validation, efficiency | Synthetic benchmark complete; see Phase 17 evaluation and Phase 17.1 metric correction |
+| 17.1 | Metric integrity, off-grid evaluation, SPICE identifiability | Complete; corrected reused-holdout scoring and off-grid parameter evaluation on reused topology templates |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 

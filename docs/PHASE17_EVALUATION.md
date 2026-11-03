@@ -48,3 +48,7 @@ Only the included measurement-node configuration was evaluated. Multi-node measu
 ## Next steps
 
 Phase 17 synthetic benchmark completion is recorded. To estimate real repair performance, collect verified physical fault/repair cases with independent boards and labels, freeze another untouched split, and repeat the same evaluation before making real-world accuracy claims.
+
+## Phase 17.1 metric correction
+
+The original run above remains unchanged and preserves its original scoring definition. The Phase 17.1 rerun reuses the same holdout and is not a new independent result. It applies `phase17-metrics-v2`, which deduplicates predictions and truths separately at component, component/fault-mode, and exact-hypothesis levels, records raw candidate precision and duplicate counts separately, and distinguishes selected, oracle-best, and legacy-first parameter errors. The corrected report, new off-grid evaluation, SPICE tie analysis, runtime accounting, and limits are documented in [Phase 17.1 evaluation integrity hotfix](PHASE17_1_EVALUATION_HOTFIX.md).
