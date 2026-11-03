@@ -149,7 +149,7 @@ def main() -> None:
     client, models = _ollama_models()
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
 
-    tabs = st.tabs(["회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원"])
+    tabs = st.tabs(["회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식"])
     with tabs[0]:
         st.subheader("회로 및 고장 설정")
         st.write(f"**선택 회로:** {case_name}  ·  **고장 후보:** {selected_fault} / {fault_type} = {fault_value if needs_value else '—'}")
@@ -319,6 +319,20 @@ def main() -> None:
             with st.expander("근거 자료 (Evidence IDs)"):
                 st.json(saved["evidence"])
             st.download_button("수리 조언 JSON", json.dumps({"repair_advice": saved["advice"], "llm_explanation": result, "evidence": saved["evidence"]}, ensure_ascii=False, indent=2), "repair_advice.json", "application/json")
+
+    with tabs[5]:
+        from circuitcare.vision_ui import render_vision_tab
+
+        render_vision_tab(
+            st,
+            netlist_component_refs=sorted(circuit.components),
+            risk_assessment=risk,
+            risk_path=str(risk_path.relative_to(ROOT)) if risk_path.exists() else "unavailable",
+            failed_component=selected_fault,
+            fault_type=fault_type,
+            context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16],
+            current_result_status=status,
+        )
 
     _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None)
 

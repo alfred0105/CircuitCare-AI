@@ -8,7 +8,7 @@
 5. Calculate pin-level changes and compare them with **part-specific** ratings and scenario exposure time.
 6. Rank inspection candidates using interpretable features and/or lightweight local inference.
 7. Suggest next safe diagnostic measurement; update ranking only when real measurements are provided.
-8. Export an evidence-bearing report. Photo/PCB overlays are future scope.
+8. Optionally align a user-supplied PCB photo with KiCad component-position coordinates using manually confirmed board corners and at least four component correspondences; render existing risk results only after explicit registration confirmation.
 
 ## Integrity requirements
 - Electrical connectivity is not directional. Power flow and damaging fault propagation require device models, topology, current paths, and boundary conditions.
@@ -22,6 +22,7 @@
 - The saved U1 3/6/8 V Bayesian example is a separate configured scenario set. It is displayed only for its matching regulator demo context; other circuits and fault settings are labeled unsupported rather than borrowing its posterior.
 - LLM answers are bound to the current analysis context, exact measurement set, and simulation artifact identity. Changing any of these invalidates the displayed answer, and the next explicit question rebuilds evidence from current supported inputs.
 - `scripts/demo_check.py` checks local prerequisites, cached JSON, and the loopback Ollama endpoint; it does not rerun analyses or contact a cloud service.
+- The optional `circuitcare-ai[vision]` extra supplies Pillow/OpenCV/NumPy. The PCB photo tool keeps image bytes in session memory, writes no original photo, treats contour detection as an unverified candidate, and requires explicit user confirmation before joining mapped component centers to a matching risk report. A saved overlay retains image/CSV hashes, board side, homography, calibration error, scenario identity, and source risk report. Reference-center markers are not package outlines; a photo alone never establishes circuit connectivity or damage.
 
 ## Demonstration data and provenance
 - Regulator demo: committed ngspice comparison, stress/risk reports, and explicit 6.3 V C1 / 125 mW RLOAD example limits.

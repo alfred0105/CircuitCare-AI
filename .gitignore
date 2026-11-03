@@ -12,4 +12,5 @@ build/
 .env
 data/private/
 data/ui_runs/
+data/vision_results/
 reports/
