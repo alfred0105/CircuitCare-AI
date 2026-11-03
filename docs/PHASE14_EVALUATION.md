@@ -24,7 +24,7 @@ A unit-level reassessment used an explicitly labeled test-only approval record d
 - `compileall` over source, scripts, and tests completed; `git diff --check` passed.
 - The baseline CircuitCare CLI still loaded the five-component sample and returned U1 connectivity candidates.
 - Streamlit AppTest loaded all eight tabs, uploaded the official PDF, showed `CONDITION_INCOMPLETE` for the 70°C power row, executed a real local Ollama extraction, and showed `SOURCE_MISMATCH` for a 300 value whose unit was only implied by context. No app exceptions occurred.
-- GitHub Actions verification will be recorded after push.
+- GitHub Actions: [Tests run 41581184319](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41581184319) passed for implementation commit `0236d1ab91ccfb4abbe8925b3aff9852797ed45b`.
 
 ## Accuracy, boundaries, next work
 
