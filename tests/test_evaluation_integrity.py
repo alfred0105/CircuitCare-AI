@@ -104,8 +104,18 @@ def test_llm_only_ranking_does_not_inject_missing_truth_candidate():
     assert score_fault_rankings(cases, llm_only)["top_k_accuracy"]["1"] == 0.0
 
 
+def test_empty_fault_evaluation_has_null_metrics_and_no_ranking_claim():
+    proposal = score_fault_proposals([], {})
+    ranking = score_fault_rankings([], {})
+    assert proposal["status"] == "NOT_EVALUATED"
+    assert proposal["candidate_precision"] is None
+    assert ranking["ranking_coverage"] is None
+    assert ranking["top_k_accuracy"]["1"] is None
+
+
 def _truth():
-    return {"document_id": "D1", "rating_key": "max_power_w", "value": 0.1, "unit": "W",
+    return {"document_id": "D1", "manufacturer": "Vishay", "mpn": "MCT 0603",
+            "rating_key": "max_power_w", "value": 0.1, "unit": "W",
             "rating_kind": "continuous", "conditions": {"temperature_c": 70},
             "pdf_page_index": 0, "evidence_text": "Rated power 0.1 W at 70 C",
             "evaluation_scope": {"scope_type": "target_rating", "complete_target_scope": True,
@@ -113,7 +123,8 @@ def _truth():
 
 
 def _candidate(**kwargs):
-    row = {"document_id": "D1", "rating_key": "max_power_w", "normalized_value": 0.1,
+    row = {"document_id": "D1", "manufacturer": "Vishay", "mpn": "MCT 0603",
+           "rating_key": "max_power_w", "normalized_value": 0.1,
            "normalized_unit": "W", "rating_kind": "continuous",
            "conditions": {"temperature_c": 70}, "pdf_page_index": 0,
            "source_text": "Rated power 0.1 W at 70 C", "evidence_status": "SOURCE_MATCHED"}
@@ -138,6 +149,8 @@ def test_wrong_unit_and_wrong_model_variant_are_classified_not_called_hallucinat
     variant_truth = {**truth, "evaluation_scope": {**truth["evaluation_scope"], "component_variant": "MCT 0603"}}
     other_variant = _candidate(table_context={"variant": "MCS 0402"})
     assert classify_candidate(other_variant, variant_truth) == "WRONG_COMPONENT_VARIANT"
+    other_mpn = _candidate(mpn="MCT 0402")
+    assert classify_candidate(other_mpn, truth) == "WRONG_COMPONENT_VARIANT"
     assert score_extractions([truth], [_candidate(evidence_status="SOURCE_NOT_FOUND")])["hallucination_rate"]["status"] == "NOT_EVALUATED"
 
 

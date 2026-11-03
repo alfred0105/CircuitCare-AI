@@ -141,6 +141,10 @@ def classify_in_scope_error(truth: dict[str, Any], candidate: dict[str, Any]) ->
 def _scope_status(candidate: dict[str, Any], truth: dict[str, Any]) -> str:
     if not _same_document(truth, candidate) or candidate.get("rating_key") != truth.get("rating_key"):
         return "OUT_OF_SCOPE"
+    for key in ("manufacturer", "mpn"):
+        expected_identity, actual_identity = truth.get(key), candidate.get(key)
+        if expected_identity and actual_identity and _norm(expected_identity) != _norm(actual_identity):
+            return "WRONG_COMPONENT_VARIANT"
     status = candidate.get("evidence_status")
     if status == "SOURCE_AMBIGUOUS":
         return "SOURCE_AMBIGUOUS"
