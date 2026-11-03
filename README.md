@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–13 implemented; 44 local tests pass and the latest GitHub Actions run passed.** Optional local ONNX detection/OCR and a Component–Net influence map are available. The PCB detector has public validation-split metrics, but design-reference matching on a CircuitCare board is unverified. Risk levels, model scores, heuristic matches, and Bayesian posterior weights do **not** establish actual damage or real-world failure probability.
+> **Status: Phases 01–14 implemented; Phase 14's one-document local extraction and UI flow were verified locally.** Broad rating-extraction accuracy and physical MPN-to-Reference matching remain unverified. Optional local ONNX detection/OCR, a Component–Net influence map, and evidence-gated datasheet rating review are available. Risk levels, model scores, heuristic matches, and Bayesian posterior weights do **not** establish actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -30,6 +30,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 11 | PCB photo input, manual registration, evidence-based risk overlay | Complete; synthetic fixture and KiCad CSV format verified, real board not verified |
 | 12 | Local PCB component detection, silkscreen OCR, design-aware matching | Complete; public validation split evaluated, matching CircuitCare board unavailable |
 | 13 | Interactive influence map and Bayesian What-if dashboard | Implemented; U1 virtual interaction and stress-data separation verified locally |
+| 14 | Local datasheet extraction and evidence-gated rating review | Implemented; one YAGEO PDF and local Ollama smoke-checked; broad accuracy and physical Reference match not evaluated |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -43,7 +44,7 @@ circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1
 python -m pytest -q
 ```
 
-CI는 Python 3.11에서 이 테스트 의존성 조합을 설치합니다. Vision은 실행 시 선택 기능이지만, 현재 전체 테스트 수집에는 NumPy/OpenCV/Pillow가 필요합니다.
+CI는 Python 3.11에서 `dev`, `vision`, `datasheet` 테스트 의존성을 설치합니다. PDF 테스트는 공식 데이터시트나 LLM 모델을 다운로드하지 않고 합성 PDF로 실행됩니다. Vision은 실행 시 선택 기능이지만, 현재 전체 테스트 수집에는 NumPy/OpenCV/Pillow가 필요합니다.
 
 For the integrated dashboard, install the optional UI dependency and start Streamlit:
 
@@ -51,6 +52,15 @@ For the integrated dashboard, install the optional UI dependency and start Strea
 python -m pip install -e ".[ui]"
 streamlit run src/circuitcare/ui.py
 ```
+
+To enable the **데이터시트 AI** tab's local PDF text/table extraction, install the optional PDF readers too:
+
+```bash
+python -m pip install -e ".[ui,datasheet]"
+streamlit run src/circuitcare/ui.py
+```
+
+The tab uses `pypdf` and `pdfplumber`; local LLM structuring reuses the loopback-only Ollama integration. Candidate values are never applied until their cited source, MPN-to-Reference mapping, conditions, and human approval are confirmed. See [Datasheet AI guide](docs/DATASHEET_AI_GUIDE.md) and [Phase 14 evaluation](docs/PHASE14_EVALUATION.md).
 
 To enable the optional local PCB photo workflow (OpenCV, NumPy, and Pillow), install the vision extra too:
 
@@ -65,7 +75,7 @@ Optional AI setup: `python -m pip install -e ".[ui,vision,vision-ai,vision-ocr]"
 
 The **분석 개요** tab provides a Component–Net fault influence candidate map with separate connectivity, electrical-stress, and conditional inspection-priority views. U1 What-if controls recalculate Bayesian outputs from a `simulated_demo` virtual measurement; they do not change actual measurement records or rerun SPICE. See the [fault map guide](docs/FAULT_MAP_GUIDE.md), [What-if guide](docs/WHAT_IF_DIAGNOSIS.md), and [Phase 13 verification record](docs/PHASE13_EVALUATION.md).
 
-The dashboard has circuit/fault, SPICE, rating risk, Bayesian diagnosis, local LLM, and optional PCB photo tabs. It opens the saved 5 V→8 V regulator demo by default; the divider and RC charging examples can also be run with ngspice. Simulation status distinguishes `CACHED`, `RUNNING`, `SUCCESS`, `FAILED`, and `NOT_RUN`; failed reruns do not keep a previous live result active. User measurements and simulated demo measurements are distinguished. The saved U1 3/6/8 V Bayesian set is shown only in its matching regulator demo context; it is identified as stored scenario evidence, separate from the selected live run. Ollama is called only after an explicit question. Without Ollama, deterministic advice remains available.
+The dashboard has circuit/fault, SPICE, rating risk, Bayesian diagnosis, local LLM, PCB photo, and datasheet review tabs. It opens the saved 5 V→8 V regulator demo by default; the divider and RC charging examples can also be run with ngspice. Simulation status distinguishes `CACHED`, `RUNNING`, `SUCCESS`, `FAILED`, and `NOT_RUN`; failed reruns do not keep a previous live result active. User measurements and simulated demo measurements are distinguished. The saved U1 3/6/8 V Bayesian set is shown only in its matching regulator demo context; it is identified as stored scenario evidence, separate from the selected live run. Ollama is called only after an explicit question or explicit datasheet extraction action. Without Ollama, deterministic advice and rule-based datasheet candidates remain available.
 
 For an offline presentation, install the package, ngspice, and (if desired) an Ollama model before disconnecting from the internet. Ollama models are not committed to this repository. Run `python scripts/demo_check.py` before the event to verify local prerequisites and cached data without repeating circuit simulations.
 
@@ -162,7 +172,7 @@ Use `--no-llm` to produce deterministic isolation, inspection, replacement, and 
 
 ## Current implementation and next phase
 
-Phases 01–10 provide the electrical-analysis workflow; Phase 11 adds manual PCB photo alignment, Phase 12 adds optional local detector/OCR review, and Phase 13 adds interactive visualization and an isolated What-if preview. Electrical evaluation is in [the final evaluation record](docs/FINAL_EVALUATION.md), with the [Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. PCB model evidence and limits are in [the Phase 12 evaluation](docs/PCB_AI_EVALUATION.md). Evaluation and timing values describe the recorded local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–10 provide the electrical-analysis workflow; Phase 11 adds manual PCB photo alignment, Phase 12 adds optional local detector/OCR review, Phase 13 adds interactive visualization and an isolated What-if preview, and Phase 14 adds locally processed datasheets with evidence-gated rating review. Electrical evaluation is in [the final evaluation record](docs/FINAL_EVALUATION.md), with the [Phase 09 summary](data/evaluations/phase09_summary.json); run `python scripts/evaluate.py` to regenerate the latter. PCB model evidence and limits are in [the Phase 12 evaluation](docs/PCB_AI_EVALUATION.md); datasheet evidence and limits are in [the Phase 14 evaluation](docs/PHASE14_EVALUATION.md). Evaluation and timing values describe the recorded local environment and are not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 The figures in [the poster content](docs/POSTER_CONTENT.md) are generated from committed JSON/CSV evidence by `python scripts/make_poster_figures.py`. Evaluation is limited to two independent small circuit topologies and a separate regulator Bayesian demo. There are no independent damaged-part labels, so damage-detection accuracy, Top-k damage coverage, and avoidable inspections are not claimed. The RSS reported by the evaluation excludes ngspice and Ollama child processes.
 

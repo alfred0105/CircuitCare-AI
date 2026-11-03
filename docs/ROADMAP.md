@@ -73,6 +73,15 @@ Add an evidence-separated Component–Net candidate map to a new overview tab. R
 
 **Complete when:** interactive UI, context-scoped What-if state, stress/diagnosis separation, exports, regression tests, documentation, and CI are complete. Phase 14 may proceed; automatic datasheet rating extraction is not part of this phase.
 
+## Phase 14 — Local datasheet intelligence and verified rating integration — Implementation complete
+Add optional `pypdf`/`pdfplumber` processing and bounded local Ollama extraction. Preserve source page, quote, SHA-256, unit, rating type and conditions; require same-page evidence checks, user approval, MPN-to-Reference confirmation, and condition confirmation before adapting a rating into the existing per-metric Rating Engine input. Reassess with existing saved SPICE stress; do not rerun the simulator or mutate baseline ratings, Bayesian measurements, or PCB geometry. Keep review and apply/revoke records local and append-only.
+
+**Verified locally:** one official YAGEO RC0805FR-071KL product PDF was parsed; the 0.125 W at 70°C candidate matched its page quote/value/unit. Local Ollama `gemma4:12b` structured candidates; unsupported implied-unit voltage candidates were rejected. Streamlit AppTest uploaded the PDF and exercised the local extraction action. Adapter tests reuse cached stress; risk remains `WITHIN_LIMIT` for the test RLOAD because the extracted 0.125 W equals its prior demo assumption, while provenance changes. The saved SPICE stress hash stayed unchanged. Details: [Phase 14 evaluation](PHASE14_EVALUATION.md).
+
+**Not evaluated / not verified:** one PDF is not an extraction-accuracy dataset; overall precision/recall and rules-only versus rules-plus-LLM comparison remain `NOT EVALUATED`. The repository has a 1 kΩ KiCad value for RLOAD but no physical board proof that its installed MPN is the YAGEO part. No real user approval or physical Reference match is claimed. Datasheet OCR and complex condition/derating analysis are not implemented.
+
+**Phase 15 direction:** build a licensed multi-family ground-truth corpus, improve rating-row/condition association, independently measure candidate errors, and verify MPN-to-Reference mapping on a known board before making broader accuracy claims.
+
 ## Explicit future scope
 Image-derived connectivity, instrument control, broad IC model ingestion, and probabilistically calibrated field-failure forecasts remain out of scope. A matched CircuitCare PCB photo/design dataset and independent board-level Reference-matching evaluation are still needed.
 

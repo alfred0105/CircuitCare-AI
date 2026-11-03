@@ -19,6 +19,7 @@ poster = ["matplotlib>=3.8"]
 vision = ["numpy>=1.26,<3", "opencv-python-headless>=4.10,<5", "Pillow>=10"]
 vision-ai = ["onnxruntime>=1.18,<2"]
 vision-ocr = ["rapidocr>=3.10,<4", "onnxruntime>=1.18,<2"]
+datasheet = ["pypdf>=5,<7", "pdfplumber>=0.11,<1"]
 
 [project.scripts]
 circuitcare = "circuitcare.cli:main"

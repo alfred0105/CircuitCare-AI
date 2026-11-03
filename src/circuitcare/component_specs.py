@@ -32,6 +32,9 @@ def load_component_specs(path: str | Path) -> dict[str, Any]:
             not isinstance(source, dict) or not isinstance(source.get("type"), str) or not source["type"].strip()
         ):
             raise ValueError(f"component {reference} has ratings but no source metadata")
+        rating_sources = component.get("rating_sources", {})
+        if not isinstance(rating_sources, dict) or set(rating_sources) - RATING_KEYS:
+            raise ValueError(f"rating_sources for {reference} must use supported rating keys")
         kinds = component.get("rating_types", {})
         if not isinstance(kinds, dict) or set(kinds) - RATING_KEYS:
             raise ValueError(f"rating_types for {reference} must use supported rating keys")

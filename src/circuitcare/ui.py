@@ -13,6 +13,9 @@ import time
 from pathlib import Path
 
 from circuitcare.conversation import answer_question
+from circuitcare.datasheet.datasheet_ui import render_datasheet_tab
+from circuitcare.datasheet.rating_adapter import apply_approved_rating, reassess_existing_risk
+from circuitcare.datasheet.rating_review import find_applications
 from circuitcare.diagnosis_ai import run_diagnosis
 from circuitcare.evidence_builder import build_evidence
 from circuitcare.graph import build_graph, direct_candidates, find_paths, to_dot
@@ -146,6 +149,27 @@ def main() -> None:
     comparison = _json_if_exists(comparison_path)
     risk = _json_if_exists(risk_path)
     stress = _json_if_exists(stress_path)
+    base_risk = risk
+    component_mapping = _json_if_exists(ROOT / case["mapping"])
+    stress_signature = hashlib.sha256(stress_path.read_bytes()).hexdigest() if stress_path.is_file() else None
+    applied_key = f"datasheet_applied_{context_key}"
+    applied_ratings = st.session_state.get(applied_key)
+    if applied_ratings is None and stress_signature and risk.get("scenario_id"):
+        applied_ratings = find_applications(ROOT / "data/private/datasheet_ai/applied_ratings.json",
+            circuit_path=case["netlist"], scenario_id=risk["scenario_id"], stress_sha256=stress_signature)
+        if applied_ratings:
+            st.session_state[applied_key] = applied_ratings
+    if applied_ratings and risk and stress:
+        try:
+            applied_specs = json.loads((ROOT / case["ratings"]).read_text(encoding="utf-8"))
+            for application in applied_ratings:
+                record = application["record"]
+                applied_specs = apply_approved_rating(applied_specs, record,
+                    component_ref=application["component_ref"], selected_reference=application["component_ref"],
+                    mpn_match_status=record["mpn_match_status"], conditions_compatible=application["conditions_compatible"])
+            risk = reassess_existing_risk(risk, stress, applied_specs, component_mapping)
+        except (OSError, ValueError, KeyError, TypeError):
+            st.session_state.pop(f"datasheet_applied_{context_key}", None)
     is_cached_selection = _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value)
     status = _simulation_status(live_used, st.session_state.get("live_error"), is_cached_selection)
     if status != "RUNNING":
@@ -160,7 +184,7 @@ def main() -> None:
     client, models = _ollama_models()
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
 
-    tabs = st.tabs(["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식"])
+    tabs = st.tabs(["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI"])
     with tabs[0]:
         what_if_result = _render_analysis_overview(
             st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
@@ -352,6 +376,13 @@ def main() -> None:
             inspection_ranking=(what_if_result or {}).get("inspection_ranking"),
             selected_component=st.session_state.get(f"fault_map_component_{hashlib.sha256(repr(context_key).encode()).hexdigest()[:10]}"),
         )
+    with tabs[7]:
+        render_datasheet_tab(st, root=ROOT, circuit=circuit,
+            context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16], case=case,
+            risk=base_risk, stress=stress, client=client, models=models,
+            stress_signature=stress_signature,
+            applied_records=applied_ratings,
+            current_risk=risk if applied_ratings and risk.get("reassessment_source") else None)
 
     _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None)
 

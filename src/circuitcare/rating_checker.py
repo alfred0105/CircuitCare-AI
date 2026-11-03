@@ -21,7 +21,6 @@ def check_component_ratings(
         reference = component["component_ref"]
         spec = specs.get(reference, {})
         ratings = spec.get("ratings", {})
-        source = spec.get("source")
         model_type = component_mapping.get(reference, {}).get("model_type")
         metrics = {}
         for measured_key, (rating_key, unit, measure_method) in _METRICS.items():
@@ -44,6 +43,7 @@ def check_component_ratings(
             utilization = None
             exceeded = None
             rating_kind = spec.get("rating_types", {}).get(rating_key, "unknown")
+            source = spec.get("rating_sources", {}).get(rating_key, spec.get("source"))
             if fault_summary and fault_summary.get("maximum") is not None:
                 raw_fault_peak = fault_summary["maximum"]
                 stress = max(abs(fault_summary.get("minimum", raw_fault_peak)), abs(raw_fault_peak)) if measure_method == "absolute_peak" else max(0.0, raw_fault_peak)
