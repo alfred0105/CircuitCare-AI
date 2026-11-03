@@ -302,6 +302,16 @@ def test_prior_registry_requires_approval_and_supports_activate_deactivate_rollb
     assert [event["action"] for event in repository.list_prior_events()]
 
 
+def test_prior_registry_rejects_operational_threshold_below_five(tmp_path):
+    repository = RepairCaseRepository(tmp_path / "repair.sqlite3")
+    one_case = [_case("single")]
+    proposal = estimate_prior(one_case, group_id="regulator-family", hypothesis_set_id="regulator-set-v1",
+        base_prior=HYPOTHESES, minimum_cases=1)
+    assert proposal["status"] == "PROPOSAL_READY"
+    with pytest.raises(ValueError, match="minimum of 5"):
+        propose_prior(repository, proposal)
+
+
 def test_deleting_a_training_case_invalidates_and_deactivates_its_prior(tmp_path):
     repository = RepairCaseRepository(tmp_path / "repair.sqlite3")
     cases = [_case(f"case-{index}", index=index) for index in range(1, 6)]

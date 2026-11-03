@@ -8,6 +8,8 @@ import math
 from .case_repository import RepairCaseRepository
 from .models import utc_now
 
+MIN_OPERATIONAL_PRIOR_CASES = 5
+
 
 def propose_prior(repository: RepairCaseRepository, proposal: dict) -> dict:
     if proposal.get("status") != "PROPOSAL_READY" or not proposal.get("prior_weights"):
@@ -15,6 +17,8 @@ def propose_prior(repository: RepairCaseRepository, proposal: dict) -> dict:
     if proposal.get("contains_synthetic_records") is not False:
         raise ValueError("Prior proposal provenance must explicitly exclude synthetic records.")
     ids = proposal.get("training_case_ids", [])
+    if proposal.get("minimum_case_count", 0) < MIN_OPERATIONAL_PRIOR_CASES:
+        raise ValueError(f"Operational prior proposals require a minimum of {MIN_OPERATIONAL_PRIOR_CASES} distinct verified cases.")
     if len(ids) != len(set(ids)) or len(ids) != proposal.get("eligible_case_count") or not ids:
         raise ValueError("Prior proposal requires distinct case IDs matching its eligible case count.")
     if len(ids) < proposal.get("minimum_case_count", 1):
@@ -54,6 +58,8 @@ def activate_prior(repository: RepairCaseRepository, version: str, *, reviewer: 
         raise ValueError("A human-approved prior is required before activation.")
     if model.get("contains_synthetic_records") is not False or not model.get("training_case_ids") or not model.get("prior_weights"):
         raise ValueError("Only a non-empty, real-repair prior proposal can be activated.")
+    if len(set(model.get("training_case_ids", []))) < MIN_OPERATIONAL_PRIOR_CASES or model.get("eligible_case_count", 0) < MIN_OPERATIONAL_PRIOR_CASES:
+        raise ValueError(f"Activation requires at least {MIN_OPERATIONAL_PRIOR_CASES} distinct verified real-repair cases.")
     for current in repository.list_prior_models(group_id=model["group_id"]):
         if current.get("status") == "ACTIVE" and current["version"] != version:
             repository.update_prior_model(current["version"], status="APPROVED")

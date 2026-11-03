@@ -184,7 +184,7 @@ def main() -> None:
     client, models = _ollama_models()
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
 
-    tabs = st.tabs(["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석", "수리 이력 및 AI 학습"])
+    tabs = st.tabs(["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석", "수리 이력 및 AI 학습", "AI 성능 평가"])
     with tabs[0]:
         what_if_result = _render_analysis_overview(
             st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
@@ -397,6 +397,9 @@ def main() -> None:
                 "circuit_hash": hashlib.sha256(netlist_path.read_bytes()).hexdigest(),
                 "component_refs": sorted(circuit.components)},
             fault_state=fault_state)
+    with tabs[10]:
+        from circuitcare.benchmark_ui import render_benchmark_tab
+        render_benchmark_tab(st, root=ROOT)
 
     _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None)
 

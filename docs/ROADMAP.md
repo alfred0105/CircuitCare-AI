@@ -108,3 +108,9 @@ Blinded the local fault-proposal payload with an explicit allowlist, preserved m
 Adds a local SQLite repair-case history, immutable diagnosis snapshots, evidence and outcome review, duplicate screening, explicit training eligibility, smoothed prior proposals, approval and rollback, Bayesian comparison, and evaluation leakage checks. The Streamlit dashboard includes the **수리 이력 및 AI 학습** tab. Synthetic fixtures verify the workflow and estimator only; they are not activated as real repair priors.
 
 **Current evidence status:** repair feedback implementation complete; synthetic workflow verified; real repair cases `0`; eligible real cases `0`; active learned prior `NONE`; real-repair performance `NOT_EVALUATED`. Independent holdout improvement remains unevaluated. Details and method are recorded in [Phase 16 evaluation](PHASE16_EVALUATION.md), [Repair Feedback guide](REPAIR_FEEDBACK_GUIDE.md), and [Prior Learning guide](PRIOR_LEARNING_GUIDE.md).
+
+## Phase 17 — Independent benchmark and statistical validation — In progress
+
+Benchmark infrastructure now separates public diagnostic inputs from private labels, checks the exact pre-call LLM payload, scores component/mode/exact hypothesis levels, separates end-to-end and conditional SPICE ranking, applies equal per-case simulation budgets, records runtime and reproducibility metadata, and provides a saved-result-only Streamlit dashboard. A builder is prepared to create five new synthetic topology groups with two SPICE-injected cases each after benchmark code is committed and frozen.
+
+The existing Phase 15 examples remain a reused three-topology development set. No Phase 17 independent holdout result is claimed until frozen code is used to build and evaluate the new synthetic cases. Real-repair accuracy, open-set rejection, multi-node measurement-policy comparison, new datasheet holdout, physical PCB Reference matching, and real learned-prior benefit remain `NOT_EVALUATED` without suitable data.

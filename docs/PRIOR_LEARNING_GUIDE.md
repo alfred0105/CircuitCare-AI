@@ -22,6 +22,8 @@ This method is valid only for the configured mutually exclusive hypothesis set. 
 
 A proposal records its model version, hypothesis set, circuit family, source case IDs/count, base prior, smoothing parameter, and estimated weights. A proposal is not automatically applied. A user reviews and approves it, then activates a version. The registry preserves versions and activation events and supports deactivation and rollback. If a source case is deleted or changed, the derived prior is invalidated and removed from active use.
 
+Operational safeguard: proposal registration and activation both require at least five distinct reviewed real-repair cases, even if a development estimator was called with a lower test threshold. The UI does not allow lowering this operating minimum.
+
 The Fault AI screen offers `Default Prior` and an approved compatible learned prior. Unapproved versions are preview-only in the learning screen. A missing or incompatible model falls back to the default prior and reports the reason. The Bayesian integration changes only optional prior weights; it continues to use the existing observation likelihood calculation.
 
 ## Comparison limits

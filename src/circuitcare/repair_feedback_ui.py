@@ -233,7 +233,7 @@ def _render_prior_learning(st: Any, repository: RepairCaseRepository) -> None:
             base_case = repository.get_case(selected)
             snapshot = base_case["diagnosis_snapshot"]
             hypothesis_set_id = snapshot["hypothesis_set_id"]
-            minimum_cases = st.number_input("최소 검증 사례 수", min_value=1, value=5, step=1,
+            minimum_cases = st.number_input("최소 검증 사례 수", min_value=5, value=5, step=1,
                 help="운영 기본값 5는 설정값이며 통계적으로 최적이라고 주장하지 않습니다.")
             alpha = st.number_input("Dirichlet smoothing α", min_value=0.1, value=5.0, step=0.5,
                 help="기본 Prior 쪽으로 수축하는 명시적 설정값입니다. 최적값으로 검증된 값은 아닙니다.")

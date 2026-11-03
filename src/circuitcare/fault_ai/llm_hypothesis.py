@@ -2,7 +2,7 @@
 
 import json
 import time
-from typing import Any
+from typing import Any, Callable
 
 from circuitcare.local_llm import OllamaClient
 
@@ -18,18 +18,13 @@ _SYSTEM = ("You propose circuit fault hypotheses as untrusted JSON data. Never f
 def propose_hypotheses(client: OllamaClient, model: str, *, circuit_id: str,
                        components: list[dict[str, Any]], observations: list[dict[str, Any]],
                        symptoms: str, executable_catalog: list[dict[str, Any]],
-                       include_candidate_parameters: bool = True) -> dict[str, Any]:
-    allowed = []
-    for row in executable_catalog:
-        if row.get("validation_status") != "VALIDATED_EXECUTABLE":
-            continue
-        candidate = {"component_ref": row["component_ref"], "fault_type": row["fault_type"],
-                     "nets": row.get("nets", [])}
-        if include_candidate_parameters:
-            candidate["parameters"] = row.get("parameters", {})
-        allowed.append(candidate)
-    payload = {"circuit_id": circuit_id, "components": components[:100], "observations": observations[:30],
-               "symptoms": str(symptoms)[:2000], "executable_catalog": allowed[:80]}
+                       include_candidate_parameters: bool = True,
+                       pre_call_audit: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
+    payload = build_proposal_payload(circuit_id=circuit_id, components=components,
+        observations=observations, symptoms=symptoms, executable_catalog=executable_catalog,
+        include_candidate_parameters=include_candidate_parameters)
+    if pre_call_audit is not None:
+        pre_call_audit(payload)
     start = time.perf_counter()
     response = client.chat_json(model, [{"role": "system", "content": _SYSTEM},
                                         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}])
@@ -52,3 +47,20 @@ def propose_hypotheses(client: OllamaClient, model: str, *, circuit_id: str,
     return {"hypotheses": candidates, "model": response.get("model"), "model_info": response.get("model_info"),
             "prompt_version": PROMPT_VERSION, "latency_seconds": round(time.perf_counter() - start, 4),
             "json_mode": response.get("json_mode")}
+
+
+def build_proposal_payload(*, circuit_id: str, components: list[dict[str, Any]],
+                           observations: list[dict[str, Any]], symptoms: str,
+                           executable_catalog: list[dict[str, Any]],
+                           include_candidate_parameters: bool = True) -> dict[str, Any]:
+    allowed = []
+    for row in executable_catalog:
+        if row.get("validation_status") != "VALIDATED_EXECUTABLE":
+            continue
+        candidate = {"component_ref": row["component_ref"], "fault_type": row["fault_type"],
+                     "nets": row.get("nets", [])}
+        if include_candidate_parameters:
+            candidate["parameters"] = row.get("parameters", {})
+        allowed.append(candidate)
+    return {"circuit_id": circuit_id, "components": components[:100], "observations": observations[:30],
+            "symptoms": str(symptoms)[:2000], "executable_catalog": allowed[:80]}
