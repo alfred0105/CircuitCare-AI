@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–08 complete; Phase 09 integration is in progress.** The Streamlit dashboard displays saved analysis and provides the integration tabs, but its live ngspice button currently fails in this macOS Streamlit process with ngspice exit code `-11`. The same CLI simulations succeed when run directly. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
+> **Status: Phases 01–09 complete.** The Streamlit dashboard runs live ngspice analyses in an isolated Python subprocess, validates fresh results before displaying them, and keeps measurements and outputs scoped to the selected circuit and fault conditions. Risk levels and posterior weights do **not** determine actual damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -25,7 +25,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 06 | Secondary-damage stress assessment and evidence | Complete; overvoltage demo flags C1 above its declared demo rating |
 | 07 | Local lightweight AI and active measurement ranking | Complete; simulated measurement updates hypothesis posterior |
 | 08 | Evidence-grounded repair recommendations and audit trail | Complete; local Ollama explanation plus deterministic fallback |
-| 09 | UI, benchmark, offline evaluation | In progress; dashboard and two independent CLI evaluations work, UI live ngspice execution unresolved |
+| 09 | UI, benchmark, offline evaluation | Complete; divider and RC live runs verified in the dashboard, with fault-scoped session state and accumulated Bayesian measurements |
 | 10 | Stabilization, poster, reproducible demo | Planned |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -133,7 +133,7 @@ Use `--no-llm` to produce deterministic isolation, inspection, replacement, and 
 
 ## Current implementation and next phase
 
-Phases 01–08 are implemented. Phase 09 adds the dashboard and two distinct small circuit topologies (resistor divider and RC charging) with reproducible live ngspice CLI evaluations. See [the Phase 09 summary](data/evaluations/phase09_summary.json) and run `python scripts/evaluate.py` to regenerate it. The dashboard’s live simulation action still fails with ngspice exit code `-11` in the current Streamlit process, although the same CLI runs succeed directly; therefore full UI end-to-end acceptance remains open. Timings and memory are local observations, not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
+Phases 01–09 are implemented. Phase 09 adds the dashboard and two distinct small circuit topologies (resistor divider and RC charging) with reproducible live ngspice evaluations. The dashboard runs each analysis in a separate Python subprocess using a unique output directory, and activates a result only after checking the process status, scenario identity, simulation status, and newly written reports. Divider R1 drift and RC RCHARGE drift were both run successfully from the dashboard; the divider showed LOAD changing from 2.5 V to about 0.455 V, and the RC view showed its normal/fault waveform. Session data is keyed to the circuit files and fault settings; measurements accumulate by node, replace earlier values for the same node, and can be cleared to recompute prior-only results. See [the Phase 09 summary](data/evaluations/phase09_summary.json) and run `python scripts/evaluate.py` to regenerate it. Timings and memory are local observations, not general performance guarantees. Only explicitly supplied ratings and supported measurements are evaluated. Posterior weights are conditional on the configured hypothesis set and do not estimate real-world failure probability or confirm damage.
 
 ## Scope and caution
 

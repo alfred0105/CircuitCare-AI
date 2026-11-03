@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import csv
-import io
 import json
 import re
+import subprocess
 import sys
 import tempfile
 import time
-from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
 
 from circuitcare.conversation import answer_question
-from circuitcare.cli import main as cli_main
 from circuitcare.diagnosis_ai import run_diagnosis
 from circuitcare.evidence_builder import build_evidence
 from circuitcare.graph import build_graph, direct_candidates, find_paths, to_dot
@@ -69,12 +66,18 @@ def main() -> None:
     fault_type = st.sidebar.selectbox("고장 유형", case["fault_types"], index=case["fault_types"].index(case["fault_type"]), key=f"fault_type_{case_name}")
     needs_value = fault_type in {"resistance_drift", "regulator_output_rise", "regulator_output_drop"}
     fault_value = st.sidebar.text_input("고장 파라미터 (SPICE 숫자 표기)", value=case["value"] if fault_type == case["fault_type"] else ("10k" if fault_type == "resistance_drift" else "8"), disabled=not needs_value, key=f"fault_value_{case_name}_{fault_type}")
+    context_key = _analysis_context_key(case_name, case, selected_fault, fault_type, fault_value if needs_value else None)
+    if st.session_state.get("analysis_context_key") != context_key:
+        for key in ("live_result_dir", "diagnosis_result", "measurements", "last_advisor", "live_error"):
+            st.session_state.pop(key, None)
+        st.session_state.analysis_context_key = context_key
+        st.session_state.measurements = []
     st.sidebar.caption(f"선택한 고장 모델: {fault_type} · 파라미터: {fault_value if needs_value else '해당 없음'}")
     st.sidebar.caption("시연 데이터는 저장된 결과이며, 새 시뮬레이션은 버튼을 눌렀을 때만 실행합니다.")
 
     run_col, state_col = st.sidebar.columns(2)
     run_live = run_col.button("ngspice 실행", disabled=not _command_exists("ngspice"), use_container_width=True)
-    live_matches = bool(st.session_state.get("live_result_dir")) and st.session_state.get("live_case") == case_name and st.session_state.get("live_fault") == selected_fault and st.session_state.get("live_fault_type") == fault_type and st.session_state.get("live_fault_value") == fault_value
+    live_matches = bool(st.session_state.get("live_result_dir")) and st.session_state.get("live_context_key") == context_key
     if not live_matches:
         st.session_state.pop("live_result_dir", None)
         live_used = False
@@ -90,7 +93,7 @@ def main() -> None:
             st.sidebar.error("파라미터는 양수 숫자 또는 10k 같은 SPICE 숫자 표기만 허용합니다.")
             st.stop()
         slug = {"U1": "regulator_8v", "R1": "divider_r1_drift", "RCHARGE": "rc_rcharge_drift"}.get(selected_fault, "scenario")
-        output = ROOT / "data/ui_runs" / slug
+        output = ROOT / "data/ui_runs" / f"{slug}-{time.time_ns()}"
         cmd = [sys.executable, "-m", "circuitcare.cli", "--netlist", str(netlist_path), "--fault", selected_fault,
                "--fault-type", fault_type, "--spice-base", str(ROOT / case["base"]),
                "--spice-mapping", str(ROOT / case["mapping"]), "--output", str(output), "--simulate", "--probes", str(ROOT / case["probes"]),
@@ -99,19 +102,19 @@ def main() -> None:
             cmd.extend(["--fault-value", fault_value])
         with st.spinner("Fault Injection → ngspice → stress/rating assessment 실행 중…"):
             try:
-                cli_output = io.StringIO()
-                with patch.object(sys, "argv", [cmd[2], *cmd[3:]]), redirect_stdout(cli_output):
-                    cli_main()
-                json.loads(cli_output.getvalue())
-                st.session_state.live_result_dir = str(output / "simulation_results" / f"fault_{selected_fault.lower()}_{fault_type}")
-                st.session_state.live_case = case_name
-                st.session_state.live_fault = selected_fault
-                st.session_state.live_fault_type = fault_type
-                st.session_state.live_fault_value = fault_value
+                completed = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=180, check=False)
+                result_dir = _validate_live_result(completed, output, selected_fault, fault_type)
+                st.session_state.live_result_dir = str(result_dir)
+                st.session_state.live_context_key = context_key
+                st.session_state.pop("live_error", None)
                 st.success("새 시뮬레이션 완료")
                 st.rerun()
-            except (OSError, ValueError, RuntimeError, SystemExit, json.JSONDecodeError) as exc:
-                st.error(f"시뮬레이션 실패: {exc}")
+            except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+                details = str(exc)
+                if isinstance(exc, SimulationRunError):
+                    details = exc.details
+                st.session_state.live_error = details
+                st.error(f"시뮬레이션 실패 · 성공 결과로 등록하지 않았습니다.\n\n{details}")
     comparison_path = result_dir / "comparison.json"
     risk_path = result_dir / "risk_assessment.json"
     stress_path = result_dir / "component_stress.json"
@@ -119,7 +122,12 @@ def main() -> None:
     risk = _json_if_exists(risk_path)
     stress = _json_if_exists(stress_path)
     is_cached_selection = selected_fault == case["fault"] and fault_type == case["fault_type"] and fault_value == case["value"]
-    state_col.markdown("🟢 Live Simulation" if live_used else ("🔵 Cached Simulation Result" if is_cached_selection else "⚪ 분석 준비 · 미실행"))
+    if live_used:
+        state_col.markdown("🟢 Live Simulation")
+    elif st.session_state.get("live_error"):
+        state_col.markdown("🔴 Live Simulation 실패" + (" · 저장된 기본 결과 표시" if is_cached_selection else ""))
+    else:
+        state_col.markdown("🔵 Cached Simulation Result" if is_cached_selection else "⚪ 분석 준비 · 미실행")
     st.sidebar.markdown("🟢 ngspice 사용 가능" if _command_exists("ngspice") else "🟠 ngspice 없음 · 저장 결과 조회 가능")
     client, models = _ollama_models()
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
@@ -137,7 +145,7 @@ def main() -> None:
                  "connections": [{"pin": item.pin, "net": item.net} for item in circuit.connections if item.ref == ref],
                  "direct_candidates": [{"reference": item.target_ref, "shared_nets": item.shared_nets, "evidence": item.evidence_level} for item in candidates],
                  "path_candidate_count": len(paths), "graph_note": "연결 기반 후보 경로이며 손상 전파/실제 손상을 증명하지 않습니다."})
-        if not case.get("mapping") or not Path(case.get("mapping", "")).exists():
+        if not case.get("mapping") or not (ROOT / case["mapping"]).is_file():
             st.warning("KiCad XML만 확인 가능합니다. 명시적 SPICE mapping/model이 없어 물리 시뮬레이션을 지원하지 않습니다.")
         st.caption(f"넷리스트: `{case['netlist']}` · 파형/위험 데이터 출처: `{comparison_path.relative_to(ROOT) if comparison_path.exists() else case['cached']}`")
 
@@ -181,11 +189,14 @@ def main() -> None:
     with tabs[3]:
         st.subheader("Bayesian 진단")
         if case.get("prior"):
-            current = st.session_state.get("diagnosis_result") or _load_diagnosis(case)
+            measurements = st.session_state.setdefault("measurements", [])
+            current = st.session_state.get("diagnosis_result") or (_run_diagnosis(measurements) if measurements else _load_diagnosis(case))
             if st.button("저장된 7.9 V simulated_demo 측정으로 예시 갱신"):
                 with MEASUREMENTS.open(encoding="utf-8") as handle:
                     sample = json.load(handle)["measurements"][0]
-                current = _run_diagnosis(sample)
+                measurements = _upsert_measurement(measurements, sample)
+                st.session_state.measurements = measurements
+                current = _run_diagnosis(measurements)
                 st.session_state.diagnosis_result = current
             with st.form("measurement_form"):
                 node = st.selectbox("측정 노드", current["diagnosis"].get("available_measurement_nodes", []), index=0)
@@ -194,7 +205,17 @@ def main() -> None:
                 source = st.selectbox("출처", ["user_measurement", "simulated_demo"], help="실제 계측값을 직접 입력한 경우에만 user_measurement를 선택하세요.")
                 submitted = st.form_submit_button("측정 추가 후 재계산")
             if submitted:
-                current = _run_diagnosis({"node": node, "value": value, "unit": "V", "uncertainty": uncertainty, "source": source})
+                measurements = _upsert_measurement(measurements, {"node": node, "value": value, "unit": "V", "uncertainty": uncertainty, "source": source})
+                st.session_state.measurements = measurements
+                current = _run_diagnosis(measurements)
+                st.session_state.diagnosis_result = current
+            if measurements:
+                st.caption("같은 노드를 다시 입력하면 기존 값을 교체합니다.")
+                st.dataframe(measurements, use_container_width=True, hide_index=True)
+            if st.button("측정값 초기화"):
+                measurements = []
+                st.session_state.measurements = []
+                current = _run_diagnosis([])
                 st.session_state.diagnosis_result = current
             diagnosis = current["diagnosis"]
             if diagnosis.get("model_mismatch"):
@@ -274,12 +295,83 @@ def _load_diagnosis(case: dict) -> dict:
     return {"diagnosis": _json_if_exists(base / "diagnosis.json"), "inspection_ranking": _json_if_exists(base / "inspection_ranking.json"), "recommendations": _json_if_exists(base / "measurement_recommendations.json")}
 
 
-def _run_diagnosis(measurement: dict) -> dict:
+def _run_diagnosis(measurements: list[dict]) -> dict:
     with tempfile.TemporaryDirectory(prefix="circuitcare-ui-") as tmp:
         measurement_path = Path(tmp) / "measurements.json"
-        measurement_path.write_text(json.dumps({"measurements": [measurement]}), encoding="utf-8")
+        measurement_path.write_text(json.dumps({"measurements": measurements}), encoding="utf-8")
         result = run_diagnosis(DEMO_HYPOTHESES, measurement_path, Path(tmp) / "results")
         return {"diagnosis": result["diagnosis"], "inspection_ranking": result["inspection_ranking"], "recommendations": result["recommendations"]}
+
+
+class SimulationRunError(RuntimeError):
+    def __init__(self, details: str):
+        self.details = details
+        super().__init__(details)
+
+
+def _analysis_context_key(case_name: str, case: dict, fault: str, fault_type: str, fault_value: str | None) -> tuple:
+    files = []
+    for name in ("netlist", "base", "mapping", "probes", "ratings", "prior"):
+        value = case.get(name)
+        if not value:
+            continue
+        path = ROOT / value
+        try:
+            stat = path.stat()
+            identity = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            identity = (str(path.resolve()), None, None)
+        files.append((name, identity))
+    return (case_name, fault, fault_type, fault_value, tuple(files))
+
+
+def _upsert_measurement(measurements: list[dict], measurement: dict) -> list[dict]:
+    updated = list(measurements)
+    node = str(measurement["node"])
+    for index, existing in enumerate(updated):
+        if str(existing.get("node", "")).casefold() == node.casefold():
+            updated[index] = measurement
+            return updated
+    updated.append(measurement)
+    return updated
+
+
+def _validate_live_result(completed: subprocess.CompletedProcess, output: Path, fault: str, fault_type: str) -> Path:
+    if completed.returncode != 0:
+        raise SimulationRunError(_simulation_error_details(completed, output))
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise SimulationRunError(f"CLI JSON을 읽을 수 없습니다: {exc}\n{_simulation_error_details(completed, output)}") from exc
+    scenario = payload.get("fault_scenario", {})
+    scenario_id = f"FAULT_{fault}_{fault_type}".upper()
+    report = scenario.get("simulation_analysis", {})
+    if (scenario.get("component_ref") != fault or scenario.get("fault_type") != fault_type
+            or scenario.get("scenario_id") != scenario_id or scenario.get("simulation_status") != "success"
+            or report.get("simulation_status") != "success"
+            or report.get("simulation_run_status") != {"baseline": "success", "fault": "success"}):
+        raise SimulationRunError(f"CLI 출력이 현재 고장 조건의 성공 결과와 일치하지 않습니다.\n{_simulation_error_details(completed, output)}")
+    result_dir = output / "simulation_results" / f"fault_{fault.lower()}_{fault_type}"
+    paths = {name: result_dir / f"{name}.json" for name in ("comparison", "component_stress", "risk_assessment")}
+    if not all(path.is_file() for path in paths.values()):
+        raise SimulationRunError(f"필요한 새 결과 파일이 부족합니다: {', '.join(p.name for p in paths.values() if not p.is_file())}\n{_simulation_error_details(completed, output)}")
+    try:
+        comparison, stress, risk = (json.loads(paths[key].read_text(encoding="utf-8")) for key in ("comparison", "component_stress", "risk_assessment"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SimulationRunError(f"결과 JSON을 읽을 수 없습니다: {exc}\n{_simulation_error_details(completed, output)}") from exc
+    if (comparison.get("simulation_success") is not True or comparison.get("scenario_id") != scenario_id
+            or stress.get("simulation_success") is not True or stress.get("fault_type") != fault_type
+            or risk.get("simulation_status") != "success" or risk.get("scenario_id") != scenario_id
+            or risk.get("failed_component") != fault or risk.get("fault_type") != fault_type):
+        raise SimulationRunError(f"결과 파일 상태 또는 고장 조건이 일치하지 않습니다.\n{_simulation_error_details(completed, output)}")
+    return result_dir
+
+
+def _simulation_error_details(completed: subprocess.CompletedProcess, output: Path) -> str:
+    stderr = (completed.stderr or "").strip()[-3000:] or "(stderr 없음)"
+    logs = sorted(output.rglob("*.log")) if output.exists() else []
+    log_text = ", ".join(str(path) for path in logs) if logs else f"{output}/simulation_results/의 ngspice 로그를 확인하세요."
+    return f"종료 코드: {completed.returncode}\nstderr:\n{stderr}\nngspice 로그: {log_text}"
 
 
 def _advisor_inputs(case: dict) -> tuple[dict, dict, dict]:
