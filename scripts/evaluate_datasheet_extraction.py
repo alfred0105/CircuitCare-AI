@@ -86,12 +86,15 @@ def main() -> int:
             "source_sha256": parsed["sha256"], "manifest_sha256_match": parsed["sha256"] == doc["source_sha256"],
             "page_count": parsed["page_count"], "table_count": len(tables),
             "ground_truth_count": len(truth), "rule_candidate_count": len(rules_checked),
+            "llm_latency_seconds": llm_latency,
             "llm_candidate_count": len(llm_checked), "llm_status": "FAILED" if llm_error else ("SUCCESS" if args.run_llm else "NOT_RUN"),
             "llm_error": llm_error, "rule_only": rule_metrics,
             "rule_plus_llm": combined_metrics, "llm_model": model_info})
     all_truth = [row for group in labels_by_doc.values() for row in group]
     # Per-document metrics are the aggregate unit because a PDF can have many candidates.
     included_truth = [row for row in all_truth if any(doc.get("document_id") == row["document_id"] and doc.get("status") == "EVALUATED" for doc in documents)]
+    measured_llm_latencies = [item["llm_latency_seconds"] for item in documents
+                              if isinstance(item.get("llm_latency_seconds"), (int, float))]
     result = {
         "evaluation_status": "DEVELOPMENT_PILOT" if included_truth else "NOT_EVALUATED",
         "status": "PARTIALLY_EVALUATED" if included_truth else "NOT_EVALUATED",
@@ -101,12 +104,19 @@ def main() -> int:
         "run_metadata": {"git_commit_sha": _git_sha(), "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "python": platform.python_version(), "os": platform.platform(), "llm": model_metadata,
             "model_requested": args.model if args.run_llm else None, "prompt_version": "datasheet-rating-v1" if args.run_llm else None,
-            "documents_dir": Path(args.documents_dir).name, "llm_enabled": args.run_llm},
+            "documents_dir": Path(args.documents_dir).name, "llm_enabled": args.run_llm,
+            "ngspice": "NOT_USED"},
         "document_count": len(docs), "evaluated_document_count": sum(item.get("status") == "EVALUATED" for item in documents),
         "manufacturer_count": len({docs[item["document_id"]]["manufacturer"] for item in documents if item.get("status") == "EVALUATED"}),
         "component_families": {family: sum(1 for item in documents if item.get("status") == "EVALUATED" and docs[item["document_id"]]["component_family"] == family)
                                 for family in sorted({d["component_family"] for d in docs.values()})},
         "ground_truth_rating_count": len(included_truth),
+        "candidate_counts": {"rule_only": len(rule_all), "rule_plus_llm": len(combined_all),
+            "scored_in_target_scope_rule_only": sum(item.get("rule_only", {}).get("scored_candidate_count", 0) for item in documents),
+            "scored_in_target_scope_rule_plus_llm": sum(item.get("rule_plus_llm", {}).get("scored_candidate_count", 0) for item in documents)},
+        "llm_processing_seconds": {"total": sum(measured_llm_latencies) if measured_llm_latencies else None,
+            "mean_per_document": sum(measured_llm_latencies) / len(measured_llm_latencies) if measured_llm_latencies else None,
+            "evaluated_document_count": len(measured_llm_latencies), "status": "MEASURED" if measured_llm_latencies else "NOT_EVALUATED"},
         "rule_only": score_extractions(included_truth, rule_all,
             full_document_ground_truth_complete=manifest.get("ground_truth_complete") is True),
         "rule_plus_llm": score_extractions(included_truth, combined_all,
