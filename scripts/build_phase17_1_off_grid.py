@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 
 from circuitcare.benchmark.freeze import benchmark_code_fingerprint, benchmark_sources_match_commit
+from circuitcare.benchmark.integrity import audit_public_payload
+from circuitcare.fault_ai.evaluation import build_blind_diagnostic_input
 from circuitcare.fault_injector import inject_fault
 from circuitcare.fault_models import create_scenario
 from circuitcare.netlist import load_netlist
@@ -22,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default="evaluation/phase17_1/off_grid")
+    parser.add_argument("--output", default="evaluation/phase17_1/off_grid_v2")
     args = parser.parse_args()
     if not ngspice_available():
         raise SystemExit("ngspice is required; no off-grid dataset was written.")
@@ -68,23 +70,29 @@ def main() -> int:
                                          "uncertainty": 0.03, "source": "synthetic_off_grid_fault_simulation",
                                          "measurement_mode": "final_sample"})
             rel = lambda path: str(path.relative_to(ROOT))
-            public.append({"case_id": case_id, "llm_case_id": f"offgrid_{number:04d}",
+            llm_case_id = f"case_{9000 + number:04d}"
+            diagnostic_input = {"circuit_id": llm_case_id, "components": components,
+                               "observations": observations,
+                               "symptoms": "Measured circuit response differs from nominal behavior."}
+            blind = build_blind_diagnostic_input({"llm_case_id": llm_case_id},
+                components=components, observations=observations, executable_catalog=[])
+            audit_public_payload(blind)
+            public.append({"case_id": case_id, "llm_case_id": llm_case_id,
                 "topology_group": topology["name"], "split": "off_grid_parameter_reused_topology",
                 "circuit": {"netlist": rel(netlist_path), "spice": rel(spice_path),
                             "mapping": rel(mapping_path), "probes": rel(probes_path)},
-                "diagnostic_input": {"circuit_id": f"offgrid_{number:04d}", "components": components,
-                                     "observations": observations,
-                                     "symptoms": "Measured circuit response differs from nominal behavior."}})
+                "diagnostic_input": diagnostic_input})
             private[case_id] = [{"component_ref": ref, "fault_type": fault_type, "parameters": params}]
 
-    public_bytes = _encode({"dataset_id": "circuitcare-phase17-1-off-grid-v1", "cases": public})
+    dataset_id = "circuitcare-phase17-1-off-grid-v2"
+    public_bytes = _encode({"dataset_id": dataset_id, "cases": public})
     truth_bytes = _encode({"cases": private})
     public_path, truth_path = output / "public_cases.json", output / "private_ground_truth.json"
     public_path.write_bytes(public_bytes)
     truth_path.write_bytes(truth_bytes)
     assets = sorted({path for case in public for path in case["circuit"].values()})
     groups = sorted({case["topology_group"] for case in public})
-    manifest = {"dataset_id": "circuitcare-phase17-1-off-grid-v1", "version": "1.0.0",
+    manifest = {"dataset_id": dataset_id, "version": "2.0.0",
         "split": "off_grid_parameter_reused_topology", "off_grid": True, "independent_holdout": False,
         "data_type": "synthetic_spice_injected_off_grid_parameters",
         "topology_source": "Phase 17 synthetic topology templates; topology groups reused, not independently novel",
