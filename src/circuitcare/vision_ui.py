@@ -7,23 +7,45 @@ import inspect
 import io
 import json
 import re
-from pathlib import Path
 from typing import Any
+
+from circuitcare.vision.ui_context import ConfirmedOverlayContext, VisionViewContext
+
 
 def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assessment: dict | None,
                       risk_path: str, failed_component: str, fault_type: str,
                       context_key: str, current_result_status: str,
                       inspection_ranking: dict | None = None,
-                      selected_component: str | None = None) -> None:
+                      selected_component: str | None = None,
+                      result_integrity: str = "PROVENANCE_UNVERIFIED") -> None:
+    view_context = VisionViewContext(
+        context_key=context_key,
+        netlist_component_refs=tuple(netlist_component_refs),
+        risk_assessment=risk_assessment,
+        risk_path=risk_path,
+        failed_component=failed_component,
+        fault_type=fault_type,
+        simulation_status=current_result_status,
+        result_integrity=result_integrity,
+        inspection_ranking=inspection_ranking,
+        selected_component=selected_component,
+    )
+    risk_assessment = view_context.overlay_risk
     st.subheader("PCB 사진 인식")
     st.caption("선택 설치된 로컬 학습 모델은 사진의 부품 후보를 탐지하고, OCR은 실크스크린 Reference 후보를 읽습니다. 사진은 회로 연결이나 손상을 판정하지 않습니다. 위험 표시는 같은 회로임을 확인하고 부품 Reference까지 승인한 뒤에만 연결합니다.")
     try:
-        from circuitcare.vision.overlay import RISK_COLORS, render_risk_overlay, risk_by_reference
-        from circuitcare.vision.pcb_positions import ComponentPosition, match_netlist_references, parse_position_csv
-        from circuitcare.vision.board_detector import detect_board_candidates, validate_corners
+        from circuitcare.vision.board_detector import (
+            detect_board_candidates,
+            validate_corners,
+        )
         from circuitcare.vision.image_loader import ImageLoadError, load_board_image
+        from circuitcare.vision.pcb_positions import (
+            ComponentPosition,
+            match_netlist_references,
+            parse_position_csv,
+        )
         from circuitcare.vision.perspective import rectify_board
-        from circuitcare.vision.registration import fit_registration, map_component_positions
+        from circuitcare.vision.registration import fit_registration
     except ImportError as exc:
         st.error(f"Vision 선택 의존성을 설치해야 합니다: {exc}. `python -m pip install -e '.[vision,ui]'` 실행 후 앱을 다시 시작하세요.")
         return
@@ -265,15 +287,32 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
 
     from circuitcare.vision.overlay_view import render_confirmed_overlay
     render_confirmed_overlay(
-        st, registration, loaded, rectified_image, parsed, positions, netlist_component_refs,
-        board_key, csv_hash, side, confirmed_key, identity_key, context_key, failed_component, fault_type,
-        current_result_status, risk_path, risk_assessment, inspection_ranking, selected_component,
-        detection_record, rectified_state, ai_state, ai_reference_state, ai_reference_confirmations,
-        matching, rectified_sha256, _png_bytes, _safe_result_id,
+        st,
+        view_context,
+        ConfirmedOverlayContext(
+            registration=registration,
+            loaded_image=loaded,
+            rectified_image=rectified_image,
+            parsed_positions=parsed,
+            positions=positions,
+            board_key=board_key,
+            csv_hash=csv_hash,
+            board_side=side,
+            board_identity=board_identity.strip(),
+            detection_record=detection_record,
+            rectified_state=rectified_state,
+            ai_state=ai_state,
+            ai_reference_state=ai_reference_state,
+            ai_reference_confirmations=ai_reference_confirmations,
+            matching=matching,
+            rectified_image_sha256=rectified_sha256,
+        ),
+        png_bytes=_png_bytes,
+        safe_result_id=_safe_result_id,
     )
 
 
-def _preview_locations(positions: list[ComponentPosition], homography: list[list[float]], side: str,
+def _preview_locations(positions: list[Any], homography: list[list[float]], side: str,
                        image_size: tuple[int, int], netlist_refs: list[str]) -> dict:
     import cv2
     import numpy as np

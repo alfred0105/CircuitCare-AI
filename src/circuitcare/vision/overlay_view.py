@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-def render_confirmed_overlay(st, registration, loaded, rectified_image, parsed, positions, netlist_component_refs,     board_key, csv_hash, side, confirmed_key, identity_key, context_key, failed_component, fault_type,     current_result_status, risk_path, risk_assessment, inspection_ranking, selected_component,     detection_record, rectified_state, ai_state, ai_reference_state, ai_reference_confirmations,     matching, rectified_sha256, png_bytes, safe_result_id) -> None:
+def render_confirmed_overlay(st, view_context, data, *, png_bytes, safe_result_id) -> None:
     from circuitcare.vision.overlay import (
         RISK_COLORS,
         render_detection_risk_overlay,
@@ -15,13 +15,40 @@ def render_confirmed_overlay(st, registration, loaded, rectified_image, parsed, 
     )
     from circuitcare.vision.registration import map_component_positions
 
+    registration = data.registration
+    loaded = data.loaded_image
+    rectified_image = data.rectified_image
+    parsed = data.parsed_positions
+    positions = data.positions
+    netlist_component_refs = view_context.netlist_component_refs
+    board_key = data.board_key
+    csv_hash = data.csv_hash
+    side = data.board_side
+    context_key = view_context.context_key
+    failed_component = view_context.failed_component
+    fault_type = view_context.fault_type
+    current_result_status = view_context.simulation_status
+    risk_path = view_context.risk_path
+    risk_assessment = view_context.overlay_risk
+    inspection_ranking = view_context.inspection_ranking
+    selected_component = view_context.selected_component
+    detection_record = data.detection_record
+    rectified_state = data.rectified_state
+    ai_state = data.ai_state
+    ai_reference_state = data.ai_reference_state
+    ai_reference_confirmations = data.ai_reference_confirmations
+    matching = data.matching
+    rectified_sha256 = data.rectified_image_sha256
+    if view_context.blocked_reason:
+        st.warning(f"위험도 색상은 연결하지 않았습니다: {view_context.blocked_reason}")
+
     try:
         registration["status"] = "user_confirmed"
         registration["image_sha256"] = loaded.sha256
         registration["image_size_px"] = [rectified_image.width, rectified_image.height]
         registration["kicad_csv_sha256"] = csv_hash
         registration["position_source"] = parsed["source"]
-        registration["board_identity_user_assertion"] = st.session_state.get(identity_key)
+        registration["board_identity_user_assertion"] = data.board_identity
         registration["board_side"] = side
         circuit_positions = [row for row in positions if row.reference in netlist_component_refs]
         locations = map_component_positions(circuit_positions, registration["homography"], board_side=side,
@@ -42,7 +69,7 @@ def render_confirmed_overlay(st, registration, loaded, rectified_image, parsed, 
     current_risks, risk_issue = risk_by_reference(risk_assessment, expected_fault=failed_component,
                                                   expected_fault_type=fault_type)
     inspection_by_ref = {row["component_ref"]: row for row in (inspection_ranking or {}).get("posterior_weighted_inspection_order", [])}
-    if current_result_status not in {"SUCCESS", "CACHED"}:
+    if current_result_status not in {"SUCCESS", "CACHED_SIMULATION"}:
         risk_issue = "현재 조건에 성공 또는 저장된 위험 결과가 없어 위치만 표시합니다."
         current_risks = {}
     location_by_ref = {record["reference"] for record in locations["components"]}
@@ -73,7 +100,6 @@ def render_confirmed_overlay(st, registration, loaded, rectified_image, parsed, 
     with right:
         st.image(overlay, caption="위험 오버레이 · 부품 중심점만 표시", use_container_width=True)
     if ai_state.get("detections"):
-        from circuitcare.vision.overlay import render_detection_risk_overlay
         detector_overlay, detector_meta = render_detection_risk_overlay(
             rectified_image, ai_state["detections"], confirmed_references=ai_reference_confirmations,
             risk_assessment=risk_assessment if current_risks else None,
