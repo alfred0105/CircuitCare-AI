@@ -369,7 +369,13 @@ def test_live_ngspice_result_manifest_is_verified_then_detects_tamper(tmp_path: 
         settings={"engine": "ngspice", "analysis": "transient", "runner": "circuitcare-cli"},
         ratings=root / case["ratings"])
     manifest = json.loads((verified_dir / "simulation_context.json").read_text())
+    assert "comparison.csv" in manifest["result_sha256"]
     assert verify_simulation_manifest(verified_dir, manifest, fingerprint)[0] == "VERIFIED"
+    csv_path = verified_dir / "comparison.csv"
+    csv_bytes = csv_path.read_bytes()
+    csv_path.write_bytes(csv_bytes + b"\n")
+    assert verify_simulation_manifest(verified_dir, manifest, fingerprint)[0] == "STALE"
+    csv_path.write_bytes(csv_bytes)
     (verified_dir / "comparison.json").write_text("{}")
     assert verify_simulation_manifest(verified_dir, manifest, fingerprint)[0] == "STALE"
 

@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import io
 from pathlib import Path
 
+from circuitcare.dashboard.downloads import MAX_DOWNLOAD_CSV_BYTES
 
-def csv_rows(path: Path) -> list[dict]:
+
+def csv_rows(path: Path, *, expected_sha256: str | None = None) -> list[dict]:
     try:
-        with path.open(newline="", encoding="utf-8") as handle:
+        if path.stat().st_size > MAX_DOWNLOAD_CSV_BYTES:
+            return []
+        raw = path.read_bytes()
+        if expected_sha256 is not None and hashlib.sha256(raw).hexdigest() != expected_sha256:
+            return []
+        with io.StringIO(raw.decode("utf-8"), newline="") as handle:
             return list(csv.DictReader(handle))
-    except OSError:
+    except (OSError, UnicodeError, csv.Error):
         return []
 
 

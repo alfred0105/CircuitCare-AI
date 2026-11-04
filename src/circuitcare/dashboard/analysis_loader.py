@@ -26,6 +26,8 @@ class AnalysisSnapshot:
     stress: dict
     manifest: dict
     integrity: str
+    csv_integrity: str
+    csv_sha256: str | None
     status: str
 
 
@@ -42,6 +44,18 @@ def load_analysis_snapshot(*, result_dir: Path, current_fingerprint: dict,
     required_results = {"comparison.json", "risk_assessment.json", "component_stress.json"}
     if integrity == "VERIFIED" and not required_results.issubset(result_hashes or {}):
         integrity = "PROVENANCE_UNVERIFIED"
+    csv_path = result_dir / "comparison.csv"
+    csv_integrity = "NOT_PRESENT"
+    if csv_path.exists():
+        if isinstance(result_hashes, dict) and "comparison.csv" in result_hashes:
+            csv_integrity = integrity
+        else:
+            csv_integrity = "PROVENANCE_UNVERIFIED"
+            if integrity == "VERIFIED":
+                integrity = "PROVENANCE_UNVERIFIED"
+    elif isinstance(result_hashes, dict) and "comparison.csv" in result_hashes:
+        csv_integrity = "STALE"
+        integrity = "STALE"
     status = _simulation_status(live_used, live_error, cached_selection)
     if status in {"SUCCESS", "CACHED"}:
         status = ("SUCCESS" if live_used else "CACHED_SIMULATION") if integrity == "VERIFIED" else integrity
@@ -49,4 +63,6 @@ def load_analysis_snapshot(*, result_dir: Path, current_fingerprint: dict,
         status == "FAILED" and cached_selection and integrity != "VERIFIED"
     ):
         comparison, risk, stress = {}, {}, {}
-    return AnalysisSnapshot(result_dir, comparison, risk, stress, manifest, integrity, status)
+    csv_sha256 = result_hashes.get("comparison.csv") if isinstance(result_hashes, dict) else None
+    return AnalysisSnapshot(result_dir, comparison, risk, stress, manifest, integrity,
+                            csv_integrity, csv_sha256, status)

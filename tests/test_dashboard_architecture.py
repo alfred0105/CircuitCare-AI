@@ -122,6 +122,9 @@ def _write_verified_analysis(result_dir: Path, fingerprint: dict) -> None:
     for name, content in contents.items():
         (result_dir / name).write_text(content, encoding="utf-8")
         digests[name] = hashlib.sha256(content.encode()).hexdigest()
+    csv_path = result_dir / "comparison.csv"
+    if csv_path.exists():
+        digests[csv_path.name] = hashlib.sha256(csv_path.read_bytes()).hexdigest()
     (result_dir / "simulation_context.json").write_text(json.dumps({
         "fingerprint": fingerprint, "result_sha256": digests,
     }), encoding="utf-8")
@@ -174,6 +177,67 @@ def test_analysis_loader_keeps_failed_and_verified_cached_statuses(tmp_path: Pat
     failed = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
                                     live_used=False, live_error="ngspice failed", cached_selection=True)
     assert failed.status == "FAILED"
+
+
+def test_analysis_loader_verifies_cached_csv_and_preserves_json_only_cache(tmp_path: Path) -> None:
+    import json
+
+    fingerprint = {"fingerprint_sha256": "a" * 64}
+    result_dir = tmp_path / "results"
+    result_dir.mkdir()
+    _write_verified_analysis(result_dir, fingerprint)
+    json_only = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+        live_used=False, live_error=None, cached_selection=True)
+    assert json_only.status == "CACHED_SIMULATION"
+    assert json_only.csv_integrity == "NOT_PRESENT"
+
+    csv_path = result_dir / "comparison.csv"
+    csv_path.write_text("time_s,baseline_V(OUT)_V,fault_V(OUT)_V\n0,1,2\n", encoding="utf-8")
+    _write_verified_analysis(result_dir, fingerprint)
+    verified = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+        live_used=False, live_error=None, cached_selection=True)
+    assert (verified.status, verified.integrity, verified.csv_integrity) == (
+        "CACHED_SIMULATION", "VERIFIED", "VERIFIED")
+
+    csv_path.write_text("time_s,baseline_V(OUT)_V,fault_V(OUT)_V\n0,8,9\n", encoding="utf-8")
+    tampered = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+        live_used=False, live_error=None, cached_selection=True)
+    assert (tampered.status, tampered.integrity, tampered.csv_integrity) == ("STALE", "STALE", "STALE")
+    assert tampered.comparison == tampered.risk == tampered.stress == {}
+
+    _write_verified_analysis(result_dir, fingerprint)
+    csv_path.unlink()
+    deleted = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+        live_used=False, live_error=None, cached_selection=True)
+    assert (deleted.status, deleted.integrity, deleted.csv_integrity) == ("STALE", "STALE", "STALE")
+
+    csv_path.write_text("time_s,baseline_V(OUT)_V,fault_V(OUT)_V\n0,1,2\n", encoding="utf-8")
+    manifest_path = result_dir / "simulation_context.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["result_sha256"].pop("comparison.csv")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    legacy = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+        live_used=False, live_error=None, cached_selection=True)
+    assert (legacy.status, legacy.integrity, legacy.csv_integrity) == (
+        "PROVENANCE_UNVERIFIED", "PROVENANCE_UNVERIFIED", "PROVENANCE_UNVERIFIED")
+    assert legacy.comparison == legacy.risk == legacy.stress == {}
+
+
+def test_datasheet_failed_reassessment_clears_only_exact_scoped_key() -> None:
+    from circuitcare.datasheet.rating_adapter import RatingApplicationError
+    from circuitcare.ui import _clear_failed_datasheet_cache
+
+    key = "rating_review_applied_context-a_stress-a"
+    state = {key: ["approved"], "rating_review_applied_context-b_stress-b": ["keep"],
+             "analysis_context_key": "context-a"}
+    for error in (RatingApplicationError("bad rating"), ValueError(), KeyError(), TypeError()):
+        try:
+            raise error
+        except (RatingApplicationError, ValueError, KeyError, TypeError):
+            _clear_failed_datasheet_cache(state, key)
+    assert key not in state
+    assert state["rating_review_applied_context-b_stress-b"] == ["keep"]
+    assert state["analysis_context_key"] == "context-a"
 
 
 def test_datasheet_application_cache_identity_is_shared_and_scoped() -> None:
@@ -302,6 +366,8 @@ def test_circuit_view_uses_live_fault_type_and_parameter(monkeypatch, tmp_path: 
 
 
 def test_download_view_blocks_raw_csv_when_simulation_is_unverified(tmp_path: Path) -> None:
+    import hashlib
+
     from circuitcare.dashboard.views.downloads import render_downloads
 
     class Block:
@@ -319,7 +385,9 @@ def test_download_view_blocks_raw_csv_when_simulation_is_unverified(tmp_path: Pa
 
     result_dir = tmp_path / "results"
     result_dir.mkdir()
-    (result_dir / "comparison.csv").write_text("time,value\n0,1\n", encoding="utf-8")
+    csv_content = b"time,value\n0,1\n"
+    (result_dir / "comparison.csv").write_bytes(csv_content)
+    csv_sha256 = hashlib.sha256(csv_content).hexdigest()
     fake = FakeStreamlit()
     fake.downloads = []
     fake.captions = []
@@ -330,8 +398,55 @@ def test_download_view_blocks_raw_csv_when_simulation_is_unverified(tmp_path: Pa
 
     fake.downloads = []
     render_downloads(fake, {"netlist": "demo.xml"}, result_dir, {}, {}, None,
-                     "R1", "resistance_drift", "13k", simulation_verified=True)
+                     "R1", "resistance_drift", "13k", simulation_verified=True, csv_verified=False,
+                     csv_sha256=csv_sha256)
+    assert "시뮬레이션 CSV" not in fake.downloads
+    render_downloads(fake, {"netlist": "demo.xml"}, result_dir, {}, {}, None,
+                     "R1", "resistance_drift", "13k", simulation_verified=True, csv_verified=True,
+                     csv_sha256=csv_sha256)
     assert "시뮬레이션 CSV" in fake.downloads
+
+
+def test_waveform_view_does_not_read_unverified_csv(tmp_path: Path, monkeypatch) -> None:
+    import circuitcare.dashboard.views.waveforms as view
+
+    calls = []
+    monkeypatch.setattr(view, "csv_rows", lambda path, **kwargs: calls.append((path, kwargs)) or [])
+
+    class FakeStreamlit:
+        def __init__(self): self.warnings = []
+        def subheader(self, *_args): pass
+        def selectbox(self, *_args): return "OUT"
+        def warning(self, message): self.warnings.append(message)
+        def columns(self, count): return [self for _ in range(count)]
+        def metric(self, *_args): pass
+        def caption(self, *_args): pass
+        def dataframe(self, *_args, **_kwargs): pass
+
+    st = FakeStreamlit()
+    view.render_waveform_view(st, comparison={"simulation_success": True, "voltage_nodes": {
+        "OUT": {"baseline": {"last": 1}, "fault": {"last": 2},
+                "delta_fault_minus_baseline": {"last": 1}}}},
+        result_dir=tmp_path, stress={}, csv_verified=False)
+    assert calls == []
+    assert any("CSV 출처를 확인" in message for message in st.warnings)
+    view.render_waveform_view(st, comparison={"simulation_success": True, "voltage_nodes": {
+        "OUT": {"baseline": {"last": 1}, "fault": {"last": 2},
+                "delta_fault_minus_baseline": {"last": 1}}}},
+        result_dir=tmp_path, stress={}, csv_verified=True, csv_sha256="c" * 64)
+    assert calls == [(tmp_path / "comparison.csv", {"expected_sha256": "c" * 64})]
+
+
+def test_waveform_csv_reader_rejects_content_changed_after_snapshot(tmp_path: Path) -> None:
+    import hashlib
+
+    from circuitcare.dashboard.formatters import csv_rows
+
+    path = tmp_path / "comparison.csv"
+    path.write_text("time_s,baseline,fault\n0,1,2\n", encoding="utf-8")
+    expected = hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text("time_s,baseline,fault\n0,7,8\n", encoding="utf-8")
+    assert csv_rows(path, expected_sha256=expected) == []
 
 
 def test_simulation_controller_builds_absolute_command_and_optional_fault_value(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import re
@@ -9,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 from circuitcare.dashboard.context import ROOT
+from circuitcare.dashboard.downloads import MAX_DOWNLOAD_CSV_BYTES
 from circuitcare.workspace.simulation_context import build_simulation_fingerprint
 
 
@@ -70,11 +72,28 @@ def _validate_live_result(completed: subprocess.CompletedProcess, output: Path, 
             or risk.get("simulation_status") != "success" or risk.get("scenario_id") != scenario_id
             or risk.get("failed_component") != fault or risk.get("fault_type") != fault_type):
         raise SimulationRunError(f"결과 파일 상태 또는 고장 조건이 일치하지 않습니다.\n{_simulation_error_details(completed, output)}")
+    csv_path = result_dir / "comparison.csv"
+    try:
+        if not csv_path.is_file() or csv_path.stat().st_size == 0:
+            raise ValueError("comparison.csv가 없거나 비어 있습니다.")
+        if csv_path.stat().st_size > MAX_DOWNLOAD_CSV_BYTES:
+            raise ValueError("comparison.csv가 허용된 크기를 초과했습니다.")
+        with csv_path.open(newline="", encoding="utf-8") as csv_file:
+            reader = csv.DictReader(csv_file)
+            fields = reader.fieldnames or []
+            node_columns = {f"{prefix}_V({node})_V" for node in comparison.get("voltage_nodes", {})
+                            for prefix in ("baseline", "fault")}
+            if ("time_s" not in fields or not node_columns.issubset(fields)
+                    or not next(reader, None) or not next(reader, None)):
+                raise ValueError("comparison.csv의 시간 열 또는 데이터 행이 유효하지 않습니다.")
+    except (OSError, UnicodeError, csv.Error, ValueError) as exc:
+        raise SimulationRunError(f"Live Simulation 파형 CSV를 검증할 수 없습니다: {exc}\n{_simulation_error_details(completed, output)}") from exc
     if case is None:
         raise SimulationRunError("성공한 시뮬레이션에 입력 Fingerprint를 기록할 회로 설정이 없습니다.")
     fingerprint = _current_simulation_fingerprint(case, fault, fault_type, fault_value)
+    result_paths = [*paths.values(), csv_path]
     manifest = {"status": "LIVE_SUCCESS", "fingerprint": fingerprint,
-                "result_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths.values()}}
+                "result_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in result_paths}}
     (result_dir / "simulation_context.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
     return result_dir
 

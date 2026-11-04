@@ -251,7 +251,7 @@ def main() -> None:
                     mpn_match_status=record["mpn_match_status"], conditions_compatible=application["conditions_compatible"])
             risk = reassess_existing_risk(risk, stress, applied_specs, component_mapping)
         except (OSError, ValueError, KeyError, TypeError):
-            st.session_state.pop(f"datasheet_applied_{context_key}", None)
+            _clear_failed_datasheet_cache(st.session_state, applied_key)
     is_cached_selection = bool(case.get("cached")) and _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value)
     status = analysis_snapshot.status
     if status != "RUNNING":
@@ -293,7 +293,9 @@ def main() -> None:
                             root=ROOT, comparison_path=comparison_path)
     elif active_view == views[2]:
         from circuitcare.dashboard.views.waveforms import render_waveform_view
-        render_waveform_view(st, comparison=comparison, result_dir=result_dir, stress=stress)
+        render_waveform_view(st, comparison=comparison, result_dir=result_dir, stress=stress,
+                             csv_verified=analysis_snapshot.csv_integrity == "VERIFIED",
+                             csv_sha256=analysis_snapshot.csv_sha256)
     elif active_view == views[3]:
         from circuitcare.dashboard.views.risk import render_risk_view
         render_risk_view(st, risk=risk)
@@ -356,7 +358,14 @@ def main() -> None:
         render_benchmark_tab(st, root=ROOT)
 
     _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None,
-                simulation_verified=(cache_integrity == "VERIFIED" and status in {"SUCCESS", "CACHED_SIMULATION"}))
+                simulation_verified=(cache_integrity == "VERIFIED" and status in {"SUCCESS", "CACHED_SIMULATION"}),
+                csv_verified=analysis_snapshot.csv_integrity == "VERIFIED",
+                csv_sha256=analysis_snapshot.csv_sha256)
+
+
+def _clear_failed_datasheet_cache(session_state, applied_key: str) -> None:
+    """Drop only the scoped approved-rating cache that failed during reassessment."""
+    session_state.pop(applied_key, None)
 
 
 def _render_analysis_overview(st, *, circuit, case_name, case, context_key, failed_component,

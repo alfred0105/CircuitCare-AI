@@ -8,7 +8,8 @@ from typing import Any
 from circuitcare.dashboard.formatters import csv_rows, stress_table
 
 
-def render_waveform_view(st: Any, *, comparison: dict, result_dir: Path, stress: dict) -> None:
+def render_waveform_view(st: Any, *, comparison: dict, result_dir: Path, stress: dict,
+                         csv_verified: bool = False, csv_sha256: str | None = None) -> None:
     st.subheader("정상 / 고장 SPICE 전압 비교")
     if not comparison or not comparison.get("simulation_success"):
         st.warning("저장된 비교 결과가 없습니다. 명시적 SPICE 모델/매핑이 준비되지 않으면 이 단계는 지원되지 않습니다.")
@@ -18,7 +19,11 @@ def render_waveform_view(st: Any, *, comparison: dict, result_dir: Path, stress:
         st.warning("비교 가능한 전압 노드가 없습니다.")
     else:
         node = st.selectbox("전압 노드", nodes)
-        rows = csv_rows(result_dir / "comparison.csv")
+        rows = csv_rows(result_dir / "comparison.csv", expected_sha256=csv_sha256) if csv_verified else []
+        if not csv_verified:
+            st.warning("파형 CSV 출처를 확인할 수 없어 원시 파형 표시를 차단했습니다.")
+        elif not rows:
+            st.warning("파형 CSV가 검증 이후 변경되었거나 읽을 수 없어 표시를 차단했습니다.")
         baseline_key, fault_key = f"baseline_V({node})_V", f"fault_V({node})_V"
         if rows and baseline_key in rows[0] and fault_key in rows[0]:
             import pandas as pd
