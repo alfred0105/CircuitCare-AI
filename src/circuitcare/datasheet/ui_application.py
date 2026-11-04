@@ -10,7 +10,7 @@ from .rating_adapter import (
     apply_approved_rating,
     reassess_existing_risk,
 )
-from .rating_review import save_application
+from .rating_review import applied_rating_session_key, save_application
 from .ui_helpers import _comparison_row, _mapping_for_case, _risk_row, _specs_for_case
 
 
@@ -36,7 +36,7 @@ def render_rating_application(st: Any, *, root: Path, case: dict, risk: dict,
                                   "component_ref": component_ref, "stress_signature": stress_signature,
                                   "circuit_path": case["netlist"], "scenario_id": risk.get("scenario_id")},
                                  root / "data/private/datasheet_ai/applied_ratings.json")
-                st.session_state.pop(f"datasheet_applied_{context_key}", None)
+                st.session_state.pop(applied_rating_session_key(context_key, stress_signature), None)
                 st.success("기존 SPICE 결과를 재사용해 Rating Engine을 다시 계산했습니다. SPICE 재실행은 하지 않았습니다.")
                 st.rerun()
             except RatingApplicationError as exc:
@@ -63,5 +63,5 @@ def render_rating_application(st: Any, *, root: Path, case: dict, risk: dict,
                               "scenario_id": current_risk.get("scenario_id"),
                               "stress_signature": stress_signature},
                              root / "data/private/datasheet_ai/applied_ratings.json")
-            st.session_state.pop(f"datasheet_applied_{context_key}", None)
+            st.session_state.pop(applied_rating_session_key(context_key, stress_signature), None)
             st.rerun()

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from circuitcare.workspace.atomic_json import write_json_atomic
+
+
+def applied_rating_session_key(context_key: str, stress_signature: str | None) -> str:
+    """Return the one session cache key for a circuit/scenario/stress rating application."""
+    payload = json.dumps({"context": context_key, "stress_signature": stress_signature},
+                         sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return f"datasheet_applied_{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
 
 
 def save_review(record: dict[str, Any], path: str | Path) -> dict[str, Any]:
@@ -18,8 +26,8 @@ def save_review(record: dict[str, Any], path: str | Path) -> dict[str, Any]:
     except FileNotFoundError:
         history = {"records": []}
     if not isinstance(history, dict) or not isinstance(history.get("records"), list):
-        raise ValueError("Review history has an invalid structure; refusing to overwrite it.")
-    saved = {**record, "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        raise ValueError("Review history has an invalid structure; refusing to overwrite it.")  # noqa: TRY004 - preserve public validation contract
+    saved = {**record, "reviewed_at": datetime.now(UTC).isoformat(),
              "review_source": "user_review", "human_approved": record.get("decision") == "approved"}
     history["records"].append(saved)
     write_json_atomic(target, history)
@@ -59,8 +67,8 @@ def save_application(record: dict[str, Any], path: str | Path) -> None:
     except FileNotFoundError:
         data = {"applications": []}
     if not isinstance(data, dict) or not isinstance(data.get("applications"), list):
-        raise ValueError("Applied-rating registry is invalid; refusing to overwrite it.")
-    data["applications"].append({"event": "applied", **record, "applied_at": datetime.now(timezone.utc).isoformat()})
+        raise ValueError("Applied-rating registry is invalid; refusing to overwrite it.")  # noqa: TRY004 - preserve public validation contract
+    data["applications"].append({"event": "applied", **record, "applied_at": datetime.now(UTC).isoformat()})
     write_json_atomic(target, data)
 
 

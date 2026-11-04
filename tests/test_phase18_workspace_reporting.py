@@ -4,28 +4,43 @@ import json
 import shutil
 import subprocess
 import sys
+import zipfile
 from io import BytesIO
 from pathlib import Path
-import zipfile
 
 import pytest
 
-from circuitcare.reporting.exporters import export_bundle, export_html, export_json, export_markdown
-from circuitcare.reporting.report_builder import classify_parameter_grid_coverage
-from circuitcare.reporting.report_builder import _git_sha, build_diagnostic_snapshot
-from circuitcare.models import Circuit
+from circuitcare.models import Circuit, Component
+from circuitcare.reporting.exporters import (
+    export_bundle,
+    export_html,
+    export_json,
+    export_markdown,
+)
+from circuitcare.reporting.report_builder import (
+    _git_sha,
+    build_diagnostic_snapshot,
+    classify_parameter_grid_coverage,
+)
 from circuitcare.reporting.report_validator import validate_report, verify_bundle
-from circuitcare.workspace.context import build_workspace_context, store_uploaded_netlist
+from circuitcare.workspace.context import (
+    build_workspace_context,
+    store_uploaded_netlist,
+)
+from circuitcare.workspace.measurement_provenance import (
+    measurement_set_sha256,
+    measurement_source_class,
+    normalize_measurement,
+)
 from circuitcare.workspace.provenance import artifact_record
 from circuitcare.workspace.session import reconcile_session_workspace
+from circuitcare.workspace.simulation_context import (
+    build_simulation_fingerprint,
+    verify_cached_fingerprint,
+    verify_simulation_manifest,
+)
 from circuitcare.workspace.state_validator import stale_analysis_records
 from circuitcare.workspace.workflow import workflow_steps
-from circuitcare.workspace.measurement_provenance import (
-    measurement_set_sha256, measurement_source_class, normalize_measurement,
-)
-from circuitcare.workspace.simulation_context import (
-    build_simulation_fingerprint, verify_cached_fingerprint, verify_simulation_manifest,
-)
 
 
 def _report(tmp_path: Path) -> dict:
@@ -238,6 +253,60 @@ def test_active_measurement_and_what_if_preview_stay_separate(tmp_path: Path) ->
     assert "MEASUREMENT_DIAGNOSIS_MISMATCH" in validate_report(report)
 
 
+def test_dashboard_report_only_includes_context_matched_inspection_ranking(tmp_path: Path) -> None:
+    import hashlib
+
+    from circuitcare.services.report_service import (
+        ReportSnapshotContext,
+        build_report_snapshot_for_dashboard,
+    )
+
+    analysis_context_key = ("demo", "U1", "regulator_output_rise", "8")
+    context_id = hashlib.sha256(repr(analysis_context_key).encode()).hexdigest()[:16]
+    observations = [{"node": "VOUT", "value": 0.0, "unit": "V", "source": "user_measurement"}]
+    measurement_hash = measurement_set_sha256(observations)
+    ranking = {"posterior_weighted_inspection_order": [{"component_ref": "U2", "rank": 1}]}
+    state = {
+        "analysis_context_key": analysis_context_key,
+        "measurements": observations,
+        "diagnosis_result": {
+            "analysis_context_id": context_id,
+            "measurement_set_sha256": measurement_hash,
+            "diagnosis": {"status": "ACTIVE_CONDITIONAL"},
+            "inspection_ranking": ranking,
+        },
+    }
+    context = ReportSnapshotContext(
+        root=tmp_path,
+        workspace={"workspace_id": "ws", "circuit_id": "demo", "circuit_hash": "a" * 64,
+                   "netlist_path": "demo.xml", "input_hashes": {}, "validation_status": "READY"},
+        circuit=Circuit(components={"U1": Component("U1", "REG", "Regulator")}, connections=[]), failed_component="U1",
+        fault_type="regulator_output_rise", fault_value="8", simulation_status="NOT_RUN",
+        comparison={}, risk_assessment={}, simulation_context={}, analysis_context_key=analysis_context_key,
+        bayesian_supported=True, include_preview=True,
+        what_if_result={"diagnosis": {"posterior": [{"hypothesis_id": "preview"}]},
+                        "recommendations": {"inspection_ranking": {"component_ref": "PREVIEW"}}},
+        what_if_measurements=[{"node": "VOUT", "value": 7.9, "unit": "V", "source": "simulated_demo"}],
+        connection_paths=[],
+    )
+
+    report = build_report_snapshot_for_dashboard(context, state)
+    assert report["recommended_inspection"]["ranking"] == ranking
+    assert report["fault_or_symptom"]["observations"][0]["value"] == 0.0
+    assert report["preview_context"]["status"] == "PREVIEW_ONLY"
+    assert report["preview_diagnosis"]["posterior"][0]["hypothesis_id"] == "preview"
+
+    state["diagnosis_result"]["measurement_set_sha256"] = "f" * 64
+    stale_by_measurement = build_report_snapshot_for_dashboard(context, state)
+    assert stale_by_measurement["recommended_inspection"]["status"] == "NOT_EVALUATED"
+    assert stale_by_measurement["diagnosis"]["status"] == "NOT_EVALUATED"
+
+    state["diagnosis_result"]["measurement_set_sha256"] = measurement_hash
+    state["diagnosis_result"]["analysis_context_id"] = "wrong-context"
+    stale_by_context = build_report_snapshot_for_dashboard(context, state)
+    assert stale_by_context["recommended_inspection"]["status"] == "NOT_EVALUATED"
+
+
 def test_simulation_fingerprint_detects_same_size_content_change(tmp_path: Path) -> None:
     paths = [tmp_path / name for name in ("board.xml", "deck.cir", "mapping.json", "probes.json")]
     for path in paths:
@@ -291,7 +360,7 @@ def test_live_ngspice_result_manifest_is_verified_then_detects_tamper(tmp_path: 
         "--fault-type", "resistance_drift", "--fault-value", "10k", "--spice-base", case["base"],
         "--spice-mapping", case["mapping"], "--output", str(output), "--simulate", "--probes", case["probes"],
         "--ratings", case["ratings"], "--assess-risk"]
-    completed = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=120)
+    completed = subprocess.run(command, check=False, cwd=root, capture_output=True, text=True, timeout=120)
     from circuitcare.ui import _validate_live_result
     verified_dir = _validate_live_result(completed, output, "R1", "resistance_drift", case=case, fault_value="10k")
     fingerprint = build_simulation_fingerprint(netlist=root / case["netlist"], spice_deck=root / case["base"],

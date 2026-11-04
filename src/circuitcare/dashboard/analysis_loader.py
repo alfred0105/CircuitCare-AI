@@ -32,18 +32,19 @@ class AnalysisSnapshot:
 def load_analysis_snapshot(*, result_dir: Path, current_fingerprint: dict,
                            live_used: bool, live_error: str | None,
                            cached_selection: bool) -> AnalysisSnapshot:
-    """Read files and fail closed for invalid cached provenance while preserving live status."""
+    """Read files and require verified provenance for every successful result."""
     comparison = json_object_if_exists(result_dir / "comparison.json")
     risk = json_object_if_exists(result_dir / "risk_assessment.json")
     stress = json_object_if_exists(result_dir / "component_stress.json")
     manifest = json_object_if_exists(result_dir / "simulation_context.json")
     integrity, _ = verify_simulation_manifest(result_dir, manifest, current_fingerprint)
-    if not live_used and cached_selection and integrity != "VERIFIED":
-        comparison, risk, stress = {}, {}, {}
-
+    result_hashes = manifest.get("result_sha256") if isinstance(manifest, dict) else None
+    required_results = {"comparison.json", "risk_assessment.json", "component_stress.json"}
+    if integrity == "VERIFIED" and not required_results.issubset(result_hashes or {}):
+        integrity = "PROVENANCE_UNVERIFIED"
     status = _simulation_status(live_used, live_error, cached_selection)
-    if status == "CACHED":
-        status = "CACHED_SIMULATION" if integrity == "VERIFIED" else integrity
+    if status in {"SUCCESS", "CACHED"}:
+        status = ("SUCCESS" if live_used else "CACHED_SIMULATION") if integrity == "VERIFIED" else integrity
     if status in {"STALE", "PROVENANCE_UNVERIFIED"} or (
         status == "FAILED" and cached_selection and integrity != "VERIFIED"
     ):

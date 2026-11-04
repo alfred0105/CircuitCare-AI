@@ -11,7 +11,8 @@ from circuitcare.dashboard.downloads import (
 )
 
 
-def render_downloads(st, case, result_dir, comparison, risk, diagnosis, selected_fault, fault_type, fault_value):
+def render_downloads(st, case, result_dir, comparison, risk, diagnosis, selected_fault, fault_type, fault_value,
+                     *, simulation_verified: bool = False):
     with st.expander("결과 내보내기"):
         summary = {"circuit": case["netlist"], "fault": {"component": selected_fault, "fault_type": fault_type, "parameter": fault_value}, "simulation_source": "live" if "ui_runs" in str(result_dir) else ("cached" if comparison else "unsupported_or_not_run"), "comparison": comparison or None, "risk_assessment": risk or None, "bayesian_diagnosis": diagnosis.get("diagnosis") if diagnosis else None, "damage_confirmed": False, "limitations": ["Simulation does not confirm damage.", "Ratings and demo observations may be assumptions.", "UNKNOWN is not safe."]}
         st.download_button("전체 분석 요약 JSON", json.dumps(summary, ensure_ascii=False, indent=2), "circuitcare_summary.json", "application/json")
@@ -20,7 +21,7 @@ def render_downloads(st, case, result_dir, comparison, risk, diagnosis, selected
         if diagnosis:
             st.download_button("Bayesian 진단 JSON", json.dumps(diagnosis["diagnosis"], ensure_ascii=False, indent=2), "diagnosis.json", "application/json")
         csv_path = result_dir / "comparison.csv"
-        if csv_path.is_file():
+        if simulation_verified and csv_path.is_file():
             download_context = hashlib.sha256(json.dumps(
                 {"circuit": case.get("netlist"), "fault": selected_fault,
                  "fault_type": fault_type, "fault_value": fault_value},
@@ -36,6 +37,8 @@ def render_downloads(st, case, result_dir, comparison, risk, diagnosis, selected
                 st.download_button("시뮬레이션 CSV", data, "comparison.csv", "text/csv")
             except (OSError, ValueError) as exc:
                 st.warning(f"CSV 파일이 바뀌었거나 다운로드 한도를 넘었습니다. 다시 실행해 주세요. ({exc})")
+        elif csv_path.is_file():
+            st.caption("시뮬레이션 출처가 확인되지 않아 원시 결과 CSV 다운로드를 차단했습니다.")
         report = ["# CircuitCare AI Analysis", "", f"- Circuit: {case['netlist']}", f"- Fault: {selected_fault} / {fault_type} / {fault_value or 'n/a'}", f"- Simulation source: {'live' if 'ui_runs' in str(result_dir) else ('cached' if comparison else 'unsupported or not run')}", "- Ratings are explicit inputs; demo assumptions are not datasheet facts.", "- UNKNOWN does not mean safe; priority scores are not failure probabilities.", "- Physical damage is not confirmed."]
         st.download_button("통합 Markdown 보고서", "\n".join(report), "circuitcare_report.md", "text/markdown")
 

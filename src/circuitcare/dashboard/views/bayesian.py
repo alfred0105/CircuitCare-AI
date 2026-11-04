@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -11,16 +12,18 @@ from circuitcare.services.diagnosis_service import (
     load_saved_diagnosis,
     run_diagnosis_for_measurements,
 )
+from circuitcare.workspace.measurement_provenance import measurement_set_sha256
 
 
 def render_bayesian_view(st: Any, *, case: dict, supported: bool,
-                         measurement_example: Path) -> None:
+                         measurement_example: Path, context_key: Any) -> None:
     st.subheader("Bayesian 진단")
     if not supported:
         st.info("이 회로에 연결된 Bayesian 가설 모델이 없습니다. U1 3/6/8 V 시나리오가 준비된 기본 데모에서만 Bayesian 갱신을 활성화합니다.")
         return
     st.caption("저장된 U1 3/6/8 V 시나리오 Bayesian 데모입니다. 현재 ngspice 실행에서 계산한 진단 결과와는 별도로 표시합니다. 가상 측정은 simulated_demo로 구분됩니다.")
     measurements = st.session_state.setdefault("measurements", [])
+    context_id = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
     current = st.session_state.get("diagnosis_result") or (
         run_diagnosis_for_measurements(measurements) if measurements else load_saved_diagnosis(case)
     )
@@ -30,6 +33,10 @@ def render_bayesian_view(st: Any, *, case: dict, supported: bool,
         measurements = _upsert_measurement(measurements, sample)
         st.session_state.measurements = measurements
         st.session_state.diagnosis_result = run_diagnosis_for_measurements(measurements)
+        st.session_state.diagnosis_result.update(
+            analysis_context_id=context_id,
+            measurement_set_sha256=measurement_set_sha256(measurements),
+        )
         st.session_state.pop("last_advisor", None)
         st.rerun()
     with st.form("measurement_form"):
@@ -45,6 +52,10 @@ def render_bayesian_view(st: Any, *, case: dict, supported: bool,
                                                            "uncertainty": uncertainty, "source": source})
         st.session_state.measurements = measurements
         st.session_state.diagnosis_result = run_diagnosis_for_measurements(measurements)
+        st.session_state.diagnosis_result.update(
+            analysis_context_id=context_id,
+            measurement_set_sha256=measurement_set_sha256(measurements),
+        )
         st.session_state.pop("last_advisor", None)
         st.rerun()
     if measurements:
@@ -53,6 +64,10 @@ def render_bayesian_view(st: Any, *, case: dict, supported: bool,
     if st.button("측정값 초기화"):
         st.session_state.measurements = []
         st.session_state.diagnosis_result = run_diagnosis_for_measurements([])
+        st.session_state.diagnosis_result.update(
+            analysis_context_id=context_id,
+            measurement_set_sha256=measurement_set_sha256([]),
+        )
         st.session_state.pop("last_advisor", None)
         st.rerun()
     diagnosis = current["diagnosis"]

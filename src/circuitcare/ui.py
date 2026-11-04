@@ -63,7 +63,10 @@ from circuitcare.datasheet.rating_adapter import (
     apply_approved_rating,
     reassess_existing_risk,
 )
-from circuitcare.datasheet.rating_review import find_applications
+from circuitcare.datasheet.rating_review import (
+    applied_rating_session_key,
+    find_applications,
+)
 from circuitcare.evidence_builder import build_evidence  # noqa: F401 - compatibility export
 from circuitcare.graph import build_graph, direct_candidates, find_paths_result, to_dot  # noqa: F401 - compatibility exports
 from circuitcare.local_llm import LocalLLMError  # noqa: F401 - compatibility export
@@ -230,7 +233,8 @@ def main() -> None:
     base_risk = risk
     component_mapping = _json_if_exists(ROOT / case["mapping"]) if case.get("mapping") else {}
     stress_signature = hashlib.sha256(stress_path.read_bytes()).hexdigest() if stress_path.is_file() else None
-    applied_key = f"datasheet_applied_{context_key}"
+    datasheet_context_token = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
+    applied_key = applied_rating_session_key(datasheet_context_token, stress_signature)
     applied_ratings = st.session_state.get(applied_key)
     if applied_ratings is None and stress_signature and risk.get("scenario_id"):
         applied_ratings = find_applications(ROOT / "data/private/datasheet_ai/applied_ratings.json",
@@ -284,7 +288,9 @@ def main() -> None:
     elif active_view == views[1]:
         from circuitcare.dashboard.views.circuit import render_circuit_view
         render_circuit_view(st, circuit=circuit, case_name=case_name, case=case,
-                            selected_fault=selected_fault, root=ROOT, comparison_path=comparison_path)
+                            selected_fault=selected_fault, fault_type=str(fault_type or case["fault_type"]),
+                            fault_value=fault_value if needs_value else None,
+                            root=ROOT, comparison_path=comparison_path)
     elif active_view == views[2]:
         from circuitcare.dashboard.views.waveforms import render_waveform_view
         render_waveform_view(st, comparison=comparison, result_dir=result_dir, stress=stress)
@@ -293,7 +299,8 @@ def main() -> None:
         render_risk_view(st, risk=risk)
     elif active_view == views[4]:
         from circuitcare.dashboard.views.bayesian import render_bayesian_view
-        render_bayesian_view(st, case=case, supported=bayesian_supported, measurement_example=MEASUREMENTS)
+        render_bayesian_view(st, case=case, supported=bayesian_supported,
+                             measurement_example=MEASUREMENTS, context_key=context_key)
     elif active_view == views[5]:
         from circuitcare.dashboard.views.repair_advisor import (
             render_repair_advisor_view,
@@ -322,7 +329,7 @@ def main() -> None:
             st.info("업로드 회로에는 부품 Mapping과 확인된 SPICE 정격 분석이 없습니다. 데이터시트 정격 적용은 해당 회로 Context에서 지원되지 않습니다.")
         else:
             render_datasheet_tab(st, root=ROOT, circuit=circuit,
-                context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16], case=case,
+                context_key=datasheet_context_token, case=case,
                 risk=base_risk, stress=stress, client=client, models=models,
                 stress_signature=stress_signature,
                 applied_records=applied_ratings,
@@ -348,7 +355,8 @@ def main() -> None:
         from circuitcare.benchmark_ui import render_benchmark_tab
         render_benchmark_tab(st, root=ROOT)
 
-    _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None)
+    _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None,
+                simulation_verified=(cache_integrity == "VERIFIED" and status in {"SUCCESS", "CACHED_SIMULATION"}))
 
 
 def _render_analysis_overview(st, *, circuit, case_name, case, context_key, failed_component,
@@ -404,6 +412,7 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
             risk_assessment=risk,
             simulation_context=simulation_context,
             bayesian_supported=bayesian_supported,
+            analysis_context_key=context_key,
             include_preview=include_preview,
             what_if_result=what_if_result,
             what_if_measurements=st.session_state.get("what_if_measurements", []),

@@ -9,9 +9,11 @@ from circuitcare.graph import build_graph, direct_candidates, find_paths_result,
 
 
 def render_circuit_view(st: Any, *, circuit: Any, case_name: str, case: dict,
-                        selected_fault: str, root: Path, comparison_path: Path) -> None:
+                        selected_fault: str, fault_type: str, fault_value: str | None,
+                        root: Path, comparison_path: Path) -> None:
     st.subheader("회로 및 고장 설정")
-    st.write(f"**선택 회로:** {case_name}  ·  **고장 후보:** {selected_fault} / {case['fault_type']} = {case['value'] or '—'}")
+    parameter = fault_value if fault_value is not None else "해당 없음"
+    st.write(f"**선택 회로:** {case_name}  ·  **고장 후보:** {selected_fault} / {fault_type} = {parameter}")
     candidates = direct_candidates(circuit, selected_fault)
     path_search = find_paths_result(circuit, selected_fault, max_hops=2)
     graph = build_graph(circuit)

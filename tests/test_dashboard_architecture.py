@@ -112,6 +112,228 @@ def test_analysis_loader_rejects_valid_manifest_for_different_context(tmp_path: 
     assert stale.comparison == stale.risk == stale.stress == {}
 
 
+def _write_verified_analysis(result_dir: Path, fingerprint: dict) -> None:
+    import hashlib
+    import json
+
+    contents = {name: '{"scenario_id":"S1"}' for name in
+                ("comparison.json", "risk_assessment.json", "component_stress.json")}
+    digests = {}
+    for name, content in contents.items():
+        (result_dir / name).write_text(content, encoding="utf-8")
+        digests[name] = hashlib.sha256(content.encode()).hexdigest()
+    (result_dir / "simulation_context.json").write_text(json.dumps({
+        "fingerprint": fingerprint, "result_sha256": digests,
+    }), encoding="utf-8")
+
+
+def test_live_analysis_must_pass_manifest_before_success_or_data_use(tmp_path: Path) -> None:
+    import json
+
+    fingerprint = {"fingerprint_sha256": "a" * 64}
+    result_dir = tmp_path / "live"
+    result_dir.mkdir()
+    _write_verified_analysis(result_dir, fingerprint)
+    valid = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+                                   live_used=True, live_error=None, cached_selection=False)
+    assert (valid.status, valid.integrity) == ("SUCCESS", "VERIFIED")
+    assert valid.comparison and valid.risk and valid.stress
+
+    (result_dir / "comparison.json").write_text('{"scenario_id":"TAMPERED"}', encoding="utf-8")
+    tampered = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+                                      live_used=True, live_error=None, cached_selection=False)
+    assert (tampered.status, tampered.integrity) == ("STALE", "STALE")
+    assert tampered.comparison == tampered.risk == tampered.stress == {}
+
+    (result_dir / "simulation_context.json").unlink()
+    missing = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+                                     live_used=True, live_error=None, cached_selection=False)
+    assert (missing.status, missing.integrity) == ("PROVENANCE_UNVERIFIED", "PROVENANCE_UNVERIFIED")
+    assert missing.comparison == missing.risk == missing.stress == {}
+
+    _write_verified_analysis(result_dir, fingerprint)
+    manifest_path = result_dir / "simulation_context.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["result_sha256"].pop("risk_assessment.json")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    incomplete_manifest = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+                                                 live_used=True, live_error=None, cached_selection=False)
+    assert (incomplete_manifest.status, incomplete_manifest.integrity) == (
+        "PROVENANCE_UNVERIFIED", "PROVENANCE_UNVERIFIED")
+    assert incomplete_manifest.comparison == incomplete_manifest.risk == incomplete_manifest.stress == {}
+
+
+def test_analysis_loader_keeps_failed_and_verified_cached_statuses(tmp_path: Path) -> None:
+    fingerprint = {"fingerprint_sha256": "a" * 64}
+    result_dir = tmp_path / "results"
+    result_dir.mkdir()
+    _write_verified_analysis(result_dir, fingerprint)
+    cached = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+                                    live_used=False, live_error=None, cached_selection=True)
+    assert cached.status == "CACHED_SIMULATION" and cached.integrity == "VERIFIED"
+    failed = load_analysis_snapshot(result_dir=result_dir, current_fingerprint=fingerprint,
+                                    live_used=False, live_error="ngspice failed", cached_selection=True)
+    assert failed.status == "FAILED"
+
+
+def test_datasheet_application_cache_identity_is_shared_and_scoped() -> None:
+    from circuitcare.datasheet.rating_review import applied_rating_session_key
+
+    context = "a1b2c3d4e5f60718"
+    first = applied_rating_session_key(context, "stress-a")
+    assert first == applied_rating_session_key(context, "stress-a")
+    assert first != applied_rating_session_key(context, "stress-b")
+    assert first != applied_rating_session_key("other-context", "stress-a")
+
+    # Exercise the same token + signature passed through ui.py and the datasheet UI.
+    from circuitcare.ui import hashlib as ui_hashlib
+    raw_analysis_context = ("case-a", "R1", "resistance_drift", "13k")
+    token = ui_hashlib.sha256(repr(raw_analysis_context).encode()).hexdigest()[:16]
+    ui_cache_key = applied_rating_session_key(token, "stress-a")
+    application_cache_key = applied_rating_session_key(token, "stress-a")
+    assert ui_cache_key == application_cache_key
+
+
+def test_datasheet_reassessment_is_blocked_without_verified_risk_and_stress(tmp_path: Path) -> None:
+    from circuitcare.datasheet.ui_application import render_rating_application
+
+    class FakeStreamlit:
+        def __init__(self):
+            self.warnings = []
+            self.buttons = []
+        def warning(self, value): self.warnings.append(value)
+        def button(self, label, **kwargs):
+            self.buttons.append(label)
+            return True
+
+    fake = FakeStreamlit()
+    render_rating_application(
+        fake, root=tmp_path, case={"netlist": "demo.xml"}, risk={}, stress={},
+        component_ref="R1", selected_index=0,
+        ds_state={"reviews": {"0": {"decision": "approved"}}}, conditions_fit=True,
+        context_key="ctx", state_id="state", stress_signature="stress", current_risk=None,
+    )
+    assert fake.warnings
+    assert fake.buttons == []
+
+
+def test_datasheet_apply_revoke_reapply_invalidates_same_ui_cache_key(monkeypatch, tmp_path: Path) -> None:
+    import circuitcare.datasheet.ui_application as application
+    from circuitcare.datasheet.rating_review import applied_rating_session_key
+
+    monkeypatch.setattr(application, "_specs_for_case", lambda *_: {})
+    monkeypatch.setattr(application, "_mapping_for_case", lambda *_: {})
+    monkeypatch.setattr(application, "apply_approved_rating", lambda specs, *_args, **_kwargs: specs)
+    monkeypatch.setattr(application, "reassess_existing_risk", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(application, "save_application", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(application, "_risk_row", lambda *_args: {})
+    monkeypatch.setattr(application, "_comparison_row", lambda *args: args)
+
+    class FakeStreamlit:
+        def __init__(self):
+            self.session_state = {}
+            self.clicked = ""
+        def button(self, label, **kwargs): return label == self.clicked
+        def success(self, *_args): pass
+        def warning(self, *_args): pass
+        def rerun(self): pass
+        def subheader(self, *_args): pass
+        def dataframe(self, *_args, **_kwargs): pass
+        def caption(self, *_args): pass
+        def write(self, *_args): pass
+        def json(self, *_args): pass
+
+    fake = FakeStreamlit()
+    token, stress_signature = "8bf307f136d9abce", "stress-a"
+    cache_key = applied_rating_session_key(token, stress_signature)
+    case = {"netlist": "demo.xml"}
+    risk = {"scenario_id": "S1"}
+    current_risk = {"scenario_id": "S1", "reassessment_source": "approved_datasheet",
+                    "rating_checks": []}
+    kwargs = {"root": tmp_path, "case": case, "risk": risk,
+              "stress": {"simulation_success": True}, "component_ref": "R1",
+              "selected_index": 0, "ds_state": {"reviews": {"0": {"decision": "approved"}}},
+              "conditions_fit": True, "context_key": token, "state_id": "review",
+              "stress_signature": stress_signature, "current_risk": current_risk}
+
+    for action in ("승인 정격 적용 및 위험 재평가", "승인 정격 적용 해제",
+                   "승인 정격 적용 및 위험 재평가"):
+        fake.session_state[cache_key] = [{"component_ref": "R1"}]
+        fake.clicked = action
+        application.render_rating_application(fake, **kwargs)
+        assert cache_key not in fake.session_state
+
+
+def test_circuit_view_uses_live_fault_type_and_parameter(monkeypatch, tmp_path: Path) -> None:
+    import circuitcare.dashboard.views.circuit as view
+
+    class FakeStreamlit:
+        def __init__(self): self.output = []
+        def subheader(self, value): pass
+        def write(self, value): self.output.append(str(value))
+        def graphviz_chart(self, *args, **kwargs): pass
+        def selectbox(self, *args, **kwargs): return "R1"
+        def json(self, value): pass
+        def caption(self, value): pass
+        def warning(self, value): pass
+
+    monkeypatch.setattr(view, "direct_candidates", lambda *_: [])
+    monkeypatch.setattr(view, "find_paths_result", lambda *_args, **_kwargs: type("P", (), {
+        "paths": [], "status": "COMPLETE", "expanded_states": 0,
+        "peak_queue_size": 0, "limit_reason": None})())
+    monkeypatch.setattr(view, "build_graph", lambda *_: {})
+    monkeypatch.setattr(view, "to_dot", lambda *_: "digraph G {}")
+    fake = FakeStreamlit()
+    fake.output = []
+    view.render_circuit_view(fake, circuit=type("C", (), {
+        "components": {"R1": type("Part", (), {"ref": "R1", "value": "10k", "library_id": "Device:R"})()},
+        "connections": []})(), case_name="A", case={"fault_type": "old", "value": "10k", "netlist": "demo.xml"},
+        selected_fault="R1", fault_type="resistance_drift", fault_value="13k",
+        root=tmp_path, comparison_path=tmp_path / "comparison.json")
+    assert "resistance_drift = 13k" in fake.output[0]
+
+    fake.output = []
+    view.render_circuit_view(fake, circuit=type("C", (), {
+        "components": {"R1": type("Part", (), {"ref": "R1", "value": "10k", "library_id": "Device:R"})()},
+        "connections": []})(), case_name="A", case={"fault_type": "old", "value": "10k", "netlist": "demo.xml"},
+        selected_fault="R1", fault_type="open", fault_value=None,
+        root=tmp_path, comparison_path=tmp_path / "comparison.json")
+    assert "open = 해당 없음" in fake.output[0]
+
+
+def test_download_view_blocks_raw_csv_when_simulation_is_unverified(tmp_path: Path) -> None:
+    from circuitcare.dashboard.views.downloads import render_downloads
+
+    class Block:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+
+    class FakeStreamlit:
+        def __init__(self):
+            self.downloads = []
+            self.captions = []
+        def expander(self, *_args, **_kwargs): return Block()
+        def download_button(self, label, *_args, **_kwargs): self.downloads.append(label)
+        def caption(self, value): self.captions.append(value)
+        def warning(self, *_args, **_kwargs): pass
+
+    result_dir = tmp_path / "results"
+    result_dir.mkdir()
+    (result_dir / "comparison.csv").write_text("time,value\n0,1\n", encoding="utf-8")
+    fake = FakeStreamlit()
+    fake.downloads = []
+    fake.captions = []
+    render_downloads(fake, {"netlist": "demo.xml"}, result_dir, {}, {}, None,
+                     "R1", "resistance_drift", "13k", simulation_verified=False)
+    assert "시뮬레이션 CSV" not in fake.downloads
+    assert any("다운로드를 차단" in caption for caption in fake.captions)
+
+    fake.downloads = []
+    render_downloads(fake, {"netlist": "demo.xml"}, result_dir, {}, {}, None,
+                     "R1", "resistance_drift", "13k", simulation_verified=True)
+    assert "시뮬레이션 CSV" in fake.downloads
+
+
 def test_simulation_controller_builds_absolute_command_and_optional_fault_value(tmp_path: Path) -> None:
     command = build_simulation_command(
         python_executable="python", project_root=tmp_path,

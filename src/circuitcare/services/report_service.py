@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +29,7 @@ class ReportSnapshotContext:
     comparison: dict
     risk_assessment: dict
     simulation_context: dict
+    analysis_context_key: Any
     bayesian_supported: bool
     include_preview: bool
     what_if_result: dict | None
@@ -45,12 +47,21 @@ def build_report_snapshot_for_dashboard(context: ReportSnapshotContext,
     observations = (state.get("measurements", []) if context.bayesian_supported
                     else fault_ai_state.get("observations", []))
     actual_set_hash = _measurement_set_id(observations)
+    analysis_context_id = hashlib.sha256(
+        repr(context.analysis_context_key).encode()
+    ).hexdigest()[:16]
     fault_hypothesis_context_matches = (
         fault_ai_state.get("context_key") == fault_ai_state_id
         and fault_ai_state.get("measurement_set_sha256") == actual_set_hash
     )
     report_hypotheses = fault_ai_state.get("hypotheses", []) if fault_hypothesis_context_matches else []
-    active_diagnosis_result = state.get("diagnosis_result") if context.bayesian_supported else None
+    candidate_diagnosis_result = state.get("diagnosis_result") if context.bayesian_supported else None
+    diagnosis_context_matches = bool(
+        candidate_diagnosis_result
+        and candidate_diagnosis_result.get("analysis_context_id") == analysis_context_id
+        and candidate_diagnosis_result.get("measurement_set_sha256") == actual_set_hash
+    )
+    active_diagnosis_result = candidate_diagnosis_result if diagnosis_context_matches else None
     report_diagnosis = (
         active_diagnosis_result.get("diagnosis") if active_diagnosis_result else
         {"status": "CANDIDATES_AVAILABLE", "hypotheses": report_hypotheses,
@@ -58,7 +69,7 @@ def build_report_snapshot_for_dashboard(context: ReportSnapshotContext,
         {"status": "NOT_EVALUATED"}
     )
     active_ranking = (active_diagnosis_result.get("inspection_ranking") if active_diagnosis_result
-                      else fault_ai_state.get("bayesian_result"))
+                      else fault_ai_state.get("bayesian_result") if fault_hypothesis_context_matches else None)
     diagnosis_context = {
         "mode": "ACTIVE_DIAGNOSIS", "measurement_set_sha256": actual_set_hash,
         "circuit_hash": context.workspace.get("circuit_hash"),
@@ -76,7 +87,7 @@ def build_report_snapshot_for_dashboard(context: ReportSnapshotContext,
         "measurement_recommendations": context.what_if_result.get("recommendations")
         if context.what_if_result else None,
         "interpretation": "Conditional inspection ordering only; separate from electrical stress and not damage probability.",
-    } if active_ranking else None)
+    } if active_ranking else {"status": "NOT_EVALUATED"})
     rule_candidates = fault_ai_state.get("rule_candidates", []) if fault_hypothesis_context_matches else []
     parameter_identification = classify_parameter_grid_coverage(
         component_ref=context.failed_component, fault_type=context.fault_type,
