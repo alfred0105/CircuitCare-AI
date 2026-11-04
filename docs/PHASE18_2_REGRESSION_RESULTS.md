@@ -27,9 +27,9 @@ The recurring warnings are the existing pandas `reset_index(inplace=...)` deprec
 ## Structure and static checks
 
 - `ui.py`: 1,075 → 942 lines; subprocess execution moved out to `services/simulation_service.py` (only error type handling/import remains in UI).
-- `vision_ui.py`: 461 → 330 lines; confirmed overlay and evidence presentation moved into `vision/overlay_view.py` (155 lines).
+- `vision_ui.py`: 461 → 330 lines; confirmed overlay and evidence presentation moved into `vision/overlay_view.py` (157 lines).
 - `datasheet_ui.py`: 304 → 295 lines; pure data preparation moved into `datasheet/ui_helpers.py` (40 lines).
-- Largest remaining functions: `ui.main()` 452 lines, `_render_analysis_overview()` 252 lines, `vision_ui.render_vision_tab()` 261 lines, `overlay_view.render_confirmed_overlay()` 148 lines, `datasheet_ui.render_datasheet_tab()` 257 lines.
+- Largest remaining functions: `ui.main()` 451 lines, `_render_analysis_overview()` 264 lines, `vision_ui.render_vision_tab()` 261 lines, `overlay_view.render_confirmed_overlay()` 148 lines, `datasheet_ui.render_datasheet_tab()` 257 lines.
 - New/refactored module dependency graph checked for back-imports to `circuitcare.ui`; none were introduced. The boundaries are acyclic by import direction.
 - macOS spawn-safe subprocess flags remain at the sole `subprocess.run` call in `services/simulation_service.py`: absolute executable/argument paths supplied by the existing coordinator and `close_fds=False`.
 - Full-repository Ruff: 179 diagnostics compared with the previously recorded 178 (one additional diagnostic). Remaining findings are primarily pre-existing; changed UI files still include existing broad-exception/unused-local findings.
@@ -37,6 +37,6 @@ The recurring warnings are the existing pandas `reset_index(inplace=...)` deprec
 
 ## Remaining verification/debt
 
-- The complete browser flow `live run → report download → switch circuit → inspect stale-state invalidation` was not completed in one stable browser session.
+- The complete browser flow passed in one stable session: live run → report download → switch circuit → inspect state reset.
 - The core `ui.main()` and overview function remain long orchestration functions; further splitting should be small and behavior-preserving.
 - No coverage, performance, or concurrency benchmark was added; no new test suite was introduced.

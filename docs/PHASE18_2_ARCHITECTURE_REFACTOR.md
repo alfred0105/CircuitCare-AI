@@ -10,7 +10,7 @@ Before refactoring, `ui.py` was 1,075 lines and contained Streamlit rendering, a
 
 The refactor moved the dashboard context/reuse helpers to `dashboard/context.py`, bounded download snapshots to `dashboard/downloads.py`, and spawn-safe simulation execution/result validation to `services/simulation_service.py`. Datasheet data preparation now lives in `datasheet/ui_helpers.py`. The confirmed PCB registration, overlay, evidence display, and save/download stage now has a separate `vision/overlay_view.py` rendering boundary.
 
-`ui.py` is now 942 lines. It remains the current application coordinator and retains compatibility exports used by existing tests and callers. The largest functions are still `main()` (451 lines) and `_render_analysis_overview()` (264 lines); further view/state orchestration extraction remains follow-up work. `render_vision_tab()` is 330 lines, with the confirmed overlay stage factored into a separate 155-line module. `render_datasheet_tab()` remains 295 lines; its policy-sensitive flow stays cohesive while pure helper logic is separated.
+`ui.py` is now 942 lines. It remains the current application coordinator and retains compatibility exports used by existing tests and callers. The largest functions are still `main()` (451 lines) and `_render_analysis_overview()` (264 lines); further view/state orchestration extraction remains follow-up work. `render_vision_tab()` is 330 lines, with the confirmed overlay stage factored into a separate 157-line module. `render_datasheet_tab()` remains 295 lines; its policy-sensitive flow stays cohesive while pure helper logic is separated.
 
 ## Preserved behavior and contracts
 
@@ -27,7 +27,7 @@ The refactor moved the dashboard context/reuse helpers to `dashboard/context.py`
 - Baseline at `b93f45b0ecee26733ed6332232df719585299728`: 179 base tests, 14 integration, 11 stress, 204 non-crash total, and 3 crash-injection tests passed.
 - Refactored code: the same test groups pass at the same counts. Existing pandas deprecation and duplicate ZIP test warnings remain.
 - Browser: the application loaded and rendered its existing dashboard. A live divider fault run with an edited parameter reached `SUCCESS · Live Simulation`; the divider ngspice run, JSON report download, RC circuit switch, and prior-state reset all completed successfully; no browser page errors were observed.
-- Static quality: no automated formatting or broad cleanup was applied. Full-repository Ruff and mypy counts are included in the regression record.
+- Static quality: focused import-order cleanup was applied; no broad cleanup was applied. Full-repository Ruff and mypy counts are included in the regression record.
 
 ## Follow-up debt
 
