@@ -2,7 +2,7 @@
 
 - 회로: Regulator + divider + switch (cached demo)
 - Circuit Hash: `9f51ab1d0c3a98200e4d52830c632130c63daeba670723cffe7dcbb6ee308294`
-- 생성 시각: 2026-11-04T00:37:30.067560+00:00
+- 생성 시각: 2026-11-04T00:39:59.766682+00:00
 - 부품 / Net: 6 / 4
 
 ## 고장 및 관측
@@ -42,4 +42,4 @@
 
 ## 재현 정보
 
-- Git SHA: `64a557e53c9441373d1d05bd1f7000ab0d59f7bf`
+- Git SHA: `357294d286b6e21af63aee0b027fdb715c63fce0`

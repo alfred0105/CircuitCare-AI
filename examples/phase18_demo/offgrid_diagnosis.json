@@ -538,7 +538,7 @@
       "summary": "Risk levels compare simulated stress with configured rating records."
     }
   ],
-  "generated_at": "2026-11-04T00:37:30.102987+00:00",
+  "generated_at": "2026-11-04T00:39:59.803740+00:00",
   "limitations": [
     "Synthetic or simulated evidence is not a physical repair result.",
     "A priority score or conditional posterior is not a failure probability.",
@@ -562,9 +562,9 @@
     "status": "NOT_EVALUATED"
   },
   "reproducibility": {
-    "analysis_timestamp": "2026-11-04T00:37:30.102987+00:00",
+    "analysis_timestamp": "2026-11-04T00:39:59.803740+00:00",
     "circuit_hash": "9f51ab1d0c3a98200e4d52830c632130c63daeba670723cffe7dcbb6ee308294",
-    "git_sha": "64a557e53c9441373d1d05bd1f7000ab0d59f7bf",
+    "git_sha": "357294d286b6e21af63aee0b027fdb715c63fce0",
     "input_hashes": {
       "base": "0ffc8040950705a24b65794156d30b84b7f569c1cf2411a72fc0b75c05ba9415",
       "mapping": "921363fe6cc18cd5911052863bcf9e648f5b5c33f7c0230d48322b13568e9bd0",
@@ -1403,7 +1403,7 @@
       "RLOAD",
       "U1"
     ],
-    "generated_at": "2026-11-04T00:37:30.100250+00:00",
+    "generated_at": "2026-11-04T00:39:59.800040+00:00",
     "input_hashes": {
       "base": "0ffc8040950705a24b65794156d30b84b7f569c1cf2411a72fc0b75c05ba9415",
       "mapping": "921363fe6cc18cd5911052863bcf9e648f5b5c33f7c0230d48322b13568e9bd0",
