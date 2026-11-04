@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 import importlib.util
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -28,15 +29,20 @@ CASES = [
 @pytest.mark.parametrize("runtime", ["onnx", "ocr"])
 def test_native_vision_inference_isolated_child(runtime):
     model = ROOT / "models/pcb_component_detector.onnx"
+    def unavailable(message: str) -> None:
+        if os.environ.get("CIRCUITCARE_REQUIRE_NATIVE_INFERENCE") == "1":
+            pytest.fail(message)
+        pytest.skip(message)
+
     if runtime == "onnx" and (not model.is_file() or not importlib.util.find_spec("onnxruntime")):
-        pytest.skip("local detector model or ONNX Runtime is unavailable")
+        unavailable("local detector model or ONNX Runtime is unavailable")
     if runtime == "ocr":
         if not importlib.util.find_spec("rapidocr") or not importlib.util.find_spec("onnxruntime"):
-            pytest.skip("RapidOCR or ONNX Runtime is unavailable")
-        import rapidocr
-        model_root = Path(rapidocr.__file__).parent / "models"
+            unavailable("RapidOCR or ONNX Runtime is unavailable")
+        spec = importlib.util.find_spec("rapidocr")
+        model_root = Path(spec.origin).parent / "models" if spec and spec.origin else Path("/nonexistent")
         if not any(model_root.glob("*.onnx")):
-            pytest.skip("local OCR ONNX model files are unavailable")
+            unavailable("local OCR ONNX model files are unavailable")
     script = r'''
 import json, sys
 from PIL import Image

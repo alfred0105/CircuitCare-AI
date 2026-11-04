@@ -34,4 +34,5 @@ testpaths = ["tests"]
 markers = [
     "integration: requires external native or optional runtime dependencies",
     "stress: bounded synthetic stress and soak coverage",
+    "crash_injection: intentionally terminates an isolated child process",
 ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+from functools import lru_cache
 import json
 import re
 import subprocess
@@ -987,9 +988,27 @@ def _downloads(st, case, result_dir, comparison, risk, diagnosis, selected_fault
             st.download_button("Bayesian 진단 JSON", json.dumps(diagnosis["diagnosis"], ensure_ascii=False, indent=2), "diagnosis.json", "application/json")
         csv_path = result_dir / "comparison.csv"
         if csv_path.is_file():
-            st.download_button("시뮬레이션 CSV", csv_path.read_bytes(), "comparison.csv", "text/csv")
+            digest = _download_file_digest(csv_path)
+            st.download_button("시뮬레이션 CSV", _cached_download_bytes(str(csv_path), digest), "comparison.csv", "text/csv")
         report = ["# CircuitCare AI Analysis", "", f"- Circuit: {case['netlist']}", f"- Fault: {selected_fault} / {fault_type} / {fault_value or 'n/a'}", f"- Simulation source: {'live' if 'ui_runs' in str(result_dir) else ('cached' if comparison else 'unsupported or not run')}", "- Ratings are explicit inputs; demo assumptions are not datasheet facts.", "- UNKNOWN does not mean safe; priority scores are not failure probabilities.", "- Physical damage is not confirmed."]
         st.download_button("통합 Markdown 보고서", "\n".join(report), "circuitcare_report.md", "text/markdown")
+
+
+@lru_cache(maxsize=4)
+def _cached_download_bytes(path: str, digest: str) -> bytes:
+    """Keep at most four unchanged CSV download payloads across Streamlit reruns."""
+    data = Path(path).read_bytes()
+    if hashlib.sha256(data).hexdigest() != digest:
+        return Path(path).read_bytes()
+    return data
+
+
+def _download_file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _command_exists(name: str) -> bool:

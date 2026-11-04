@@ -4,8 +4,10 @@ import pytest
 
 from circuitcare.ui import (
     SimulationRunError,
-    _analysis_context_key,
     _advisor_matches,
+    _analysis_context_key,
+    _cached_download_bytes,
+    _download_file_digest,
     _measurement_set_id,
     _simulation_result_id,
     _simulation_status,
@@ -13,6 +15,19 @@ from circuitcare.ui import (
     _upsert_measurement,
     _validate_live_result,
 )
+
+
+def test_csv_download_cache_is_bounded_and_invalidates_on_content_change(tmp_path):
+    path = tmp_path / "comparison.csv"
+    _cached_download_bytes.cache_clear()
+    path.write_bytes(b"time,value\n0,1\n")
+    first_digest = _download_file_digest(path)
+    assert _cached_download_bytes(str(path), first_digest) == path.read_bytes()
+    path.write_bytes(b"time,value\n0,2\n")
+    second_digest = _download_file_digest(path)
+    assert second_digest != first_digest
+    assert _cached_download_bytes(str(path), second_digest) == path.read_bytes()
+    assert _cached_download_bytes.cache_info().maxsize == 4
 
 
 def test_ui_context_and_measurement_updates_are_isolated():
