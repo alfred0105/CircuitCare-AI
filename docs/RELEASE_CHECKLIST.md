@@ -1,5 +1,17 @@
 # 발표 당일 체크리스트
 
+## MVP 설치 및 보고서 확인
+
+- [ ] `python -m pip install -e ".[dev,ui,vision,datasheet]"` 설치 완료
+- [ ] `python -m pytest -q` 전체 테스트 통과
+- [ ] `python -m compileall -q src/circuitcare` 통과
+- [ ] 분석 개요에서 Workspace ID와 현재 회로/고장 Context 확인
+- [ ] JSON, Markdown, HTML 및 Evidence Bundle ZIP 생성 확인
+- [ ] `scripts/build_phase18_demo_report.py`로 cached synthetic demo 보고서 재생성 확인
+- [ ] Bundle manifest 해시 검증 및 로컬 열람 확인
+- [ ] MVP 버전 표기: `v0.1.0-mvp`; GitHub Release 및 Tag는 Phase 18 검증 완료 후 생성
+- [ ] Physical Repair Validation은 실측 검증 데이터가 없으면 `NOT_EVALUATED`
+
 ## 사전 설치 및 오프라인 준비
 
 - [ ] Python 3.11 이상 가상환경 준비

@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: Phases 01–17.1 implemented; synthetic evaluation integrity hotfix completed.** Phase 17 measured 10 SPICE-generated cases in five new topology groups. Phase 17.1 corrected unique-level precision, parameter errors, failed-call timing, and SPICE tie reporting, then reevaluated the existing holdout and added 10 off-grid faults on reused topology templates. The reused-holdout run is not a new independent result, and off-grid data adds no new topology. See [Phase 17.1 evaluation](docs/PHASE17_1_EVALUATION_HOTFIX.md). This is synthetic evidence only: real repair accuracy, physical repair outcomes, and learned-prior benefit remain unevaluated. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: CircuitCare AI v0.1.0 MVP integration implemented.** Phase 18 adds a content-addressed diagnostic workspace, guided workflow summary, and snapshot-based JSON, Markdown, standalone HTML, and evidence bundle exports while retaining the existing 11 tabs. Follow [the User Guide](docs/USER_GUIDE.md), [Diagnostic Workflow](docs/DIAGNOSTIC_WORKFLOW.md), and [Reporting Guide](docs/REPORTING_GUIDE.md). Phase 17.1 evaluation corrections and synthetic limits are in [Phase 17.1 evaluation](docs/PHASE17_1_EVALUATION_HOTFIX.md). Current validation covers cached synthetic examples and software behavior; physical repair accuracy and actual damage prediction remain `NOT_EVALUATED`. Risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -35,6 +35,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 16 | Verified repair history, controlled prior adaptation, longitudinal evaluation | Implemented; synthetic workflow verified; no real repair records, active learned prior, or independent improvement evaluation |
 | 17 | Independent benchmark, fair baselines, statistical validation, efficiency | Synthetic benchmark complete; see Phase 17 evaluation and Phase 17.1 metric correction |
 | 17.1 | Metric integrity, off-grid evaluation, SPICE identifiability | Complete; corrected reused-holdout scoring and off-grid parameter evaluation on reused topology templates |
+| 18 | Unified workspace, guided workflow, evidence-grounded reports | Implemented; cached synthetic report flow verified; physical repair validation not evaluated |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -43,10 +44,13 @@ Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 Requires Python 3.11+ (Python 3.11 is the CI baseline; Python 3.12 also works).
 
 ```bash
-python -m pip install -e ".[dev,vision]"
+python -m pip install -e ".[dev,ui,vision,datasheet]"
 circuitcare --netlist tests/fixtures/simple_kicad_netlist.xml --fault U1
 python -m pytest -q
+streamlit run src/circuitcare/ui.py
 ```
+
+The [Phase 18 User Guide](docs/USER_GUIDE.md) walks through the dashboard. Report examples are in [`examples/phase18_demo/`](examples/phase18_demo/); regenerate them with `python scripts/build_phase18_demo_report.py`.
 
 CI는 Python 3.11에서 `dev`, `vision`, `datasheet` 테스트 의존성을 설치합니다. PDF 테스트는 공식 데이터시트나 LLM 모델을 다운로드하지 않고 합성 PDF로 실행됩니다. Vision은 실행 시 선택 기능이지만, 현재 전체 테스트 수집에는 NumPy/OpenCV/Pillow가 필요합니다.
 

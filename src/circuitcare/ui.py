@@ -22,6 +22,7 @@ from circuitcare.graph import build_graph, direct_candidates, find_paths, to_dot
 from circuitcare.local_llm import LocalLLMError, OllamaClient
 from circuitcare.netlist import load_netlist
 from circuitcare.repair_advisor import build_repair_advice
+from circuitcare.workspace import build_workspace_context, reconcile_session_workspace, store_uploaded_netlist
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -57,20 +58,52 @@ def main() -> None:
     st.caption("로컬 회로 고장 영향 분석 · 정격 스트레스 평가 · Bayesian 진단 · 근거 기반 수리 지원")
     st.info("연결 그래프는 후보 경로만 나타냅니다. 시뮬레이션은 손상을 확정하지 않으며, 위험 순위와 Posterior는 실제 고장 확률이 아닙니다.")
 
-    case_name = st.sidebar.selectbox("회로 데이터셋", list(CASES), key="case_name")
-    case = CASES[case_name]
+    upload_choice = "KiCad XML 업로드 (연결 그래프 전용)"
+    case_name = st.sidebar.selectbox("회로 데이터셋", [*CASES, upload_choice], key="case_name")
+    if case_name == upload_choice:
+        uploaded = st.sidebar.file_uploader("KiCad XML 넷리스트", type=["xml"], key="uploaded_netlist")
+        if uploaded is None:
+            st.info("KiCad XML을 올리면 부품·Net 연결 그래프를 확인할 수 있습니다. 업로드 회로에는 사전 구성된 SPICE 모델/매핑이 없어 시뮬레이션은 지원되지 않습니다.")
+            st.stop()
+        try:
+            uploaded_path = store_uploaded_netlist(uploaded.getvalue(), workspace_root=ROOT)
+            circuit = load_netlist(uploaded_path)
+        except (OSError, ValueError) as exc:
+            st.error(f"회로 검증에 실패했습니다: {exc} · KiCad XML 넷리스트를 다시 내보내 주세요.")
+            st.stop()
+        case_name = f"Uploaded KiCad netlist · {uploaded_path.stem[:12]}"
+        case = {"netlist": str(uploaded_path), "fault": next(iter(circuit.components)),
+                "fault_type": "unspecified", "value": "", "fault_types": ["unspecified"],
+                "base": None, "mapping": None, "probes": None, "ratings": None,
+                "cached": None, "prior": None, "uploaded": True}
+    else:
+        case = CASES[case_name]
     netlist_path = ROOT / case["netlist"]
-    circuit = load_netlist(netlist_path)
+    if case_name != upload_choice and not case.get("uploaded"):
+        circuit = load_netlist(netlist_path)
     fault_options = {
         "Regulator + divider + switch (cached demo)": ["U1"],
         "Independent resistor divider (evaluation circuit A)": ["R1", "R2"],
         "Independent RC charging circuit (evaluation circuit B)": ["RCHARGE", "RBLEED"],
-    }[case_name]
+    }.get(case_name, sorted(circuit.components))
     selected_fault = st.sidebar.selectbox("고장 부품", fault_options, index=fault_options.index(case["fault"]) if case["fault"] in fault_options else 0)
     fault_type = st.sidebar.selectbox("고장 유형", case["fault_types"], index=case["fault_types"].index(case["fault_type"]), key=f"fault_type_{case_name}")
     needs_value = fault_type in {"resistance_drift", "regulator_output_rise", "regulator_output_drop"}
     fault_value = st.sidebar.text_input("고장 파라미터 (SPICE 숫자 표기)", value=case["value"] if fault_type == case["fault_type"] else ("10k" if fault_type == "resistance_drift" else "8"), disabled=not needs_value, key=f"fault_value_{case_name}_{fault_type}")
     context_key = _analysis_context_key(case_name, case, selected_fault, fault_type, fault_value if needs_value else None)
+    workspace_context = build_workspace_context(
+        circuit_id=case_name,
+        netlist_path=netlist_path,
+        input_paths={key: ROOT / case[source] if case.get(source) else None for key, source in
+                     (("spice_model", "base"), ("mapping", "mapping"), ("probes", "probes"),
+                      ("ratings", "ratings"), ("prior", "prior"))},
+        fault={"component_ref": selected_fault, "fault_type": fault_type,
+               "parameter": fault_value if needs_value else None},
+    ).to_dict()
+    # Include content hashes in all downstream session keys so unchanged size/mtime
+    # metadata cannot accidentally reuse results for a different circuit input.
+    context_key = (context_key, workspace_context["workspace_id"])
+    workspace_context["component_refs"] = sorted(circuit.components)
     bayesian_supported = _supports_bayesian_demo(case_name, selected_fault, fault_type, fault_value if needs_value else None)
     if st.session_state.get("analysis_context_key") != context_key:
         for key in list(st.session_state):
@@ -82,17 +115,18 @@ def main() -> None:
             st.session_state.pop(key, None)
         st.session_state.analysis_context_key = context_key
         st.session_state.measurements = []
+    active_workspace = reconcile_session_workspace(st.session_state, workspace_context)
     st.sidebar.caption(f"선택한 고장 모델: {fault_type} · 파라미터: {fault_value if needs_value else '해당 없음'}")
     st.sidebar.caption("시연 데이터는 저장된 결과이며, 새 시뮬레이션은 버튼을 눌렀을 때만 실행합니다.")
 
     run_col, state_col = st.sidebar.columns(2)
     state_display = state_col.empty()
-    run_live = run_col.button("ngspice 실행", disabled=not _command_exists("ngspice"), use_container_width=True)
+    run_live = run_col.button("ngspice 실행", disabled=not _command_exists("ngspice") or bool(case.get("uploaded")), use_container_width=True)
     live_matches = bool(st.session_state.get("live_result_dir")) and st.session_state.get("live_context_key") == context_key
     if not live_matches:
         st.session_state.pop("live_result_dir", None)
         live_used = False
-        if selected_fault == case["fault"] and fault_type == case["fault_type"] and fault_value == case["value"]:
+        if case.get("cached") and selected_fault == case["fault"] and fault_type == case["fault_type"] and fault_value == case["value"]:
             result_dir = ROOT / case["cached"]
         else:
             result_dir = ROOT / "data/no_cached_results" / case_name.replace(" ", "_") / selected_fault
@@ -115,7 +149,7 @@ def main() -> None:
                     "what_if_voltage", "what_if_node", "what_if_sigma"):
             st.session_state.pop(key, None)
         live_used = False
-        result_dir = ROOT / case["cached"] if _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value) else ROOT / "data/no_cached_results" / case_name.replace(" ", "_") / selected_fault
+        result_dir = ROOT / case["cached"] if case.get("cached") and _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value) else ROOT / "data/no_cached_results" / case_name.replace(" ", "_") / selected_fault
         slug = {"U1": "regulator_8v", "R1": "divider_r1_drift", "RCHARGE": "rc_rcharge_drift"}.get(selected_fault, "scenario")
         output = ROOT / "data/ui_runs" / f"{slug}-{time.time_ns()}"
         cmd = [sys.executable, "-m", "circuitcare.cli", "--netlist", str(netlist_path), "--fault", selected_fault,
@@ -150,7 +184,7 @@ def main() -> None:
     risk = _json_if_exists(risk_path)
     stress = _json_if_exists(stress_path)
     base_risk = risk
-    component_mapping = _json_if_exists(ROOT / case["mapping"])
+    component_mapping = _json_if_exists(ROOT / case["mapping"]) if case.get("mapping") else {}
     stress_signature = hashlib.sha256(stress_path.read_bytes()).hexdigest() if stress_path.is_file() else None
     applied_key = f"datasheet_applied_{context_key}"
     applied_ratings = st.session_state.get(applied_key)
@@ -170,7 +204,7 @@ def main() -> None:
             risk = reassess_existing_risk(risk, stress, applied_specs, component_mapping)
         except (OSError, ValueError, KeyError, TypeError):
             st.session_state.pop(f"datasheet_applied_{context_key}", None)
-    is_cached_selection = _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value)
+    is_cached_selection = bool(case.get("cached")) and _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value)
     status = _simulation_status(live_used, st.session_state.get("live_error"), is_cached_selection)
     if status != "RUNNING":
         st.session_state.simulation_status = status
@@ -180,6 +214,26 @@ def main() -> None:
             "CACHED": "🔵 CACHED · 저장된 시연 결과",
             "NOT_RUN": "⚪ NOT_RUN · 분석 준비 · 미실행",
         }[status])
+    spice_record_status = ("UNSUPPORTED" if case.get("uploaded") else
+                           "COMPLETE" if status in {"SUCCESS", "CACHED"} and comparison else
+                           "FAILED" if status == "FAILED" else "READY")
+    active_workspace["analysis_records"] = [
+        {"analysis_type": "circuit_validation", "status": "COMPLETE",
+         "circuit_hash": workspace_context["circuit_hash"], "source": "KiCad XML parser",
+         "timestamp": active_workspace["generated_at"], "input_hashes": {}},
+        {"analysis_type": "graph_analysis", "status": "COMPLETE",
+         "circuit_hash": workspace_context["circuit_hash"], "source": "Component-Net graph",
+         "timestamp": active_workspace["generated_at"], "input_hashes": {"netlist": workspace_context["circuit_hash"]}},
+        {"analysis_type": "spice_fault_comparison", "status": spice_record_status,
+         "circuit_hash": workspace_context["circuit_hash"], "source": "ngspice" if comparison else "NOT_RUN",
+         "timestamp": active_workspace["generated_at"], "scenario_id": (comparison or {}).get("scenario_id"),
+         "input_hashes": workspace_context["input_hashes"]},
+        {"analysis_type": "risk_assessment", "status": "COMPLETE" if risk else "NOT_EVALUATED",
+         "circuit_hash": workspace_context["circuit_hash"], "source": "configured ratings" if risk else "NOT_EVALUATED",
+         "timestamp": active_workspace["generated_at"], "scenario_id": risk.get("scenario_id"),
+         "input_hashes": workspace_context["input_hashes"]},
+    ]
+    st.session_state["circuitcare_workspace"] = active_workspace
     st.sidebar.markdown("🟢 ngspice 사용 가능" if _command_exists("ngspice") else "🟠 ngspice 없음 · 저장 결과 조회 가능")
     client, models = _ollama_models()
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
@@ -190,6 +244,7 @@ def main() -> None:
             st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
             failed_component=selected_fault, fault_type=fault_type, fault_value=fault_value,
             risk=risk, comparison=comparison, status=status, bayesian_supported=bayesian_supported,
+            workspace=active_workspace,
         )
     with tabs[1]:
         st.subheader("회로 및 고장 설정")
@@ -258,6 +313,7 @@ def main() -> None:
                 current = _run_diagnosis(measurements)
                 st.session_state.diagnosis_result = current
                 st.session_state.pop("last_advisor", None)
+                st.rerun()
             with st.form("measurement_form"):
                 node = st.selectbox("측정 노드", current["diagnosis"].get("available_measurement_nodes", []), index=0)
                 value = st.number_input("측정 전압 (V)", value=7.9, format="%.4f")
@@ -270,6 +326,7 @@ def main() -> None:
                 current = _run_diagnosis(measurements)
                 st.session_state.diagnosis_result = current
                 st.session_state.pop("last_advisor", None)
+                st.rerun()
             if measurements:
                 st.caption("같은 노드를 다시 입력하면 기존 값을 교체합니다.")
                 st.dataframe(measurements, use_container_width=True, hide_index=True)
@@ -279,6 +336,7 @@ def main() -> None:
                 current = _run_diagnosis([])
                 st.session_state.diagnosis_result = current
                 st.session_state.pop("last_advisor", None)
+                st.rerun()
             diagnosis = current["diagnosis"]
             if diagnosis.get("model_mismatch"):
                 st.error("Model mismatch: 현재 측정값을 설정된 시뮬레이션 가설이 설명하지 못합니다. 최상위 posterior를 확정 진단으로 해석하지 마세요.")
@@ -377,17 +435,23 @@ def main() -> None:
             selected_component=st.session_state.get(f"fault_map_component_{hashlib.sha256(repr(context_key).encode()).hexdigest()[:10]}"),
         )
     with tabs[7]:
-        render_datasheet_tab(st, root=ROOT, circuit=circuit,
-            context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16], case=case,
-            risk=base_risk, stress=stress, client=client, models=models,
-            stress_signature=stress_signature,
-            applied_records=applied_ratings,
-            current_risk=risk if applied_ratings and risk.get("reassessment_source") else None)
+        if case.get("uploaded"):
+            st.info("업로드 회로에는 부품 Mapping과 확인된 SPICE 정격 분석이 없습니다. 데이터시트 정격 적용은 해당 회로 Context에서 지원되지 않습니다.")
+        else:
+            render_datasheet_tab(st, root=ROOT, circuit=circuit,
+                context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16], case=case,
+                risk=base_risk, stress=stress, client=client, models=models,
+                stress_signature=stress_signature,
+                applied_records=applied_ratings,
+                current_risk=risk if applied_ratings and risk.get("reassessment_source") else None)
     with tabs[8]:
-        from circuitcare.fault_ai_ui import render_fault_ai_tab
-        render_fault_ai_tab(st, root=ROOT, circuit=circuit, case_name=case_name, case=case,
-                            client=client, models=models,
-                            context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16])
+        if case.get("uploaded"):
+            st.info("업로드 회로에 대해 실행 가능한 SPICE Mapping이 없어 고장 가설 실행을 지원하지 않습니다. 기존 3개 데모 회로에서만 사용할 수 있습니다.")
+        else:
+            from circuitcare.fault_ai_ui import render_fault_ai_tab
+            render_fault_ai_tab(st, root=ROOT, circuit=circuit, case_name=case_name, case=case,
+                                client=client, models=models,
+                                context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16])
     with tabs[9]:
         from circuitcare.repair_feedback_ui import render_repair_feedback_tab
         state_id = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
@@ -410,7 +474,8 @@ def _load_diagnosis(case: dict) -> dict:
 
 
 def _render_analysis_overview(st, *, circuit, case_name, case, context_key, failed_component,
-                              fault_type, fault_value, risk, comparison, status, bayesian_supported):
+                              fault_type, fault_value, risk, comparison, status, bayesian_supported,
+                              workspace):
     """Unified read-only overview plus an isolated simulated-demo What-if preview."""
     from circuitcare.visualization.fault_map import build_fault_map, fault_map_json, render_fault_map_dot
 
@@ -429,6 +494,21 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
     cards[2].metric("정격 초과 후보", str(exceeded_count) if exceeded_count is not None else "UNAVAILABLE")
     cards[3].metric("Prior 점검 후보", baseline_inspection.get("component_ref") if baseline_inspection else "UNAVAILABLE")
     st.caption(f"회로: {case_name} · 고장 조건: {fault_type} / {fault_value or '—'} · 손상 확정: 아니요")
+    from circuitcare.workspace.workflow import workflow_steps
+    steps = workflow_steps(
+        circuit_status=workspace.get("validation_status", "FAILED"), graph_ready=True,
+        fault_status="COMPLETE", spice_status={"SUCCESS": "COMPLETE", "CACHED": "COMPLETE",
+            "NOT_RUN": "READY", "FAILED": "FAILED"}.get(
+                status, "UNSUPPORTED" if case.get("uploaded") else "NOT_EVALUATED"),
+        report_ready=True,
+    )
+    st.markdown("### 진단 워크플로")
+    st.caption(f"활성 Workspace `{workspace['workspace_id']}` · 회로 버전 `{workspace['circuit_version']}` · 검증 {workspace['validation_status']}")
+    st.dataframe(steps, hide_index=True, use_container_width=True)
+    if workspace.get("invalidated_analyses"):
+        st.warning("회로 또는 고장 Context가 바뀌어 이전 분석이 무효화되었습니다: "
+                   + ", ".join(workspace["invalidated_analyses"]))
+    st.caption("LLM 요청과 ngspice 실행은 각각 별도 사용자 동작으로만 시작됩니다. 수리 이력 저장은 선택 사항입니다.")
 
     what_if_result = None
     if bayesian_supported:
@@ -551,6 +631,68 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
                           "electrical_stress_recomputed": False, "damage_confirmed": False}
         st.download_button("What-if 결과 JSON 다운로드", json.dumps(what_if_export, ensure_ascii=False, indent=2),
                            "what_if_diagnosis.json", "application/json", key=f"what_if_download_{context_id}")
+    from circuitcare.reporting.report_builder import build_diagnostic_snapshot, classify_parameter_grid_coverage
+    from circuitcare.reporting.exporters import export_bundle, export_html, export_json, export_markdown
+    from circuitcare.reporting.report_validator import validate_report
+    report_context_id = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
+    fault_ai_state = st.session_state.get(f"fault_ai_state_{report_context_id}", {})
+    report_hypotheses = fault_ai_state.get("hypotheses", []) if fault_ai_state.get("context_key") == report_context_id else []
+    report_observations = (st.session_state.get("measurements", []) if bayesian_supported
+                           else fault_ai_state.get("observations", []))
+    report_diagnosis = (what_if_result.get("diagnosis") if what_if_result else
+                        ({"status": "CANDIDATES_AVAILABLE", "hypotheses": report_hypotheses,
+                          "llm_metadata": fault_ai_state.get("llm_metadata")} if report_hypotheses
+                         else {"status": "NOT_EVALUATED"}))
+    active_ranking = (what_if_result.get("inspection_ranking") if what_if_result else
+                      fault_ai_state.get("bayesian_result"))
+    inspection_recommendations = ({"status": "CONDITIONAL_INSPECTION_RANKING",
+                                   "ranking": active_ranking,
+                                   "measurement_recommendations": what_if_result.get("recommendations") if what_if_result else None,
+                                   "interpretation": "Conditional inspection ordering only; separate from electrical stress and not damage probability."}
+                                  if active_ranking else None)
+    rule_candidates = fault_ai_state.get("rule_candidates", []) if fault_ai_state.get("context_key") == report_context_id else []
+    parameter_identification = classify_parameter_grid_coverage(
+        component_ref=failed_component, fault_type=fault_type,
+        fault_parameter=fault_value if fault_type in {"resistance_drift", "regulator_output_rise", "regulator_output_drop"} else None,
+        rule_candidates=rule_candidates,
+    )
+    report_snapshot = build_diagnostic_snapshot(
+        root=ROOT, workspace=workspace, circuit=circuit,
+        fault={"component_ref": failed_component, "fault_type": fault_type,
+               "parameter": fault_value or None}, simulation_status=status,
+        comparison=comparison, risk_assessment=risk,
+        observations=report_observations,
+        diagnosis=report_diagnosis,
+        inspection_recommendations=inspection_recommendations,
+        parameter_identification=parameter_identification,
+        active_fault_candidates={"status": "CONNECTIVITY_CANDIDATES",
+                                  "failed_component": failed_component,
+                                  "direct_candidate_count": len(direct_candidates(circuit, failed_component)),
+                                  "hypotheses": report_hypotheses,
+                                  "rule_candidates": rule_candidates,
+                                  "hypothesis_symptom": fault_ai_state.get("symptom") if report_hypotheses else None,
+                                  "paths": payload.get("paths", []),
+                                  "interpretation": "Potential connectivity only; not confirmed damage."},
+    )
+    report_errors = validate_report(report_snapshot, expected_circuit_hash=workspace.get("circuit_hash"))
+    st.markdown("### 근거 보고서")
+    st.caption("현재 분석 Snapshot을 내보냅니다. 다운로드 과정에서 SPICE, LLM 또는 다른 분석을 재실행하지 않습니다.")
+    if report_errors:
+        st.error("보고서 검증 실패: " + ", ".join(report_errors))
+    else:
+        st.success("보고서 근거 참조 및 현재 회로 Hash 검증 완료 · 실제 물리 손상은 확인하지 않았습니다.")
+        try:
+            report_json = export_json(report_snapshot)
+            report_markdown = export_markdown(report_snapshot)
+            report_html = export_html(report_snapshot)
+            report_bundle = export_bundle(report_snapshot, root=ROOT)
+        except (OSError, TypeError, ValueError, OverflowError) as exc:
+            st.error(f"보고서를 만들지 못했습니다: {exc} · 회로/분석 자료를 확인하고 다시 열어 주세요.")
+        else:
+            st.download_button("진단 보고서 JSON", report_json, "circuitcare_diagnosis.json", "application/json", key=f"report_json_{workspace['workspace_id']}")
+            st.download_button("진단 보고서 Markdown", report_markdown, "circuitcare_diagnosis.md", "text/markdown", key=f"report_md_{workspace['workspace_id']}")
+            st.download_button("진단 보고서 HTML", report_html, "circuitcare_diagnosis.html", "text/html", key=f"report_html_{workspace['workspace_id']}")
+            st.download_button("Evidence Bundle ZIP", report_bundle, "circuitcare_evidence_bundle.zip", "application/zip", key=f"report_bundle_{workspace['workspace_id']}")
     if st.button("현재 지도와 What-if 결과를 로컬 저장", key=f"fault_map_save_{hashlib.sha256(repr(context_key).encode()).hexdigest()[:12]}"):
         target = ROOT / "data" / "visualizations"
         target.mkdir(parents=True, exist_ok=True)

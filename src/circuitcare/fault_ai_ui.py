@@ -68,6 +68,9 @@ def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, ca
             except (ValueError, RuntimeError, OSError) as exc:
                 state["llm_metadata"] = {"status": "failed", "error": str(exc)}
         st.session_state[state_key] = state
+        # The overview/report runs earlier in the page; rerun so it can include
+        # the newly generated candidate snapshot in the same active context.
+        st.rerun()
     state = st.session_state.get(state_key)
     if not state or state.get("context_key") != context_key:
         st.info("증상과 측정값을 입력하고 후보 생성 버튼을 누르세요. SPICE는 별도 실행 버튼에서만 작동합니다.")
@@ -98,6 +101,7 @@ def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, ca
         state["bayesian_result"] = conditional_bayesian_update(state["hypotheses"], state["observations"])
         st.session_state[state_key] = state
         st.session_state[run_key] = time.time()
+        st.rerun()
     for row in rank_hypotheses(state["hypotheses"]):
         with st.expander(f"{row.get('evidence_rank') or '—'} · {row['component_ref']} · {row['fault_type']} · {row.get('simulation_status', 'SIMULATION_NOT_RUN')}"):
             st.json(row)
