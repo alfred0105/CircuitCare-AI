@@ -26,7 +26,7 @@ This work followed `main` at `482105e01cca46dd9f6b7aedab91f9f51bc27c4b`. The rep
 - A standalone 20-circuit Streamlit AppTest switch soak sampled RSS at 171.08 MiB after initial load, 178.03 MiB at 5 switches, 179.55 MiB at 10, and 180.73 MiB at 20 (1.72 s). In the combined stress suite, after earlier image/cache tests, the same switch soak sampled 399.66, 406.12, 406.62, and 409.25 MiB at those points. It completed without app errors. These AppTest runs are not a real browser/server long-duration soak.
 - Latest isolated suite sampled peak RSS: fast 250.20 MiB, integration 423.12 MiB, stress 411.28 MiB. Integration's peak included actual ONNX/OCR child inference; its final pytest RSS was 118.44 MiB after child exit. Stress included 20 synthetic 2,000² images and repeated UI reruns. These bounded tests completed without process failure; allocator retention and high-water RSS remain possible.
 - Latest diagnostics save per-suite timing/RSS, child signal classification and `streamlit_switch_soak.json`. `ps` samples process-tree RSS and can miss short peaks. Baseline-to-peak differences include Python and optional dependency startup and should not be called a leak measurement.
-- GitHub Actions is configured with Python 3.11/3.12 fast matrix and a Linux Python 3.12 job that installs ngspice and runs integration. Results are recorded after the push and CI finishes.
+- GitHub Actions run [41760254583](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41760254583) passed for code commit `769c79a`: Python 3.11 fast CI, Python 3.12 fast CI, and Linux ngspice integration all succeeded. GitHub emitted non-blocking Node.js action deprecation and upcoming Ubuntu image migration notices.
 
 ## Limits and remaining risks
 
