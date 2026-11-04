@@ -58,7 +58,7 @@ No dependencies were added. No report JSON/HTML/Markdown/ZIP schema was changed.
 
 ## Verification record
 
-Environment available locally: macOS Apple Silicon, Python 3.12.14. Python 3.11 was not installed locally; CI has a Python 3.11/3.12 matrix and will be checked after push.
+Environment available locally: macOS Apple Silicon, Python 3.12.14. Python 3.11 was not installed locally; the pushed CI matrix passed on both Python 3.11 and 3.12.
 
 | Check | Result |
 |---|---|
@@ -73,6 +73,8 @@ Environment available locally: macOS Apple Silicon, Python 3.12.14. Python 3.11 
 | Isolated crash-injection marker | PASS — 3 tests; signal cases terminate child processes through the diagnostics harness. |
 | Streamlit browser E2E | PASS for app start on isolated port 8503, circuit view parameter `13k`, Live ngspice success, and waveform rendering. The user's existing port 8501 was left untouched. |
 
+GitHub Actions for commit `4b8258e6c70569677600078684f1191d9866f15a` completed successfully across the Python 3.11/3.12, ngspice integration, native OCR integration, bounded stress, and isolated crash-injection jobs: [run 41835573690](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41835573690).
+
 The legacy demo cache, real datasheet application, and real PCB image/position-file overlay remain **NOT_VERIFIED** for the reasons above or lack of supplied source files. Tests verify their provenance gates without substituting synthetic evidence.
 
 ## Compatibility and remaining issues
@@ -84,4 +86,4 @@ The legacy demo cache, real datasheet application, and real PCB image/position-f
 
 ## Completion assessment
 
-The four Phase 18.2.5 regression paths are fixed and regression-covered. The changes are ready to finalize Phase 18.2.5 once the pushed CI matrix completes successfully. The next circuit-diagram-centered UI/UX phase can proceed after CI; the unverified source-dependent datasheet, PCB, and legacy cached-demo paths should remain explicitly gated until their real input artifacts are available.
+The four Phase 18.2.5 regression paths are fixed and regression-covered, and the pushed CI matrix passed. Phase 18.2.5 is complete. The next circuit-diagram-centered UI/UX phase can proceed; the unverified source-dependent datasheet, PCB, and legacy cached-demo paths should remain explicitly gated until their real input artifacts are available.
