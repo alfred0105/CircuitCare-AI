@@ -46,7 +46,7 @@ def main() -> int:
         if args.operation == "document":
             result = _load_pdf_local(data, args.filename, max_bytes=args.max_bytes, max_pages=args.max_pages)
         else:
-            result = _extract_pdf_tables_local(data)
+            result = _extract_pdf_tables_local(data, max_pages=args.max_pages)
         _atomic_json(args.output_path, {"status": "OK", "result": result})
         return 0
     except Exception as exc:  # noqa: BLE001 - serialize any parser failure across the worker boundary.

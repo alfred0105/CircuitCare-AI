@@ -89,16 +89,18 @@ def _load_pdf_local(data: bytes, filename: str, *, max_bytes: int = MAX_PDF_BYTE
             "truncated_by_text_limit": total_chars >= MAX_EXTRACTED_TEXT_CHARS}
     return result
 
-def _extract_pdf_tables_local(data: bytes) -> list[dict[str, Any]]:
+def _extract_pdf_tables_local(data: bytes, *, max_pages: int = MAX_PDF_PAGES) -> list[dict[str, Any]]:
     try:
         import pdfplumber
     except ImportError:
         return []
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
+            if len(pdf.pages) > max_pages:
+                raise DatasheetError(f"PDF exceeds the {max_pages}-page table processing limit.")
             tables = []
             cells_used = 0
-            for index, page in enumerate(pdf.pages[:MAX_PDF_PAGES]):
+            for index, page in enumerate(pdf.pages):
                 for table_index, table in enumerate(page.extract_tables() or []):
                     if not table or len(tables) >= MAX_TABLES:
                         continue
