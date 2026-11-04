@@ -155,8 +155,14 @@ def export_bundle(report: dict[str, Any], *, root: Path,
         evidence["included_in_bundle"] = digest is not None
         if digest:
             evidence["source_artifact"] = f"evidence/{alias}"
-            evidence["artifact_sha256"] = digest
-            evidence["bundle_verification_status"] = "VERIFIED_ARTIFACT"
+            evidence["bundled_artifact_sha256"] = digest
+            expected_digest = evidence.get("artifact_sha256")
+            if not expected_digest:
+                evidence["bundle_verification_status"] = "SOURCE_HASH_UNAVAILABLE"
+            elif expected_digest == digest:
+                evidence["bundle_verification_status"] = "VERIFIED_ARTIFACT"
+            else:
+                evidence["bundle_verification_status"] = "ARTIFACT_HASH_MISMATCH"
         else:
             evidence["bundle_verification_status"] = "SOURCE_NOT_BUNDLED"
     files["diagnosis.json"] = export_json(bundled_report).encode("utf-8")

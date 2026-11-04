@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from circuitcare.graph import build_graph, find_paths
+from circuitcare.graph import build_graph, find_paths_result
 from circuitcare.models import Circuit
 
 RISK_COLORS = {
@@ -22,7 +22,8 @@ def build_fault_map(circuit: Circuit, failed_component: str, *, risk_assessment:
     if failed_component not in circuit.components:
         raise ValueError(f"Unknown component reference: {failed_component}")
     graph = build_graph(circuit)
-    paths = find_paths(circuit, failed_component, max_hops=max_hops)
+    search = find_paths_result(circuit, failed_component, max_hops=max_hops)
+    paths = search.paths
     risk_rows = {row["component_ref"]: row for row in (risk_assessment or {}).get("secondary_candidates", [])}
     priority_rows = {row["component_ref"]: row for row in (inspection_ranking or {}).get("posterior_weighted_inspection_order", [])}
     prior_priority_rows = {row["component_ref"]: row for row in (inspection_ranking or {}).get("prior_weighted_inspection_order", [])}
@@ -70,6 +71,9 @@ def build_fault_map(circuit: Circuit, failed_component: str, *, risk_assessment:
                           "path_sequence": list(item.path),
                           "evidence_level": "connectivity_only"}
                          for item in paths],
+               "path_search": {"status": search.status, "expanded_states": search.expanded_states,
+                               "peak_queue_size": search.peak_queue_size, "total_paths": search.total_paths,
+                               "limit_reason": search.limit_reason},
                "damage_confirmed": False,
                "interpretation": "Connectivity paths are influence candidates, not directed power flow or proof of stress/damage. Electrical risk uses only the provided scenario-matched SPICE/rating result. Inspection priority is a separate conditional index, not damage probability."}
     return payload

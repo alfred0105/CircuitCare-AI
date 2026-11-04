@@ -31,3 +31,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: requires external native or optional runtime dependencies",
+    "stress: bounded synthetic stress and soak coverage",
+]

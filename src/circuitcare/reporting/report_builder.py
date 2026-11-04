@@ -138,8 +138,9 @@ def build_diagnostic_snapshot(*, root: Path, workspace: dict[str, Any], circuit:
     if candidate_context_status != "MATCHED":
         active_fault_candidates["hypotheses"] = []
         active_fault_candidates["rule_candidates"] = []
-    comparison_hash = hashlib.sha256(json.dumps(comparison, sort_keys=True, separators=(",", ":")).encode()).hexdigest() if comparison else None
-    risk_hash = hashlib.sha256(json.dumps(risk_assessment, sort_keys=True, separators=(",", ":")).encode()).hexdigest() if risk_assessment else None
+    result_hashes = simulation_context.get("result_sha256", {}) if cached_verified else {}
+    comparison_hash = result_hashes.get("comparison.json") if comparison else None
+    risk_hash = result_hashes.get("risk_assessment.json") if risk_assessment else None
     evidence = [{"evidence_id": "EV-SPICE", "evidence_type": "SPICE_SIMULATION",
                  "source_artifact": "comparison.json" if comparison else None,
                  "artifact_sha256": comparison_hash, "verification_status": "RECORDED" if comparison else "NOT_EVALUATED",

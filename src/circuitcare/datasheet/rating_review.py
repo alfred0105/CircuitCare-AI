@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from circuitcare.workspace.atomic_json import write_json_atomic
+
 
 def save_review(record: dict[str, Any], path: str | Path) -> dict[str, Any]:
     target = Path(path)
@@ -20,7 +22,7 @@ def save_review(record: dict[str, Any], path: str | Path) -> dict[str, Any]:
     saved = {**record, "reviewed_at": datetime.now(timezone.utc).isoformat(),
              "review_source": "user_review", "human_approved": record.get("decision") == "approved"}
     history["records"].append(saved)
-    target.write_text(json.dumps(history, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
+    write_json_atomic(target, history)
     return saved
 
 
@@ -59,7 +61,7 @@ def save_application(record: dict[str, Any], path: str | Path) -> None:
     if not isinstance(data, dict) or not isinstance(data.get("applications"), list):
         raise ValueError("Applied-rating registry is invalid; refusing to overwrite it.")
     data["applications"].append({"event": "applied", **record, "applied_at": datetime.now(timezone.utc).isoformat()})
-    target.write_text(json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
+    write_json_atomic(target, data)
 
 
 def find_applications(path: str | Path, *, circuit_path: str, scenario_id: str, stress_sha256: str) -> list[dict[str, Any]]:

@@ -2,6 +2,7 @@
 
 import csv
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -12,6 +13,17 @@ from typing import Any
 
 class SimulationError(RuntimeError):
     """Raised when ngspice cannot produce a valid transient result."""
+
+    def __init__(self, message: str, *, diagnostic: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.diagnostic = diagnostic or {"engine": "ngspice", "status": "FAILED"}
+
+
+MAX_WRDATA_BYTES = 256 * 1024 * 1024
+MAX_WRDATA_SAMPLES = 1_000_000
+MAX_WRDATA_VECTORS = 128
+MAX_WRDATA_VALUES = 2_000_000
+MAX_PROCESS_OUTPUT_BYTES = 8 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -55,6 +67,8 @@ def run_ngspice(
     voltage_nodes, current_elements, unsupported = _select_vectors(source, probes, component_mapping)
     expressions = [f"v({node})" for node in voltage_nodes]
     expressions.extend(f"i({element})" for _, element in current_elements)
+    if len(expressions) > MAX_WRDATA_VECTORS:
+        raise SimulationError(f"Probe count exceeds the {MAX_WRDATA_VECTORS}-vector limit")
     if not expressions:
         raise SimulationError("At least one voltage node or supported source current must be probed")
     vector_columns = {f"v({node})".casefold(): f"voltage:{node}" for node in voltage_nodes}
@@ -62,33 +76,48 @@ def run_ngspice(
 
     runner_text = _instrument_deck(source, raw_path.name, expressions)
     runner_path.write_text(runner_text, encoding="utf-8")
-    retried_after_segfault = False
-    while True:
+    attempts: list[tuple[int, Path, Path]] = []
+    max_attempts = 2
+    completed = None
+    for attempt in range(max_attempts):
+        attempt_log = output / f"{safe_name}.attempt{attempt + 1}.log"
+        stdout_path = output / f"{safe_name}.attempt{attempt + 1}.stdout"
+        stderr_path = output / f"{safe_name}.attempt{attempt + 1}.stderr"
         try:
-            completed = subprocess.run(
-                [program, "-b", "-o", log_path.name, runner_path.name],
-                cwd=output,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-                check=False,
-            )
+            with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+                completed = subprocess.run([program, "-b", "-o", attempt_log.name, runner_path.name],
+                    cwd=output, stdout=stdout_file, stderr=stderr_file, timeout=timeout_seconds, check=False)
         except subprocess.TimeoutExpired as exc:
-            raise SimulationError(f"ngspice timed out for {source_path}; log: {log_path}") from exc
-        if completed.returncode != -11 or retried_after_segfault:
+            _preserve_attempt_logs(log_path, attempts + [(attempt + 1, attempt_log, None),
+                                                           (attempt + 1, stdout_path, None),
+                                                           (attempt + 1, stderr_path, None)])
+            raise SimulationError(f"ngspice timed out for {source_path}; log: {log_path}",
+                                  diagnostic={"engine": "ngspice", "status": "TIMEOUT",
+                                              "retry_count": attempt, "logs_preserved": True}) from exc
+        attempts.append((attempt + 1, attempt_log, stdout_path))
+        attempts.append((attempt + 1, stderr_path, stderr_path))
+        if completed.returncode != -11 or attempt + 1 >= max_attempts:
             break
-        retried_after_segfault = True
         raw_path.unlink(missing_ok=True)
-        log_path.unlink(missing_ok=True)
-    if completed.stdout or completed.stderr:
-        with log_path.open("a", encoding="utf-8") as log:
-            if completed.stdout:
-                log.write("\n[stdout]\n" + completed.stdout)
-            if completed.stderr:
-                log.write("\n[stderr]\n" + completed.stderr)
+    _preserve_attempt_logs(log_path, attempts)
+    retried_after_segfault = len(attempts) > 2 and completed.returncode == 0
 
     if completed.returncode != 0:
-        raise SimulationError(f"ngspice exited with code {completed.returncode}; log: {log_path}")
+        if completed.returncode < 0:
+            import signal
+            try:
+                signal_name = signal.Signals(-completed.returncode).name
+            except ValueError:
+                signal_name = "UNKNOWN_SIGNAL"
+            retry_count = min(max(len(attempts) // 2 - 1, 0), 1)
+            diagnostic = {"engine": "ngspice", "status": "FAILED_NATIVE_CRASH",
+                          "return_code": completed.returncode, "signal": signal_name,
+                          "retry_count": retry_count, "logs_preserved": True}
+            raise SimulationError(f"ngspice child terminated by {signal_name} (return code {completed.returncode}); diagnostic={diagnostic}; logs preserved at {log_path}", diagnostic=diagnostic)
+        raise SimulationError(f"ngspice exited with code {completed.returncode}; logs preserved at {log_path}",
+                              diagnostic={"engine": "ngspice", "status": "FAILED",
+                                          "return_code": completed.returncode,
+                                          "retry_count": max(len(attempts) // 2 - 1, 0), "logs_preserved": True})
     log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
     if re.search(r"\b(error|fatal)\s*:", log_text, flags=re.IGNORECASE) or re.search(
         r"singular matrix|timestep too small|no convergence", log_text, flags=re.IGNORECASE
@@ -98,6 +127,8 @@ def run_ngspice(
     log_path.write_text(log_text.rstrip() + "\n" + retry_note, encoding="utf-8")
     if not raw_path.is_file() or raw_path.stat().st_size == 0:
         raise SimulationError(f"ngspice produced no probe data; log: {log_path}")
+    if raw_path.stat().st_size > MAX_WRDATA_BYTES:
+        raise SimulationError(f"ngspice output exceeds the {MAX_WRDATA_BYTES}-byte limit; log: {log_path}")
 
     columns = _read_wrdata(raw_path, vector_columns)
     if len(columns.get("time_s", [])) < 2:
@@ -225,13 +256,32 @@ def _safe_name(value: str) -> str:
     return name
 
 
+def _preserve_attempt_logs(destination: Path, attempts: list[tuple[int, Path, Path | None]]) -> None:
+    """Combine bounded child logs without discarding a failed retry attempt."""
+    with destination.open("w", encoding="utf-8", errors="replace") as output:
+        for attempt, path, _ in attempts:
+            output.write(f"\n--- attempt {attempt}: {path.name} ---\n")
+            if path.is_file():
+                if path.stat().st_size > MAX_PROCESS_OUTPUT_BYTES:
+                    output.write("[truncated: child output exceeded configured log limit]\n")
+                    with path.open("rb") as source:
+                        output.write(source.read(MAX_PROCESS_OUTPUT_BYTES).decode("utf-8", errors="replace"))
+                else:
+                    output.write(path.read_text(encoding="utf-8", errors="replace"))
+
+
 def _read_wrdata(path: Path, vector_columns: dict[str, str]) -> dict[str, list[float]]:
-    lines = [line.split() for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
-    if not lines:
+    if len(vector_columns) > MAX_WRDATA_VECTORS:
+        raise SimulationError(f"Requested vector count exceeds limit in {path}")
+    iterator = (line.split() for line in path.open(encoding="utf-8", errors="replace"))
+    header_row = next((row for row in iterator if row), None)
+    if not header_row:
         raise SimulationError(f"Empty ngspice wrdata file: {path}")
-    headers = [item.casefold() for item in lines[0]]
+    headers = [item.casefold() for item in header_row]
+    if len(headers) > MAX_WRDATA_VECTORS + 1:
+        raise SimulationError(f"ngspice header exceeds the {MAX_WRDATA_VECTORS}-vector limit in {path}")
     if not headers or headers[0] != "time":
-        raise SimulationError(f"Unexpected ngspice wrdata header in {path}: {lines[0]}")
+        raise SimulationError(f"Unexpected ngspice wrdata header in {path}: {header_row}")
     requested_indices = {}
     for header, key in vector_columns.items():
         if header.casefold() not in headers:
@@ -239,7 +289,15 @@ def _read_wrdata(path: Path, vector_columns: dict[str, str]) -> dict[str, list[f
         requested_indices[key] = headers.index(header.casefold())
     columns: dict[str, list[float]] = {"time_s": []}
     columns.update({key: [] for key in requested_indices})
-    for row in lines[1:]:
+    sample_count = 0
+    for row in iterator:
+        if not row:
+            continue
+        sample_count += 1
+        if sample_count > MAX_WRDATA_SAMPLES:
+            raise SimulationError(f"ngspice sample count exceeds {MAX_WRDATA_SAMPLES} in {path}")
+        if sample_count * len(headers) > MAX_WRDATA_VALUES:
+            raise SimulationError(f"ngspice numeric value count exceeds {MAX_WRDATA_VALUES} in {path}")
         if len(row) != len(headers):
             raise SimulationError(f"Malformed ngspice data row in {path}")
         try:

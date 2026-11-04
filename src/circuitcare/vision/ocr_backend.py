@@ -42,7 +42,15 @@ def run_local_ocr(image: Any) -> dict[str, Any]:
     boxes = getattr(result, "boxes", None)
     texts = getattr(result, "txts", None)
     scores = getattr(result, "scores", None)
-    for index, raw_text in enumerate(texts or ()):
+    if texts is None:
+        texts = ()
+    try:
+        text_count = len(texts)
+    except TypeError as exc:
+        raise OCRUnavailable("OCR 엔진의 텍스트 결과 형식이 올바르지 않습니다.") from exc
+    score_count = len(scores) if scores is not None else 0
+    for index in range(text_count):
+        raw_text = texts[index]
         text = str(raw_text).strip()
         if not text:
             continue
@@ -53,7 +61,8 @@ def run_local_ocr(image: Any) -> dict[str, Any]:
             bbox = [float(min(x_values)), float(min(y_values)), float(max(x_values)), float(max(y_values))]
         else:
             bbox = None
-        records.append({"text": text, "raw_text": text, "confidence": float(scores[index]) if scores else 0.0,
+        score = float(scores[index]) if scores is not None and index < score_count else 0.0
+        records.append({"text": text, "raw_text": text, "confidence": score,
                         "bbox_xyxy": bbox, "polygon_xy": polygon, "source": "local_ocr",
                         "verification_status": "unverified", "reference_candidates": extract_reference_candidates(text)})
     return {"status": "OCR_COMPLETE", "engine": "RapidOCR / PP-OCR ONNX", "runtime": "local-onnxruntime",

@@ -1,5 +1,9 @@
 # CircuitCare AI user guide
 
+## Stability and diagnostics
+
+Choose one of the 11 analysis areas from **분석 영역**; only that area's renderer runs. Graph results include a search status. A `PARTIAL_*` result means the displayed routes are incomplete and must not be treated as the full candidate set. PDF and PCB processing reuse recent content-matched results within bounded caches. For crash reporting and isolated stress checks, follow [CRASH_DIAGNOSTICS_GUIDE.md](CRASH_DIAGNOSTICS_GUIDE.md).
+
 ## Install and start
 
 Use Python 3.11 or newer. Install the dashboard and optional local readers, then start Streamlit:

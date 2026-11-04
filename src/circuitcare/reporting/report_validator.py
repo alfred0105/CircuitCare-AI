@@ -27,7 +27,7 @@ def validate_report(report: dict[str, Any], *, expected_circuit_hash: str | None
             errors.append(f"CROSS_CIRCUIT_EVIDENCE:{evidence.get('evidence_id')}")
     scenario_ids = {row.get("scenario_id") for row in report.get("evidence", []) if row.get("scenario_id")}
     report_scenario = report.get("spice_verification", {}).get("scenario_id")
-    if report_scenario and scenario_ids and report_scenario not in scenario_ids:
+    if len(scenario_ids) > 1 or (report_scenario and scenario_ids and scenario_ids != {report_scenario}):
         errors.append("CROSS_SCENARIO_EVIDENCE")
     for finding in report.get("findings", []):
         if any(source not in evidence_ids for source in finding.get("source_evidence_ids", [])):
@@ -134,8 +134,14 @@ def verify_bundle(bundle: bytes) -> dict[str, Any]:
         for evidence in report.get("evidence", []):
             artifact = evidence.get("source_artifact")
             if evidence.get("included_in_bundle"):
-                if artifact not in bundled or evidence.get("artifact_sha256") != manifest["artifacts"].get(artifact):
+                bundled_digest = manifest["artifacts"].get(artifact)
+                if artifact not in bundled or evidence.get("bundled_artifact_sha256") != bundled_digest:
                     raise ValueError(f"Report evidence reference does not match the bundle: {evidence.get('evidence_id')}")
+                expected_digest = evidence.get("artifact_sha256")
+                if evidence.get("bundle_verification_status") == "VERIFIED_ARTIFACT" and expected_digest != bundled_digest:
+                    raise ValueError("Report marks an evidence artifact verified despite a source hash mismatch.")
+                if expected_digest and expected_digest != bundled_digest and evidence.get("bundle_verification_status") != "ARTIFACT_HASH_MISMATCH":
+                    raise ValueError("Evidence source hash mismatch is not clearly reported.")
             elif evidence.get("bundle_verification_status") == "VERIFIED_ARTIFACT":
                 raise ValueError("Report marks an artifact verified that is absent from the bundle.")
         return manifest

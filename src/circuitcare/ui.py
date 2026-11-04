@@ -18,7 +18,7 @@ from circuitcare.datasheet.rating_adapter import apply_approved_rating, reassess
 from circuitcare.datasheet.rating_review import find_applications
 from circuitcare.diagnosis_ai import run_diagnosis
 from circuitcare.evidence_builder import build_evidence
-from circuitcare.graph import build_graph, direct_candidates, find_paths, to_dot
+from circuitcare.graph import build_graph, direct_candidates, find_paths_result, to_dot
 from circuitcare.local_llm import LocalLLMError, OllamaClient
 from circuitcare.netlist import load_netlist
 from circuitcare.repair_advisor import build_repair_advice
@@ -153,6 +153,9 @@ def main() -> None:
         result_dir = ROOT / case["cached"] if case.get("cached") and _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value) else ROOT / "data/no_cached_results" / case_name.replace(" ", "_") / selected_fault
         slug = {"U1": "regulator_8v", "R1": "divider_r1_drift", "RCHARGE": "rc_rcharge_drift"}.get(selected_fault, "scenario")
         output = ROOT / "data/ui_runs" / f"{slug}-{time.time_ns()}"
+        output.mkdir(parents=True, exist_ok=True)
+        active_marker = output / ".circuitcare-active"
+        active_marker.write_text(str(__import__("os").getpid()), encoding="ascii")
         cmd = [sys.executable, "-m", "circuitcare.cli", "--netlist", str(netlist_path), "--fault", selected_fault,
                "--fault-type", fault_type, "--spice-base", str(ROOT / case["base"]),
                "--spice-mapping", str(ROOT / case["mapping"]), "--output", str(output), "--simulate", "--probes", str(ROOT / case["probes"]),
@@ -179,6 +182,8 @@ def main() -> None:
                 st.session_state.simulation_status = "FAILED"
                 live_used = False
                 st.error(f"시뮬레이션 실패 · 성공 결과로 등록하지 않았습니다.\n\n{details}")
+            finally:
+                active_marker.unlink(missing_ok=True)
     comparison_path = result_dir / "comparison.json"
     risk_path = result_dir / "risk_assessment.json"
     stress_path = result_dir / "component_stress.json"
@@ -252,11 +257,11 @@ def main() -> None:
     ]
     st.session_state["circuitcare_workspace"] = active_workspace
     st.sidebar.markdown("🟢 ngspice 사용 가능" if _command_exists("ngspice") else "🟠 ngspice 없음 · 저장 결과 조회 가능")
-    client, models = _ollama_models()
-    st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Deterministic Fallback · Ollama 연결 불가")
-
-    tabs = st.tabs(["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석", "수리 이력 및 AI 학습", "AI 성능 평가"])
-    with tabs[0]:
+    views = ["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석", "수리 이력 및 AI 학습", "AI 성능 평가"]
+    active_view = st.selectbox("분석 영역", views, key="active_analysis_view")
+    client, models = _ollama_models() if active_view in {views[5], views[7], views[8]} else (None, [])
+    st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Local LLM은 해당 영역을 열 때 확인합니다")
+    if active_view == views[0]:
         what_if_result = _render_analysis_overview(
             st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
             failed_component=selected_fault, fault_type=fault_type, fault_value=fault_value,
@@ -266,23 +271,29 @@ def main() -> None:
                                 "fingerprint": cache_manifest.get("fingerprint"),
                                 "result_sha256": cache_manifest.get("result_sha256")},
         )
-    with tabs[1]:
+    elif active_view == views[1]:
         st.subheader("회로 및 고장 설정")
         st.write(f"**선택 회로:** {case_name}  ·  **고장 후보:** {selected_fault} / {fault_type} = {fault_value if needs_value else '—'}")
         candidates = direct_candidates(circuit, selected_fault)
-        paths = find_paths(circuit, selected_fault, max_hops=2)
+        path_search = find_paths_result(circuit, selected_fault, max_hops=2)
+        paths = path_search.paths
         graph = build_graph(circuit)
         st.graphviz_chart(to_dot(graph, selected_fault, paths), use_container_width=True)
         ref = st.selectbox("부품 연결 정보", list(circuit.components), key="component_detail")
         st.json({"component": next(vars(item) for item in circuit.components.values() if item.ref == ref),
                  "connections": [{"pin": item.pin, "net": item.net} for item in circuit.connections if item.ref == ref],
                  "direct_candidates": [{"reference": item.target_ref, "shared_nets": item.shared_nets, "evidence": item.evidence_level} for item in candidates],
-                 "path_candidate_count": len(paths), "graph_note": "연결 기반 후보 경로이며 손상 전파/실제 손상을 증명하지 않습니다."})
+                 "path_candidate_count": len(paths), "path_search": {"status": path_search.status,
+                 "expanded_states": path_search.expanded_states, "peak_queue_size": path_search.peak_queue_size,
+                 "limit_reason": path_search.limit_reason},
+                 "graph_note": "연결 기반 후보 경로이며 손상 전파/실제 손상을 증명하지 않습니다."})
+        if path_search.status != "COMPLETE":
+            st.warning(f"경로 탐색은 {path_search.status} 상태로 제한되었습니다. 표시 경로는 부분 결과이며 전체 경로 목록이 아닙니다. 사유: {path_search.limit_reason}")
         if not case.get("mapping") or not (ROOT / case["mapping"]).is_file():
             st.warning("KiCad XML만 확인 가능합니다. 명시적 SPICE mapping/model이 없어 물리 시뮬레이션을 지원하지 않습니다.")
         st.caption(f"넷리스트: `{case['netlist']}` · 파형/위험 데이터 출처: `{comparison_path.relative_to(ROOT) if comparison_path.exists() else case['cached']}`")
 
-    with tabs[2]:
+    elif active_view == views[2]:
         st.subheader("정상 / 고장 SPICE 전압 비교")
         if comparison and comparison.get("simulation_success"):
             nodes = list(comparison.get("voltage_nodes", {}))
@@ -308,7 +319,7 @@ def main() -> None:
         else:
             st.warning("저장된 비교 결과가 없습니다. 명시적 SPICE 모델/매핑이 준비되지 않으면 이 단계는 지원되지 않습니다.")
 
-    with tabs[3]:
+    elif active_view == views[3]:
         st.subheader("2차 스트레스 및 정격 비교")
         if risk:
             st.caption("EXCEEDED / NEAR_LIMIT는 설정 정격과 계산 스트레스 비교입니다. WITHIN_LIMIT는 평가한 정격 항목 한정이며 부품 정상 상태나 실제 손상을 뜻하지 않습니다. UNKNOWN은 안전 판정이 아닙니다.")
@@ -319,7 +330,7 @@ def main() -> None:
         else:
             st.info("이 회로에는 위험 평가 결과가 저장되어 있지 않습니다.")
 
-    with tabs[4]:
+    elif active_view == views[4]:
         st.subheader("Bayesian 진단")
         if bayesian_supported:
             st.caption("저장된 U1 3/6/8 V 시나리오 Bayesian 데모입니다. 현재 ngspice 실행에서 계산한 진단 결과와는 별도로 표시합니다. 가상 측정은 simulated_demo로 구분됩니다.")
@@ -374,7 +385,7 @@ def main() -> None:
         else:
             st.info("이 회로에 연결된 Bayesian 가설 모델이 없습니다. U1 3/6/8 V 시나리오가 준비된 기본 데모에서만 Bayesian 갱신을 활성화합니다.")
 
-    with tabs[5]:
+    elif active_view == views[5]:
         st.subheader("로컬 LLM 수리 지원")
         if client and models:
             names = [item.get("name") for item in models if item.get("name")]
@@ -441,7 +452,7 @@ def main() -> None:
                 st.json(saved["evidence"])
             st.download_button("수리 조언 JSON", json.dumps({"repair_advice": saved["advice"], "llm_explanation": result, "evidence": saved["evidence"]}, ensure_ascii=False, indent=2), "repair_advice.json", "application/json")
 
-    with tabs[6]:
+    elif active_view == views[6]:
         from circuitcare.vision_ui import render_vision_tab
 
         render_vision_tab(
@@ -456,7 +467,7 @@ def main() -> None:
             inspection_ranking=(what_if_result or {}).get("inspection_ranking"),
             selected_component=st.session_state.get(f"fault_map_component_{hashlib.sha256(repr(context_key).encode()).hexdigest()[:10]}"),
         )
-    with tabs[7]:
+    elif active_view == views[7]:
         if case.get("uploaded"):
             st.info("업로드 회로에는 부품 Mapping과 확인된 SPICE 정격 분석이 없습니다. 데이터시트 정격 적용은 해당 회로 Context에서 지원되지 않습니다.")
         else:
@@ -466,7 +477,7 @@ def main() -> None:
                 stress_signature=stress_signature,
                 applied_records=applied_ratings,
                 current_risk=risk if applied_ratings and risk.get("reassessment_source") else None)
-    with tabs[8]:
+    elif active_view == views[8]:
         if case.get("uploaded"):
             st.info("업로드 회로에 대해 실행 가능한 SPICE Mapping이 없어 고장 가설 실행을 지원하지 않습니다. 기존 3개 데모 회로에서만 사용할 수 있습니다.")
         else:
@@ -474,7 +485,7 @@ def main() -> None:
             render_fault_ai_tab(st, root=ROOT, circuit=circuit, case_name=case_name, case=case,
                                 client=client, models=models,
                                 context_key=hashlib.sha256(repr(context_key).encode()).hexdigest()[:16])
-    with tabs[9]:
+    elif active_view == views[9]:
         from circuitcare.repair_feedback_ui import render_repair_feedback_tab
         state_id = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
         fault_state = st.session_state.get(f"fault_ai_state_{state_id}")
@@ -483,7 +494,7 @@ def main() -> None:
                 "circuit_hash": hashlib.sha256(netlist_path.read_bytes()).hexdigest(),
                 "component_refs": sorted(circuit.components)},
             fault_state=fault_state)
-    with tabs[10]:
+    elif active_view == views[10]:
         from circuitcare.benchmark_ui import render_benchmark_tab
         render_benchmark_tab(st, root=ROOT)
 

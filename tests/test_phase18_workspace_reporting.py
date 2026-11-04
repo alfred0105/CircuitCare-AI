@@ -101,6 +101,21 @@ def test_report_exports_and_bundle_hash_verification(tmp_path: Path) -> None:
     assert "evidence/measurements.json" in manifest["artifacts"]
 
 
+def test_bundle_never_replaces_original_evidence_hash_with_export_hash(tmp_path: Path) -> None:
+    report = _report(tmp_path)
+    artifact = tmp_path / "measurements.json"
+    artifact.write_text('{"measurement": 5}\n', encoding="utf-8")
+    original_hash = "b" * 64
+    report["evidence"][0].update(source_artifact="measurements.json", artifact_sha256=original_hash)
+    bundle = export_bundle(report, root=tmp_path, selected_artifacts={"measurements.json": artifact})
+    from io import BytesIO
+    with zipfile.ZipFile(BytesIO(bundle)) as archive:
+        bundled_report = json.loads(archive.read("diagnosis.json"))
+    evidence = bundled_report["evidence"][0]
+    assert evidence["artifact_sha256"] == original_hash
+    assert evidence["bundle_verification_status"] == "ARTIFACT_HASH_MISMATCH"
+
+
 def test_report_snapshot_portable_paths_and_simulated_observation_are_labelled(tmp_path: Path) -> None:
     circuit = Circuit(components={}, connections=[])
     workspace = {"workspace_id": "ws", "circuit_id": "demo", "circuit_hash": "a" * 64,
@@ -121,6 +136,19 @@ def test_report_snapshot_portable_paths_and_simulated_observation_are_labelled(t
     serialized = export_json(report)
     assert "operator private memo" not in serialized
     assert "/Users/alice/private" not in serialized
+
+
+def test_report_snapshot_uses_verified_source_file_digest_not_reserialized_object(tmp_path: Path) -> None:
+    circuit = Circuit(components={}, connections=[])
+    workspace = {"workspace_id": "ws", "circuit_id": "demo", "circuit_hash": "a" * 64,
+                 "netlist_path": "demo.xml", "input_hashes": {}, "validation_status": "READY"}
+    raw_comparison_hash = "c" * 64
+    report = build_diagnostic_snapshot(root=tmp_path, workspace=workspace, circuit=circuit,
+        fault={"component_ref": "U1", "fault_type": "regulator_output_rise"},
+        simulation_status="SUCCESS", comparison={"scenario_id": "S1"},
+        simulation_context={"status": "VERIFIED", "fingerprint": {"fingerprint_sha256": "a" * 64},
+                            "result_sha256": {"comparison.json": raw_comparison_hash}})
+    assert report["evidence"][0]["artifact_sha256"] == raw_comparison_hash
 
 
 def test_export_security_rejects_paths_outside_root_and_unknown_names(tmp_path: Path) -> None:
@@ -250,6 +278,7 @@ def test_legacy_cached_simulation_is_not_reported_as_verified(tmp_path: Path) ->
     assert report["secondary_damage_risk"]["status"] == "NOT_EVALUATED"
 
 
+@pytest.mark.integration
 def test_live_ngspice_result_manifest_is_verified_then_detects_tamper(tmp_path: Path) -> None:
     if not shutil.which("ngspice"):
         pytest.skip("ngspice is optional; live simulation integration requires the executable")
@@ -330,8 +359,11 @@ def test_streamlit_app_keeps_original_tabs_and_displays_workspace_reports() -> N
     app = AppTest.from_file(str(script), default_timeout=30).run()
     assert not app.exception
     assert any("PROVENANCE_UNVERIFIED" in item.value for item in app.markdown)
-    labels = [tab.label for tab in app.tabs]
-    assert "분석 개요" in labels and "AI 성능 평가" in labels
+    selector = next(item for item in app.selectbox if item.key == "active_analysis_view")
+    assert "분석 개요" in selector.options and "AI 성능 평가" in selector.options
+    selector.select("AI 성능 평가").run()
+    assert not app.exception
+    next(item for item in app.selectbox if item.key == "active_analysis_view").select("분석 개요").run()
     assert any(button.label == "Evidence Bundle ZIP" for button in app.download_button)
     selector = next(item for item in app.selectbox if item.key == "case_name")
     selector.select("KiCad XML 업로드 (연결 그래프 전용)").run()

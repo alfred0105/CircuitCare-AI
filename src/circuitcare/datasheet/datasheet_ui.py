@@ -71,6 +71,9 @@ def render_datasheet_tab(st: Any, *, root: Path, circuit: Any, context_key: str,
     state_id = ":".join((context_key, component_ref, document["sha256"], manufacturer.strip(), mpn.strip(), revision.strip(), model_name or "rule-only", model_digest or "no-digest", "datasheet-rating-json-v1"))
     state_key = f"datasheet_state_{state_id}"
     if st.session_state.get("datasheet_active_state") != state_id:
+        previous_state = st.session_state.get("datasheet_active_state")
+        if previous_state:
+            st.session_state.pop(f"datasheet_state_{previous_state}", None)
         st.session_state["datasheet_active_state"] = state_id
         initial_candidates = find_rating_candidates(document["pages"], document["tables"])
         saved_reviews = load_reviews(root / "data/private/datasheet_ai/review_history.json",

@@ -1,5 +1,9 @@
 # Architecture and evidence policy
 
+## Runtime stability boundaries
+
+Graph traversal, PDF extraction, image preprocessing, and SPICE result parsing have explicit resource bounds or bounded caches. The dashboard selects one analysis area per rerun. Native ONNX/OpenCV/OCR code may still terminate the Python process; Python exception handling cannot recover a segmentation fault. Use the isolated diagnostics runner and preserve the OS crash report when available. Incomplete graph searches and failed simulations remain explicitly incomplete or failed.
+
 ## Workflow
 1. Input: KiCad XML netlist, failed reference, **specified failure mode** and optional measurement evidence.
 2. Parse components, references, pins, and nets into a typed representation.

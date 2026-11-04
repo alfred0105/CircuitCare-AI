@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .fault_models import SUPPORTED_FAULT_TYPES, create_scenario
-from .graph import build_graph, direct_candidates, find_paths, to_dot
+from .graph import build_graph, direct_candidates, find_paths_result, to_dot
 from .impact_analyzer import analyze_fault_impact
 from .component_specs import load_component_specs
 from .impact_ranking import rank_impacts
@@ -62,9 +62,9 @@ def main() -> None:
     }
     if excluded_types and not (args.show_paths or args.export_dot):
         parser.error("--exclude-net-types requires --show-paths or --export-dot")
-    paths = None
+    path_search = None
     if args.show_paths or args.export_dot:
-        paths = find_paths(
+        path_search = find_paths_result(
             circuit,
             args.fault,
             max_hops=args.max_hops,
@@ -103,8 +103,13 @@ def main() -> None:
                 "ground_only_path": candidate.ground_only_path,
                 "evidence_level": candidate.evidence_level,
             }
-            for candidate in (paths or [])
+            for candidate in (path_search.paths if path_search else [])
         ]
+        output["path_search"] = {"status": path_search.status,
+                                 "expanded_states": path_search.expanded_states,
+                                 "peak_queue_size": path_search.peak_queue_size,
+                                 "total_paths": path_search.total_paths,
+                                 "limit_reason": path_search.limit_reason}
     if excluded_types:
         output["excluded_net_types"] = sorted(excluded_types)
         output["path_filter_note"] = (
@@ -128,7 +133,7 @@ def main() -> None:
             for item in circuit.connections
         ]
     if args.export_dot:
-        args.export_dot.write_text(to_dot(graph, args.fault, paths), encoding="utf-8")
+        args.export_dot.write_text(to_dot(graph, args.fault, list(path_search.paths) if path_search else None), encoding="utf-8")
 
     if args.fault_type:
         mapping = json.loads(args.spice_mapping.read_text(encoding="utf-8"))

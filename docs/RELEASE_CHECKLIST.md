@@ -1,5 +1,14 @@
 # 발표 당일 체크리스트
 
+## Phase 18.1.1 stability gates
+
+- [ ] Fast CI matrix passes on Python 3.11 and 3.12.
+- [ ] ngspice integration job passes on Linux; local macOS results are reported separately.
+- [ ] Stress suite runs with bounded synthetic inputs and no deliberate OOM.
+- [ ] Crash termination classification and log preservation are verified in isolated children.
+- [ ] Actual ONNX inference is only marked passed when the project model artifact is present and exercised.
+- [ ] Physical repair accuracy remains `NOT_EVALUATED` until independently validated on real boards.
+
 ## MVP 설치 및 보고서 확인
 
 - [ ] `python -m pip install -e ".[dev,ui,vision,datasheet]"` 설치 완료

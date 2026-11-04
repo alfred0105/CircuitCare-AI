@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .graph import find_paths
+from .graph import find_paths_result
 from .models import Circuit
 from .rating_checker import check_component_ratings
 from .risk_engine import assess_component_risk
@@ -21,7 +21,8 @@ def rank_impacts(
     output_dir: str | Path,
 ) -> dict[str, Any]:
     """Write a risk report while keeping graph evidence distinct from stress evidence."""
-    paths = find_paths(circuit, failed_component, max_hops=max(1, len(circuit.components) - 1))
+    path_search = find_paths_result(circuit, failed_component, max_hops=max(1, len(circuit.components) - 1))
+    paths = path_search.paths
     paths_by_ref: dict[str, list[dict[str, Any]]] = {}
     for path in paths:
         paths_by_ref.setdefault(path.target_ref, []).append({
@@ -105,6 +106,9 @@ def rank_impacts(
         "secondary_candidates": secondary,
         "excluded_candidates": excluded,
         "graph_only_connectivity_order": graph_only,
+        "path_search": {"status": path_search.status, "expanded_states": path_search.expanded_states,
+                        "peak_queue_size": path_search.peak_queue_size, "total_paths": path_search.total_paths,
+                        "limit_reason": path_search.limit_reason},
         "rating_checks": ratings,
         "damage_confirmed": False,
         "damage_probability": None,

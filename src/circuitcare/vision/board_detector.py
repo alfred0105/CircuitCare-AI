@@ -2,10 +2,26 @@
 
 from __future__ import annotations
 
+import hashlib
+import copy
+from collections import OrderedDict
 from typing import Any
 
 import cv2
 import numpy as np
+
+_DETECTION_CACHE: OrderedDict[tuple[str, int, str], dict[str, Any]] = OrderedDict()
+_DETECTION_CACHE_LIMIT = 8
+_DETECTION_CACHE_HITS = 0
+_DETECTION_CACHE_MISSES = 0
+
+
+def detection_cache_stats(*, reset: bool = False) -> dict[str, int]:
+    global _DETECTION_CACHE_HITS, _DETECTION_CACHE_MISSES
+    stats = {"hits": _DETECTION_CACHE_HITS, "misses": _DETECTION_CACHE_MISSES, "entries": len(_DETECTION_CACHE)}
+    if reset:
+        _DETECTION_CACHE_HITS = _DETECTION_CACHE_MISSES = 0
+    return stats
 
 
 def order_corners(points: Any) -> np.ndarray:
@@ -45,9 +61,17 @@ def validate_corners(points: Any, image_size: tuple[int, int], *, min_area_ratio
 
 
 def detect_board_candidates(image: Any, *, max_candidates: int = 5) -> dict[str, Any]:
+    global _DETECTION_CACHE_HITS, _DETECTION_CACHE_MISSES
     array = np.asarray(image.convert("RGB") if hasattr(image, "convert") else image)
     if array.ndim != 3 or array.shape[2] != 3:
         raise ValueError("입력은 RGB 이미지여야 합니다.")
+    image_hash = hashlib.sha256(memoryview(np.ascontiguousarray(array))).hexdigest()
+    cache_key = (image_hash, max_candidates, "board-contour-v1")
+    if cache_key in _DETECTION_CACHE:
+        _DETECTION_CACHE_HITS += 1
+        _DETECTION_CACHE.move_to_end(cache_key)
+        return copy.deepcopy(_DETECTION_CACHE[cache_key])
+    _DETECTION_CACHE_MISSES += 1
     height, width = array.shape[:2]
     gray = cv2.cvtColor(array, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -71,10 +95,14 @@ def detect_board_candidates(image: Any, *, max_candidates: int = 5) -> dict[str,
         candidates.append({"corners_px": points.tolist(), "area_px": area, "area_ratio": area / (width * height)})
         if len(candidates) >= max_candidates:
             break
-    return {
+    result = {
         "board_detected": bool(candidates),
         "detection_method": "opencv_contour",
         "status": "candidate_unverified" if candidates else "not_detected",
         "candidates": candidates,
         "image_size_px": [width, height],
     }
+    _DETECTION_CACHE[cache_key] = copy.deepcopy(result)
+    while len(_DETECTION_CACHE) > _DETECTION_CACHE_LIMIT:
+        _DETECTION_CACHE.popitem(last=False)
+    return result

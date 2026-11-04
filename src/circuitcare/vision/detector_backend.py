@@ -21,14 +21,15 @@ def model_file_info(path: str | Path) -> dict[str, Any]:
     if not model_path.is_file():
         return {"status": "MODEL_UNAVAILABLE", "path": str(model_path), "model_id": PCB_MODEL_ID}
     stat = model_path.stat()
-    digest = _hash_file(str(model_path.resolve()), stat.st_size, stat.st_mtime_ns)
+    digest = _hash_file(str(model_path.resolve()), stat.st_size, stat.st_mtime_ns,
+                        stat.st_ctime_ns, getattr(stat, "st_ino", 0))
     return {"status": "READY", "path": str(model_path.resolve()), "sha256": digest,
             "model_id": PCB_MODEL_ID, "size_bytes": stat.st_size}
 
 
 @lru_cache(maxsize=8)
-def _hash_file(resolved_path: str, size_bytes: int, mtime_ns: int) -> str:
-    del size_bytes, mtime_ns  # Both values are part of the cache key for replacement detection.
+def _hash_file(resolved_path: str, size_bytes: int, mtime_ns: int, ctime_ns: int, inode: int) -> str:
+    del size_bytes, mtime_ns, ctime_ns, inode  # Metadata participates in replacement detection.
     digest = hashlib.sha256()
     with Path(resolved_path).open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
@@ -45,6 +46,8 @@ def _load_session(resolved_path: str, model_sha256: str):
         raise DetectorUnavailable("ONNX Runtime가 없습니다. `python -m pip install -e '.[vision-ai]'`를 실행하세요.") from exc
     options = ort.SessionOptions()
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    options.intra_op_num_threads = 2
+    options.inter_op_num_threads = 1
     try:
         return ort.InferenceSession(resolved_path, sess_options=options, providers=["CPUExecutionProvider"])
     except Exception as exc:

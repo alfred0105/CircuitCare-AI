@@ -46,6 +46,15 @@ def render_vision_tab(st: Any, *, netlist_component_refs: list[str], risk_assess
         st.error(str(exc))
         return
     image_key = loaded.sha256[:12]
+    previous_image = st.session_state.get("vision_active_image")
+    if previous_image and previous_image != image_key:
+        heavy_prefixes = ("vision_rectified_", "vision_ai_detections_", "vision_ai_ocr_",
+                          "vision_ai_corrections_", "vision_registration_", "vision_locations_",
+                          "vision_overlay_")
+        for state_key in list(st.session_state):
+            if state_key.startswith(heavy_prefixes) and previous_image in state_key:
+                st.session_state.pop(state_key, None)
+    st.session_state["vision_active_image"] = image_key
     st.image(loaded.image, caption=f"{loaded.format} · 원본 {loaded.original_size[0]}×{loaded.original_size[1]} px · 처리 {loaded.processed_size[0]}×{loaded.processed_size[1]} px · EXIF 방향 보정 · RGB", use_container_width=True)
     st.caption(f"이미지 SHA-256: `{loaded.sha256}` · 좌표 축소율 x={loaded.scale_xy[0]:.5f}, y={loaded.scale_xy[1]:.5f}")
 

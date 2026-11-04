@@ -2,6 +2,7 @@
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from time import monotonic
 
 from .models import CandidateImpact, Circuit
 
@@ -18,6 +19,16 @@ class PathCandidate:
     net_types: tuple[tuple[str, str], ...]
     ground_only_path: bool | None
     evidence_level: str = "connectivity_only"
+
+
+@dataclass(frozen=True)
+class PathSearchResult:
+    paths: tuple[PathCandidate, ...]
+    status: str
+    expanded_states: int
+    peak_queue_size: int
+    total_paths: int
+    limit_reason: str | None = None
 
 
 def _component_node(reference: str) -> str:
@@ -95,7 +106,7 @@ def direct_candidates(circuit: Circuit, failed_ref: str) -> list[CandidateImpact
     ]
 
 
-def find_paths(
+def find_paths_result(
     circuit: Circuit,
     failed_ref: str,
     max_hops: int = 2,
@@ -103,7 +114,11 @@ def find_paths(
     net_types: dict[str, str] | None = None,
     exclude_net_types: set[str] | None = None,
     max_paths_per_candidate: int = 3,
-) -> list[PathCandidate]:
+    max_expanded_states: int = 10_000,
+    max_queue_size: int = 5_000,
+    max_total_paths: int = 5_000,
+    time_budget_seconds: float | None = None,
+) -> PathSearchResult:
     """Find deterministic simple paths, counting hops between components.
 
     A path is alternating component/net/component. Net type exclusions limit
@@ -115,6 +130,10 @@ def find_paths(
         raise ValueError("max_hops must be at least 1")
     if max_paths_per_candidate < 1:
         raise ValueError("max_paths_per_candidate must be at least 1")
+    if min(max_expanded_states, max_queue_size, max_total_paths) < 1:
+        raise ValueError("Search budgets must be positive")
+    if time_budget_seconds is not None and time_budget_seconds <= 0:
+        raise ValueError("time_budget_seconds must be positive when provided")
 
     graph = build_graph(circuit, net_types)
     excluded = {kind.strip().lower() for kind in (exclude_net_types or set())}
@@ -133,9 +152,24 @@ def find_paths(
     queue = deque([(start, (start,), frozenset({start}), 0)])
     paths: list[PathCandidate] = []
     path_counts: dict[str, int] = defaultdict(int)
+    expanded = 0
+    peak_queue = 1
+    status = "COMPLETE"
+    reason = None
+    started = monotonic()
+    depth_limited = False
     while queue:
+        if expanded >= max_expanded_states:
+            status, reason = "PARTIAL_RESOURCE_LIMIT", "max_expanded_states"
+            break
+        if time_budget_seconds is not None and monotonic() - started >= time_budget_seconds:
+            status, reason = "PARTIAL_RESOURCE_LIMIT", "time_budget_seconds"
+            break
         current, path, visited_components, hops = queue.popleft()
+        expanded += 1
         if hops >= max_hops:
+            if any(graph["nodes"].get(net, {}).get("net_type") not in excluded for net in adjacency[current]):
+                depth_limited = True
             continue
         for net in adjacency[current]:
             net_info = graph["nodes"][net]
@@ -149,6 +183,9 @@ def find_paths(
                 next_hops = hops + 1
                 component_path = (*net_path, component)
                 if reference != failed_ref and path_counts[reference] < max_paths_per_candidate:
+                    if len(paths) >= max_total_paths:
+                        status, reason = "PARTIAL_RESOURCE_LIMIT", "max_total_paths"
+                        break
                     route_nets = tuple(graph["nodes"][item]["name"] for item in component_path if item.startswith("net:"))
                     route_types = tuple(
                         (graph["nodes"][item]["name"], graph["nodes"][item]["net_type"])
@@ -168,9 +205,50 @@ def find_paths(
                     ))
                     path_counts[reference] += 1
                 if next_hops < max_hops:
+                    if len(queue) >= max_queue_size:
+                        status, reason = "PARTIAL_RESOURCE_LIMIT", "max_queue_size"
+                        break
                     queue.append((component, component_path, visited_components | {component}, next_hops))
+                    peak_queue = max(peak_queue, len(queue))
+                elif next_hops == max_hops and any(
+                    graph["nodes"][candidate_net]["net_type"] not in excluded
+                    for candidate_net in adjacency[component]
+                ):
+                    depth_limited = True
+            if status != "COMPLETE":
+                break
+        if status != "COMPLETE":
+            break
 
-    return sorted(paths, key=lambda item: (item.hops, item.target_ref, item.path))
+    if status == "COMPLETE" and queue:
+        status, reason = "PARTIAL_RESOURCE_LIMIT", "unprocessed_queue"
+    elif status == "COMPLETE" and depth_limited:
+        status, reason = "PARTIAL_DEPTH_LIMIT", "max_hops"
+    return PathSearchResult(tuple(sorted(paths, key=lambda item: (item.hops, item.target_ref, item.path))),
+                            status, expanded, peak_queue, len(paths), reason)
+
+
+def find_paths(
+    circuit: Circuit,
+    failed_ref: str,
+    max_hops: int = 2,
+    *,
+    net_types: dict[str, str] | None = None,
+    exclude_net_types: set[str] | None = None,
+    max_paths_per_candidate: int = 3,
+    max_expanded_states: int = 10_000,
+    max_queue_size: int = 5_000,
+    max_total_paths: int = 5_000,
+    time_budget_seconds: float | None = None,
+) -> list[PathCandidate]:
+    """Backward-compatible path list API with bounded global search resources."""
+    return list(find_paths_result(circuit, failed_ref, max_hops, net_types=net_types,
+                                  exclude_net_types=exclude_net_types,
+                                  max_paths_per_candidate=max_paths_per_candidate,
+                                  max_expanded_states=max_expanded_states,
+                                  max_queue_size=max_queue_size,
+                                  max_total_paths=max_total_paths,
+                                  time_budget_seconds=time_budget_seconds).paths)
 
 
 def to_dot(graph: dict, failed_ref: str, paths: list[PathCandidate] | None = None) -> str:

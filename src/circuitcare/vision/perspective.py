@@ -13,6 +13,8 @@ from circuitcare.vision.board_detector import validate_corners
 
 def rectify_board(image: Any, corners_px: Any, *, physical_size_mm: tuple[float, float] | None = None,
                   max_output_edge: int = 3000) -> dict[str, Any]:
+    if max_output_edge < 64:
+        raise ValueError("max_output_edge must be at least 64 pixels")
     array = np.asarray(image.convert("RGB") if hasattr(image, "convert") else image)
     if array.ndim != 3 or array.shape[2] != 3:
         raise ValueError("입력은 RGB 이미지여야 합니다.")
@@ -38,7 +40,8 @@ def rectify_board(image: Any, corners_px: Any, *, physical_size_mm: tuple[float,
     width, height = min(width, max_output_edge), min(height, max_output_edge)
     destination = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
     matrix = cv2.getPerspectiveTransform(source, destination)
-    if not np.isfinite(matrix).all() or abs(float(np.linalg.det(matrix))) < 1e-12:
+    if (not np.isfinite(matrix).all() or abs(float(np.linalg.det(matrix))) < 1e-12
+            or np.linalg.cond(matrix) > 1e12):
         raise ValueError("원근 변환 행렬을 계산할 수 없습니다.")
     warped = cv2.warpPerspective(array, matrix, (width, height))
     return {
