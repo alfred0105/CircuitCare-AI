@@ -4,18 +4,36 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from functools import lru_cache
 import json
-import re
 import subprocess
 import sys
 import tempfile
 import time
+from functools import lru_cache
 from pathlib import Path
 
 from circuitcare.conversation import answer_question
+from circuitcare.dashboard.context import (
+    _advisor_matches,
+    _analysis_context_key,
+    _file_sha256,
+    _is_cached_case,
+    _measurement_set_id,
+    _simulation_result_id,
+    _simulation_status,
+    _supports_bayesian_demo,
+    _upsert_measurement,
+)
+from circuitcare.dashboard.downloads import (
+    MAX_DOWNLOAD_CSV_BYTES,  # noqa: F401 - compatibility export
+    _cached_download_bytes,
+    _download_file_digest,
+)
 from circuitcare.datasheet.datasheet_ui import render_datasheet_tab
-from circuitcare.datasheet.rating_adapter import apply_approved_rating, reassess_existing_risk
+from circuitcare.datasheet.rating_adapter import (
+    apply_approved_rating,
+    reassess_existing_risk,
+)
 from circuitcare.datasheet.rating_review import find_applications
 from circuitcare.diagnosis_ai import run_diagnosis
 from circuitcare.evidence_builder import build_evidence
@@ -23,9 +41,19 @@ from circuitcare.graph import build_graph, direct_candidates, find_paths_result,
 from circuitcare.local_llm import LocalLLMError, OllamaClient
 from circuitcare.netlist import load_netlist
 from circuitcare.repair_advisor import build_repair_advice
-from circuitcare.workspace import build_workspace_context, reconcile_session_workspace, store_uploaded_netlist
-from circuitcare.workspace.simulation_context import build_simulation_fingerprint, verify_simulation_manifest
-
+from circuitcare.services.simulation_service import (
+    SimulationRunError,
+    _current_simulation_fingerprint,
+    _valid_parameter,
+    _validate_live_result,  # noqa: F401 - compatibility export for existing callers
+    execute_simulation,
+)
+from circuitcare.workspace import (
+    build_workspace_context,
+    reconcile_session_workspace,
+    store_uploaded_netlist,
+)
+from circuitcare.workspace.simulation_context import verify_simulation_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 DEMO_HYPOTHESES = ROOT / "data/diagnosis/demo_hypotheses.json"
@@ -165,12 +193,11 @@ def main() -> None:
             cmd.extend(["--fault-value", fault_value])
         with st.spinner("Fault Injection → ngspice → stress/rating assessment 실행 중…"):
             try:
-                # Absolute paths plus close_fds=False select posix_spawn on macOS;
-                # fork from Streamlit's multithreaded runtime was observed to SIGSEGV.
-                completed = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
-                                           check=False, close_fds=False)
-                result_dir = _validate_live_result(completed, output, selected_fault, fault_type,
-                                                   case=case, fault_value=fault_value if needs_value else None)
+                # The service preserves absolute paths and close_fds=False to select posix_spawn on macOS.
+                result_dir = execute_simulation(
+                    cmd, output, selected_fault, fault_type, case=case,
+                    fault_value=fault_value if needs_value else None,
+                )
                 st.session_state.live_result_dir = str(result_dir)
                 st.session_state.live_context_key = context_key
                 st.session_state.pop("live_error", None)
@@ -515,7 +542,11 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
                               fault_type, fault_value, risk, comparison, status, bayesian_supported,
                               workspace, simulation_context):
     """Unified read-only overview plus an isolated simulated-demo What-if preview."""
-    from circuitcare.visualization.fault_map import build_fault_map, fault_map_json, render_fault_map_dot
+    from circuitcare.visualization.fault_map import (
+        build_fault_map,
+        fault_map_json,
+        render_fault_map_dot,
+    )
 
     st.subheader("고장 영향 후보 지도 및 진단 개요")
     st.caption("지도는 Component–Net 연결 후보를 나타내며 실제 회로도 배치나 방향성 있는 손상 전파도가 아닙니다. 정격 스트레스와 Bayesian 점검 순위는 별도 근거입니다.")
@@ -670,8 +701,16 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
                           "electrical_stress_recomputed": False, "damage_confirmed": False}
         st.download_button("What-if 결과 JSON 다운로드", json.dumps(what_if_export, ensure_ascii=False, indent=2),
                            "what_if_diagnosis.json", "application/json", key=f"what_if_download_{context_id}")
-    from circuitcare.reporting.report_builder import build_diagnostic_snapshot, classify_parameter_grid_coverage
-    from circuitcare.reporting.exporters import export_bundle, export_html, export_json, export_markdown
+    from circuitcare.reporting.exporters import (
+        export_bundle,
+        export_html,
+        export_json,
+        export_markdown,
+    )
+    from circuitcare.reporting.report_builder import (
+        build_diagnostic_snapshot,
+        classify_parameter_grid_coverage,
+    )
     from circuitcare.reporting.report_validator import validate_report
     report_context_id = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
     fault_ai_state = st.session_state.get(f"fault_ai_state_{report_context_id}", {})
@@ -773,163 +812,30 @@ def _run_diagnosis(measurements: list[dict]) -> dict:
         return {"diagnosis": result["diagnosis"], "inspection_ranking": result["inspection_ranking"], "recommendations": result["recommendations"]}
 
 
-class SimulationRunError(RuntimeError):
-    def __init__(self, details: str):
-        self.details = details
-        super().__init__(details)
 
 
-def _analysis_context_key(case_name: str, case: dict, fault: str, fault_type: str, fault_value: str | None) -> tuple:
-    files = []
-    for name in ("netlist", "base", "mapping", "probes", "ratings", "prior"):
-        value = case.get(name)
-        if not value:
-            continue
-        path = ROOT / value
-        identity = (str(path.resolve()), _file_sha256(path))
-        files.append((name, identity))
-    context_paths = [("what_if_hypotheses", DEMO_HYPOTHESES)]
-    if case.get("cached"):
-        for result_key in ("comparison.json", "component_stress.json", "risk_assessment.json"):
-            context_paths.append((f"cached_{result_key}", ROOT / case["cached"] / result_key))
-    if case.get("prior"):
-        prior_dir = ROOT / case["prior"]
-        for result_key in ("diagnosis.json", "inspection_ranking.json", "measurement_recommendations.json"):
-            context_paths.append((f"prior_{result_key}", prior_dir / result_key))
-    try:
-        hypotheses = json.loads(DEMO_HYPOTHESES.read_text(encoding="utf-8")).get("hypotheses", [])
-    except (OSError, json.JSONDecodeError):
-        hypotheses = []
-    for index, hypothesis in enumerate(hypotheses):
-        for key, filename in (("simulation_source", "comparison.json"), ("risk_assessment_source", "risk_assessment.json")):
-            source = Path(hypothesis[key])
-            source = source if source.is_absolute() else DEMO_HYPOTHESES.parent / source
-            context_paths.append((f"hypothesis_{index}_{key}", source / filename if source.is_dir() else source))
-    for name, path in context_paths:
-        identity = (str(path.resolve()), _file_sha256(path))
-        files.append((name, identity))
-    return (case_name, fault, fault_type, fault_value, tuple(files), _file_sha256(DEMO_HYPOTHESES))
 
 
-def _supports_bayesian_demo(case_name: str, fault: str, fault_type: str, fault_value: str | None) -> bool:
-    return (case_name == "Regulator + divider + switch (cached demo)"
-            and fault == "U1" and fault_type == "regulator_output_rise" and fault_value == "8")
 
 
-def _is_cached_case(case: dict, fault: str, fault_type: str, fault_value: str, needs_value: bool) -> bool:
-    return (fault == case["fault"] and fault_type == case["fault_type"]
-            and (not needs_value or fault_value == case["value"]))
 
 
-def _simulation_status(live_matches: bool, live_error: str | None, is_cached_selection: bool) -> str:
-    if live_matches:
-        return "SUCCESS"
-    if live_error:
-        return "FAILED"
-    return "CACHED" if is_cached_selection else "NOT_RUN"
 
 
-def _measurement_set_id(measurements: list[dict]) -> str:
-    from circuitcare.workspace.measurement_provenance import measurement_set_sha256
-    return measurement_set_sha256(measurements)
 
 
-def _file_sha256(path: Path) -> str | None:
-    from circuitcare.workspace.context import file_sha256
-    return file_sha256(path)
 
 
-def _simulation_result_id(result_dir: Path) -> tuple:
-    identity = [str(result_dir.resolve())]
-    for name in ("comparison.json", "component_stress.json", "risk_assessment.json", "simulation_context.json"):
-        path = result_dir / name
-        identity.append((name, _file_sha256(path)))
-    return tuple(identity)
 
 
-def _advisor_matches(saved: dict, context_key: tuple, measurements: list[dict], result_dir: Path) -> bool:
-    return (saved.get("analysis_context_key") == context_key
-            and saved.get("measurement_set_id") == _measurement_set_id(measurements)
-            and saved.get("simulation_result_id") == _simulation_result_id(result_dir))
 
 
-def _upsert_measurement(measurements: list[dict], measurement: dict) -> list[dict]:
-    updated = list(measurements)
-    node = str(measurement["node"])
-    for index, existing in enumerate(updated):
-        if str(existing.get("node", "")).casefold() == node.casefold():
-            updated[index] = measurement
-            return updated
-    updated.append(measurement)
-    return updated
 
 
-def _current_simulation_fingerprint(case: dict, fault: str, fault_type: str,
-                                    fault_value: str | None) -> dict:
-    if not case.get("base") or not case.get("mapping") or not case.get("probes"):
-        return {"fingerprint_sha256": None}
-    deck = ROOT / case["base"]
-    model_paths = []
-    try:
-        for line in deck.read_text(encoding="utf-8").splitlines():
-            match = re.match(r"^\s*\.(?:include|inc|lib)\s+[\"']?([^\"'\s]+)", line, flags=re.IGNORECASE)
-            if match:
-                model_paths.append((deck.parent / match.group(1)).resolve())
-    except OSError:
-        return {"fingerprint_sha256": None}
-    return build_simulation_fingerprint(
-        netlist=ROOT / case["netlist"], spice_deck=deck,
-        component_mapping=ROOT / case["mapping"], probes=ROOT / case["probes"],
-        fault={"component_ref": fault, "fault_type": fault_type, "parameter": fault_value},
-        settings={"engine": "ngspice", "analysis": "transient", "runner": "circuitcare-cli"},
-        relevant_models=model_paths,
-        ratings=ROOT / case["ratings"] if case.get("ratings") else None,
-    )
 
 
-def _validate_live_result(completed: subprocess.CompletedProcess, output: Path, fault: str, fault_type: str,
-                          *, case: dict | None = None, fault_value: str | None = None) -> Path:
-    if completed.returncode != 0:
-        raise SimulationRunError(_simulation_error_details(completed, output))
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError as exc:
-        raise SimulationRunError(f"CLI JSON을 읽을 수 없습니다: {exc}\n{_simulation_error_details(completed, output)}") from exc
-    scenario = payload.get("fault_scenario", {})
-    scenario_id = f"FAULT_{fault}_{fault_type}".upper()
-    report = scenario.get("simulation_analysis", {})
-    if (scenario.get("component_ref") != fault or scenario.get("fault_type") != fault_type
-            or scenario.get("scenario_id") != scenario_id or scenario.get("simulation_status") != "success"
-            or report.get("simulation_status") != "success"
-            or report.get("simulation_run_status") != {"baseline": "success", "fault": "success"}):
-        raise SimulationRunError(f"CLI 출력이 현재 고장 조건의 성공 결과와 일치하지 않습니다.\n{_simulation_error_details(completed, output)}")
-    result_dir = output / "simulation_results" / f"fault_{fault.lower()}_{fault_type}"
-    paths = {name: result_dir / f"{name}.json" for name in ("comparison", "component_stress", "risk_assessment")}
-    if not all(path.is_file() for path in paths.values()):
-        raise SimulationRunError(f"필요한 새 결과 파일이 부족합니다: {', '.join(p.name for p in paths.values() if not p.is_file())}\n{_simulation_error_details(completed, output)}")
-    try:
-        comparison, stress, risk = (json.loads(paths[key].read_text(encoding="utf-8")) for key in ("comparison", "component_stress", "risk_assessment"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise SimulationRunError(f"결과 JSON을 읽을 수 없습니다: {exc}\n{_simulation_error_details(completed, output)}") from exc
-    if (comparison.get("simulation_success") is not True or comparison.get("scenario_id") != scenario_id
-            or stress.get("simulation_success") is not True or stress.get("fault_type") != fault_type
-            or risk.get("simulation_status") != "success" or risk.get("scenario_id") != scenario_id
-            or risk.get("failed_component") != fault or risk.get("fault_type") != fault_type):
-        raise SimulationRunError(f"결과 파일 상태 또는 고장 조건이 일치하지 않습니다.\n{_simulation_error_details(completed, output)}")
-    if case is None:
-        raise SimulationRunError("성공한 시뮬레이션에 입력 Fingerprint를 기록할 회로 설정이 없습니다.")
-    fingerprint = _current_simulation_fingerprint(case, fault, fault_type, fault_value)
-    manifest = {"status": "LIVE_SUCCESS", "fingerprint": fingerprint,
-                "result_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths.values()}}
-    (result_dir / "simulation_context.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-    return result_dir
 
 
-def _simulation_error_details(completed: subprocess.CompletedProcess, output: Path) -> str:
-    stderr = (completed.stderr or "").strip()[-3000:] or "(stderr 없음)"
-    logs = sorted(output.rglob("*.log")) if output.exists() else []
-    log_text = ", ".join(str(path) for path in logs) if logs else f"{output}/simulation_results/의 ngspice 로그를 확인하세요."
-    return f"종료 코드: {completed.returncode}\nstderr:\n{stderr}\nngspice 로그: {log_text}"
 
 
 def _advisor_inputs(case: dict) -> tuple[dict, dict, dict]:
@@ -1011,41 +917,11 @@ def _downloads(st, case, result_dir, comparison, risk, diagnosis, selected_fault
         st.download_button("통합 Markdown 보고서", "\n".join(report), "circuitcare_report.md", "text/markdown")
 
 
-MAX_DOWNLOAD_CSV_BYTES = 64 * 1024 * 1024
 
 
 @lru_cache(maxsize=4)
-def _cached_download_bytes(path: str, digest: str, context_key: str) -> bytes:
-    """Cache a bounded, immutable CSV snapshot for one analysis context and content hash."""
-    del context_key  # Part of the cache key to prevent cross-context reuse.
-    csv_path = Path(path)
-    before = csv_path.stat()
-    if before.st_size > MAX_DOWNLOAD_CSV_BYTES:
-        raise ValueError("CSV exceeds the 64 MiB download limit")
-    with csv_path.open("rb") as source:
-        data = source.read(MAX_DOWNLOAD_CSV_BYTES + 1)
-    if len(data) > MAX_DOWNLOAD_CSV_BYTES:
-        raise ValueError("CSV exceeds the 64 MiB download limit")
-    after = csv_path.stat()
-    stable = (before.st_size == after.st_size and before.st_mtime_ns == after.st_mtime_ns
-              and getattr(before, "st_ino", 0) == getattr(after, "st_ino", 0))
-    if not stable or len(data) != after.st_size or hashlib.sha256(data).hexdigest() != digest:
-        raise ValueError("CSV changed while its download snapshot was being prepared")
-    return data
 
 
-def _download_file_digest(path: Path) -> str:
-    if path.stat().st_size > MAX_DOWNLOAD_CSV_BYTES:
-        raise ValueError("CSV exceeds the 64 MiB download limit")
-    digest = hashlib.sha256()
-    total = 0
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            total += len(chunk)
-            if total > MAX_DOWNLOAD_CSV_BYTES:
-                raise ValueError("CSV exceeds the 64 MiB download limit")
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _command_exists(name: str) -> bool:
@@ -1053,15 +929,6 @@ def _command_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 
-def _valid_parameter(value: str) -> bool:
-    match = re.fullmatch(r"\s*((?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)([pnumkKMG]?)\s*", value)
-    if not match:
-        return False
-    multiplier = {"": 1.0, "p": 1e-12, "n": 1e-9, "u": 1e-6, "m": 1e-3, "k": 1e3, "K": 1e3, "M": 1e6, "G": 1e9}[match.group(2)]
-    try:
-        return float(match.group(1)) * multiplier > 0
-    except ValueError:
-        return False
 
 
 def _fallback_text(evidence: dict) -> str:
