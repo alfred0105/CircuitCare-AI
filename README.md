@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: CircuitCare AI v0.1.0 MVP integrated; Phase 18.1 reliability hotfix in progress.** Phase 18 provides a content-addressed workspace, guided workflow, and snapshot JSON/Markdown/HTML/Evidence Bundle exports in the existing 11-tab dashboard. Phase 18.1 separates active measurements from What-if preview, preserves explicitly recorded 0 V values, standardizes measurement provenance, validates simulation input/result fingerprints, and blocks invalidated learned-prior rollback. Read the [User Guide](docs/USER_GUIDE.md), [Diagnostic Workflow](docs/DIAGNOSTIC_WORKFLOW.md), [Reporting Guide](docs/REPORTING_GUIDE.md), and [Phase 18.1 Hotfix record](docs/PHASE18_1_RELIABILITY_HOTFIX.md). Physical repair accuracy and actual damage prediction remain `NOT_EVALUATED`; risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: CircuitCare AI v0.1.0 MVP integrated; Phase 18.1 reliability hotfix implemented and CI verified.** Phase 18 provides a content-addressed workspace, guided workflow, and snapshot JSON/Markdown/HTML/Evidence Bundle exports in the existing 11-tab dashboard. Phase 18.1 separates active measurements from What-if preview, preserves explicitly recorded 0 V values, standardizes measurement provenance, validates simulation input/result fingerprints, and blocks invalidated learned-prior rollback. Read the [User Guide](docs/USER_GUIDE.md), [Diagnostic Workflow](docs/DIAGNOSTIC_WORKFLOW.md), [Reporting Guide](docs/REPORTING_GUIDE.md), and [Phase 18.1 Hotfix record](docs/PHASE18_1_RELIABILITY_HOTFIX.md). Physical repair accuracy and actual damage prediction remain `NOT_EVALUATED`; risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
 
 ## Core differentiator
 - Start from a **known failed component and failure mode**, not just a symptom.
@@ -36,7 +36,7 @@ CircuitCare AI aims to answer a practical repair question: **if one component ha
 | 17 | Independent benchmark, fair baselines, statistical validation, efficiency | Synthetic benchmark complete; see Phase 17 evaluation and Phase 17.1 metric correction |
 | 17.1 | Metric integrity, off-grid evaluation, SPICE identifiability | Complete; corrected reused-holdout scoring and off-grid parameter evaluation on reused topology templates |
 | 18 | Unified workspace, guided workflow, evidence-grounded reports | Implemented; cached synthetic report flow verified; physical repair validation not evaluated |
-| 18.1 | Diagnostic context and evidence integrity | Reliability hotfix; see [verification record](docs/PHASE18_1_RELIABILITY_HOTFIX.md) |
+| 18.1 | Diagnostic context and evidence integrity | Implemented; local tests and Python 3.11/3.12 CI passed; see [verification record](docs/PHASE18_1_RELIABILITY_HOTFIX.md) |
 
 Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 

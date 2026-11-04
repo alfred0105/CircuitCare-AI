@@ -23,8 +23,8 @@ Validation results, Python versions, CI links, and limitations are recorded belo
 | Check | Result |
 |---|---|
 | Full local test suite | Python 3.12: `161 passed`; no test removed or skipped on this host |
-| Python 3.11 GitHub Actions | Pending push |
-| Python 3.12 GitHub Actions | Pending push |
+| Python 3.11 GitHub Actions | Pass · [run 41754936208](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41754936208) |
+| Python 3.12 GitHub Actions | Pass · [run 41754936208](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41754936208) |
 | Static checks | `compileall` and `git diff --check` passed |
 | Live ngspice scenario | ngspice 47: R1 10 kΩ and U1 output-rise 8 V each completed baseline and fault runs; temporary output only |
 | Simulation manifest | Live R1 manifest verified, then correctly changed to `STALE` after altering `comparison.json` |

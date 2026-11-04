@@ -10,8 +10,8 @@
 - [ ] `scripts/build_phase18_demo_report.py`로 cached synthetic demo 보고서 재생성 확인
 - [ ] Bundle manifest 해시 검증 및 로컬 열람 확인
 - [x] 기존 MVP Release `v0.1.0-mvp`와 Tag 보존
-- [ ] Phase 18.1 전체 테스트 및 Python 3.11/3.12 CI 확인
-- [ ] 0V, 실제 측정/What-if 분리, stale cache, invalid prior, bundle 참조 검증 확인
+- [x] Phase 18.1 전체 테스트 및 Python 3.11/3.12 CI 확인
+- [x] 0V, 실제 측정/What-if 분리, stale cache, invalid prior, bundle 참조 검증 확인
 - [ ] Physical Repair Validation은 실측 검증 데이터가 없으면 `NOT_EVALUATED`
 
 ## 사전 설치 및 오프라인 준비
