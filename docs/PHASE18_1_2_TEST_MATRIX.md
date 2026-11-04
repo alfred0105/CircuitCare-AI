@@ -26,3 +26,5 @@ Environment: macOS 27.0.1, arm64, Python 3.12.14 at `.venv/bin/python`. The bare
 | Concurrent native + LLM | Ollama CLI generation ran concurrently with `pytest -q tests/test_native_integration.py` | both exit 0; 5 native tests passed, including ONNX/OCR and ngspice cases |
 
 All pytest runs were performed after SIGSEGV isolation. No tests were converted to skips to hide failures. The integration fixture uses blank synthetic images: it verifies inference execution, not detector accuracy. The constrained direct JSON API request failed (501), while the separate CLI generation and its concurrent native test run succeeded. The entire requested circuit-to-report workflow was not exercised as one Streamlit session.
+
+The first pushed CI run (`41783595771`) passed Python 3.11/3.12, ngspice, stress, and required OCR, but the isolated crash job failed during test collection because it installed only `.[dev]` while unrelated collected modules import NumPy. The workflow was corrected to install the same collection-time runtime extras as the fast suite. That initial failure was retained in the GitHub Actions logs; the corrected run is the authoritative CI result.
