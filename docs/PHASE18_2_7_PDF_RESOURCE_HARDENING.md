@@ -36,12 +36,12 @@ No OS hard memory limit is claimed or applied. Python documents `resource` const
 | Area | Status | Evidence and limits |
 |---|---|---|
 | `PDF_PROCESS_ISOLATION` | `VERIFIED` | Production text and table paths call the worker; integration test asserts distinct parent/worker PIDs. |
-| `PDF_TIMEOUT_ENFORCEMENT` | `VERIFIED` locally | Real worker timeout test confirms timeout result, child reaping, temporary directory cleanup, and parent survival. Linux CI remains pending. |
-| `PDF_MEMORY_MONITORING` | `PARTIAL` | macOS RSS observation and limit termination are exercised; sustained missing readings now terminate. Sampling still cannot guarantee detection of a short peak. Linux CI remains pending. |
+| `PDF_TIMEOUT_ENFORCEMENT` | `VERIFIED` | macOS local and Linux CI tests confirm worker timeout supervision, reaping, temporary directory cleanup, and parent survival. |
+| `PDF_MEMORY_MONITORING` | `PARTIAL` | macOS and Linux worker tests observe RSS and trigger the sampled limit; sustained missing readings terminate. Sampling still cannot guarantee detection of a short peak. |
 | `PDF_HARD_MEMORY_LIMIT` | `NOT_VERIFIED` | No per-worker OS hard limit is installed. Cgroup delegation and safe enforcement are not verified. |
-| `PDF_FAILURE_CLEANUP` | `VERIFIED` locally | Timeout child is reaped, temporary directory is removed, pipe reader threads stop, and invalid/missing/oversized results fail without cache insertion. |
+| `PDF_FAILURE_CLEANUP` | `VERIFIED` | macOS local and Linux CI coverage confirms timeout child reaping, temporary directory removal, reader cleanup, and rejection of invalid/missing/oversized results. |
 | `PDF_CONCURRENT_WORKER_SAFETY` | `PARTIAL` | Two simultaneous requests are tested for same and different PDFs. Larger multi-session load and aggregate memory are not bounded or measured. |
-| `PDF_PARENT_SURVIVAL` | `VERIFIED` locally | Real timeout test confirms the parent PID remains; malformed input and simulated worker failure return controlled errors. Browser UI error handling is covered by the existing `DatasheetError` boundary, not by a live upload E2E. |
+| `PDF_PARENT_SURVIVAL` | `VERIFIED` | macOS local and Linux CI timeout/failure tests complete in the test parent; malformed input and worker errors return controlled `DatasheetError`s. Live browser upload E2E was not run. |
 
 ## Regression coverage
 
@@ -62,7 +62,8 @@ Normal extracted text and table values are checked against small synthetic PDFs.
 - Full requested Ruff scope (`src/circuitcare/datasheet tests/test_pdf_worker.py`): `FAIL` with 29 findings in unchanged Datasheet modules; no findings in changed PDF modules or test file.
 - Changed-source mypy: `FAIL` with 7 diagnostics, same 7 diagnostics in the unchanged baseline versions of these three files; no new type diagnostic. An unrelated imported module also reports an existing nullable-value diagnostic in the baseline run.
 - Local tests used Python 3.12 on macOS Apple Silicon. Test output includes existing duplicate-ZIP fixture and Streamlit/Pandas deprecation warnings.
-- Linux CI and Python 3.11/3.12: `NOT_VERIFIED` (push pending)
+- GitHub Actions: `PASS` — [run 41854035541](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41854035541), all six jobs passed: Python 3.11, Python 3.12, Linux ngspice Integration, native OCR Integration, bounded Stress, isolated Crash Injection.
+- Linux CI and Python 3.11/3.12: `PASS` for CI-covered flows; local manual validation used macOS/Python 3.12 only.
 - Local platform: macOS Apple Silicon, Python 3.12; all 18 targeted PDF tests passed.
 - Browser: app opened on isolated port 8503 before code changes; no live PDF upload/timeout browser flow was performed.
 
@@ -70,4 +71,4 @@ Normal extracted text and table values are checked against small synthetic PDFs.
 
 **PDF-related P1: PARTIAL, not CLOSED.** The worker isolation and parent survival path address the original direct-parent parsing hazard, and wall-clock termination is enforced. The remaining limits are lack of OS hard memory enforcement, sampled RSS gaps/peaks, no global concurrency cap, and no large multi-session memory test. The record does not claim `HARD_MEMORY_LIMIT_VERIFIED` or release-level PDF safety.
 
-Phase 18.2.7 may close its scoped fixes after local validation and CI pass. The project-wide release stability status remains subject to the historical non-PDF crash attribution and other unresolved audit items.
+Phase 18.2.7 scoped changes and CI verification are complete. The project-wide release stability status remains subject to the historical non-PDF crash attribution and other unresolved audit items.
