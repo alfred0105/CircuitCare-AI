@@ -97,8 +97,10 @@ def test_report_snapshot_portable_paths_and_simulated_observation_are_labelled(t
     report = build_diagnostic_snapshot(root=tmp_path, workspace=workspace, circuit=circuit,
         fault={"component_ref": "U1", "fault_type": "regulator_output_rise", "parameter": "8"},
         simulation_status="SUCCESS", comparison={"scenario_id": "S1", "baseline": {"circuit": "/private/tmp/base.cir"}},
+        risk_assessment={"risk_assessment_json": "/private/tmp/risk_assessment.json"},
         observations=[{"node": "VOUT", "value": 7.9, "source": "simulated_demo"}])
     assert report["spice_verification"]["comparison"]["baseline"]["circuit"] == "base.cir"
+    assert report["secondary_damage_risk"]["risk_assessment_json"] == "risk_assessment.json"
     assert report["fault_or_symptom"]["observation_classification"] == "SYNTHETIC_DEMO"
     assert report["evidence"][1]["evidence_type"] == "HEURISTIC_ESTIMATE"
 

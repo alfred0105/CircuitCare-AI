@@ -24,8 +24,7 @@ def _portable_artifact(value: Any, key: str = "") -> Any:
         return {name: _portable_artifact(item, name) for name, item in value.items()}
     if isinstance(value, list):
         return [_portable_artifact(item, key) for item in value]
-    if isinstance(value, str) and value.startswith("/") and any(
-            marker in key.casefold() for marker in ("path", "file", "circuit", "log", "csv")):
+    if isinstance(value, str) and Path(value).is_absolute():
         return Path(value).name
     return value
 
