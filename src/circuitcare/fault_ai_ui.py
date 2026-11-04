@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import time
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from .fault_ai.simulation_bridge import preflight_candidates, simulate_selected
 from .fault_ai.observation_matcher import compare_observations
 from .repair_feedback.case_repository import RepairCaseRepository
 from .repair_feedback.prior_registry import active_prior
+from .workspace.measurement_provenance import measurement_set_sha256
 
 
 def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, case: dict[str, Any],
@@ -33,24 +35,28 @@ def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, ca
     with st.form(f"fault_ai_form_{context_key}"):
         symptom = st.text_area("관측 증상", placeholder="예: VOUT가 기대값보다 높게 측정됨", max_chars=2000)
         cols = st.columns(4)
-        node = cols[0].selectbox("측정 노드", supported_nodes, key=f"fault_ai_node_{context_key}") if supported_nodes else ""
-        value = cols[1].number_input("측정값 (V)", value=0.0, format="%.6g", key=f"fault_ai_value_{context_key}")
-        uncertainty = cols[2].number_input("불확실도 (V, 알면 입력)", min_value=0.0, value=0.0, format="%.6g", key=f"fault_ai_sigma_{context_key}")
-        source = cols[3].selectbox("측정 출처", ["실제 측정", "시뮬레이션", "가상 데모"], key=f"fault_ai_source_{context_key}")
+        measurement_recorded = cols[0].checkbox("측정값을 기록함", value=False, key=f"fault_ai_recorded_{context_key}")
+        node = cols[1].selectbox("측정 노드", supported_nodes, key=f"fault_ai_node_{context_key}") if supported_nodes else ""
+        value = cols[2].number_input("측정값 (V)", value=0.0, format="%.6g", key=f"fault_ai_value_{context_key}")
+        uncertainty = cols[3].number_input("불확실도 (V, 알면 입력)", min_value=0.0, value=0.0, format="%.6g", key=f"fault_ai_sigma_{context_key}")
+        source_label = st.selectbox("측정 출처", ["실제 측정", "시뮬레이션", "가상 데모"], key=f"fault_ai_source_{context_key}")
+        source = {"실제 측정": "user_measurement", "시뮬레이션": "simulation", "가상 데모": "simulated_demo"}[source_label]
+        if measurement_recorded:
+            st.caption("기록 체크 후 입력한 0.0 V도 유효한 측정값으로 저장됩니다. 실제 측정은 사용자가 신고한 값이며 독립 검증을 뜻하지 않습니다.")
         generate = st.form_submit_button("규칙 기반 후보 생성")
         generate_llm = st.form_submit_button("로컬 AI 가설 제안", disabled=not (client and chosen_model))
     state_key = f"fault_ai_state_{context_key}"
     if generate or generate_llm:
-        observations = []
-        if node and (value != 0.0 or symptom.strip()):
-            observations.append({"node": node, "value": float(value), "unit": "V",
-                                 "uncertainty": float(uncertainty) if uncertainty > 0 else None,
-                                 "source": source, "measurement_mode": "final_sample"})
+        observations = _collect_observation(measurement_recorded, node, value, uncertainty, source)
         candidates = generate_rule_candidates(circuit, mapping, spice_text, observations)
         candidates = preflight_candidates(candidates, component_refs=set(circuit.components),
                                           component_mapping=mapping, spice_text=spice_text)
         state = {"observations": observations, "symptom": symptom, "rule_candidates": candidates,
                  "hypotheses": candidates, "llm_metadata": None, "context_key": context_key}
+        state["measurement_set_sha256"] = measurement_set_sha256(observations)
+        state["hypothesis_set_sha256"] = hashlib.sha256(
+            json.dumps(candidates, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        ).hexdigest()
         if generate_llm:
             components = [{"ref": c.ref, "value": c.value, "library_id": c.library_id,
                            "nets": list(circuit.component_nets.get(c.ref, ())),
@@ -67,6 +73,9 @@ def render_fault_ai_tab(st: Any, *, root: Path, circuit: Any, case_name: str, ca
                 state["llm_metadata"] = {k: proposed.get(k) for k in ("model", "model_info", "prompt_version", "latency_seconds", "json_mode")}
             except (ValueError, RuntimeError, OSError) as exc:
                 state["llm_metadata"] = {"status": "failed", "error": str(exc)}
+        state["hypothesis_set_sha256"] = hashlib.sha256(
+            json.dumps(state["hypotheses"], ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        ).hexdigest()
         st.session_state[state_key] = state
         # The overview/report runs earlier in the page; rerun so it can include
         # the newly generated candidate snapshot in the same active context.
@@ -145,3 +154,13 @@ def _read_json(path: Path) -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _collect_observation(recorded: bool, node: str, value: float, uncertainty: float,
+                         source: str) -> list[dict[str, Any]]:
+    """A checked zero is a valid reading; an unchecked widget default is missing."""
+    if not recorded or not node:
+        return []
+    return [{"node": node, "value": float(value), "unit": "V",
+             "uncertainty": float(uncertainty) if uncertainty > 0 else None,
+             "source": source, "measurement_mode": "final_sample"}]

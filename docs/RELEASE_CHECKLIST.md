@@ -9,7 +9,9 @@
 - [ ] JSON, Markdown, HTML 및 Evidence Bundle ZIP 생성 확인
 - [ ] `scripts/build_phase18_demo_report.py`로 cached synthetic demo 보고서 재생성 확인
 - [ ] Bundle manifest 해시 검증 및 로컬 열람 확인
-- [ ] MVP 버전 표기: `v0.1.0-mvp`; GitHub Release 및 Tag는 Phase 18 검증 완료 후 생성
+- [x] 기존 MVP Release `v0.1.0-mvp`와 Tag 보존
+- [ ] Phase 18.1 전체 테스트 및 Python 3.11/3.12 CI 확인
+- [ ] 0V, 실제 측정/What-if 분리, stale cache, invalid prior, bundle 참조 검증 확인
 - [ ] Physical Repair Validation은 실측 검증 데이터가 없으면 `NOT_EVALUATED`
 
 ## 사전 설치 및 오프라인 준비
@@ -27,7 +29,8 @@
 ## U1 대표 데모
 
 - [ ] 기본 Regulator + divider 회로, U1 output-rise 8 V 선택
-- [ ] 상태가 `CACHED` 또는 실제 실행 후 `SUCCESS · Live Simulation`으로 명확히 표시됨
+- [ ] 레거시 저장 결과는 `PROVENANCE_UNVERIFIED`로 표시되어 현재 분석에서 차단됨
+- [ ] 새 실행은 입력/결과 Fingerprint 검증 후 `SUCCESS · Live Simulation`으로 표시됨
 - [ ] 정상 5 V와 고장 8 V 비교 표시
 - [ ] 위험 표에서 C1 8 V / 6.3 V = 약 1.2698, `EXCEEDED` 표시
 - [ ] RLOAD 16 mW / 125 mW = 0.128, `WITHIN_LIMIT` 표시
@@ -45,7 +48,7 @@
 
 ## 장애 시 대체 절차
 
-- **ngspice 실패/미설치:** 저장된 결과만 보고 `CACHED`라고 명확히 표시합니다. 성공한 live 실행이라고 말하지 않습니다. CLI 재현 명령은 `README.md`의 ngspice 예시를 따릅니다.
+- **ngspice 실패/미설치:** 저장 캐시는 manifest가 일치할 때만 재사용합니다. 기존 manifest가 없는 캐시는 `PROVENANCE_UNVERIFIED`로 유지하고 성공한 live 실행이라고 말하지 않습니다. CLI 재현 명령은 `README.md`의 ngspice 예시를 따릅니다.
 - **Ollama 실패/미설치:** 화면의 결정론적 안내를 사용합니다. 이전에 저장된 LLM JSON을 보여줄 경우 저장된 응답이라고 알립니다.
 - **Streamlit 실패:** `python -m pytest -q`와 `scripts/demo_check.py` 결과를 보여주고, 저장된 JSON/CSV 및 평가 결과를 사용합니다. UI가 실행된 것처럼 말하지 않습니다.
 - **인터넷 연결 없음:** 사전에 설치된 패키지, ngspice, 선택 모델을 사용합니다. 시스템은 core CLI/UI 분석에서 클라우드 모델/API를 호출하지 않습니다.

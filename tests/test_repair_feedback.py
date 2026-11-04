@@ -282,6 +282,8 @@ def test_prior_estimator_deduplicates_case_ids_and_requires_matching_group():
 def test_prior_registry_requires_approval_and_supports_activate_deactivate_rollback(tmp_path):
     repository = RepairCaseRepository(tmp_path / "repair.sqlite3")
     cases = [_case(f"case-{index}", index=index) for index in range(1, 6)]
+    for case in cases:
+        repository.create_case(case)
     first = estimate_prior(cases, group_id="regulator-family", hypothesis_set_id="regulator-set-v1",
         base_prior=HYPOTHESES, minimum_cases=5)
     saved = propose_prior(repository, first)
@@ -292,12 +294,18 @@ def test_prior_registry_requires_approval_and_supports_activate_deactivate_rollb
     assert active_prior(repository, "regulator-family")["version"] == saved["version"]
     assert deactivate_prior(repository, saved["version"], reviewer="A")["status"] == "APPROVED"
     cases.append(_case("case-6", index=6))
+    repository.create_case(cases[-1])
     second = estimate_prior(cases, group_id="regulator-family", hypothesis_set_id="regulator-set-v1",
         base_prior=HYPOTHESES, minimum_cases=5)
     propose_prior(repository, second)
     approve_prior(repository, second["version"], reviewer="A")
     activate_prior(repository, second["version"], reviewer="A")
     assert rollback_prior(repository, group_id="regulator-family", target_version=saved["version"], reviewer="A")["version"] == saved["version"]
+    assert active_prior(repository, "regulator-family")["version"] == saved["version"]
+    with repository._connect() as db:
+        db.execute("CREATE TRIGGER fail_prior_event BEFORE INSERT ON prior_activation_events BEGIN SELECT RAISE(ABORT, 'forced failure'); END")
+    with pytest.raises(sqlite3.IntegrityError, match="forced failure"):
+        rollback_prior(repository, group_id="regulator-family", target_version=second["version"], reviewer="A")
     assert active_prior(repository, "regulator-family")["version"] == saved["version"]
     assert [event["action"] for event in repository.list_prior_events()]
 
@@ -327,6 +335,9 @@ def test_deleting_a_training_case_invalidates_and_deactivates_its_prior(tmp_path
     assert invalidated["status"] == "INVALIDATED_SOURCE_CHANGE"
     assert "case-1" not in json.dumps(invalidated)
     assert invalidated["prior_weights"] is None
+    assert active_prior(repository, "regulator-family") is None
+    with pytest.raises(ValueError, match="Invalidated prior"):
+        rollback_prior(repository, group_id="regulator-family", target_version=saved["version"], reviewer="A")
     assert active_prior(repository, "regulator-family") is None
     assert repository.get_case("case-1") is None
     assert repository.list_prior_events()[-1]["action"] == "INVALIDATED_SOURCE_CHANGE"

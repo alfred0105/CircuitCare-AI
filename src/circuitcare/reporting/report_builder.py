@@ -5,10 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from circuitcare.workspace.measurement_provenance import (
+    measurement_set_sha256, measurement_source_class, normalize_measurements,
+)
 
 def _git_sha(root: Path) -> str | None:
     try:
@@ -21,11 +26,17 @@ def _git_sha(root: Path) -> str | None:
 def _portable_artifact(value: Any, key: str = "") -> Any:
     """Remove machine-specific absolute paths from exported result payloads."""
     if isinstance(value, dict):
-        return {name: _portable_artifact(item, name) for name, item in value.items()}
+        omitted = {"private_notes", "created_by", "source_case_id", "local_paths", "home_directory",
+                   "database_path", "image_path", "pdf_path", "absolute_path"}
+        return {name: _portable_artifact(item, name) for name, item in value.items()
+                if name.casefold() not in omitted}
     if isinstance(value, list):
         return [_portable_artifact(item, key) for item in value]
     if isinstance(value, str) and Path(value).is_absolute():
         return Path(value).name
+    if isinstance(value, str):
+        value = re.sub(r"(?:/Users/[^\s]+|/home/[^\s]+|/tmp/[^\s]+|[A-Za-z]:\\Users\\[^\s]+)",
+                       "[local path redacted]", value)
     return value
 
 
@@ -65,7 +76,12 @@ def build_diagnostic_snapshot(*, root: Path, workspace: dict[str, Any], circuit:
                               diagnosis: dict[str, Any] | None = None,
                               inspection_recommendations: dict[str, Any] | None = None,
                               parameter_identification: dict[str, Any] | None = None,
-                              active_fault_candidates: dict[str, Any] | None = None) -> dict[str, Any]:
+                              active_fault_candidates: dict[str, Any] | None = None,
+                              diagnosis_context: dict[str, Any] | None = None,
+                              simulation_context: dict[str, Any] | None = None,
+                              preview_context: dict[str, Any] | None = None,
+                              preview_measurements: list[dict[str, Any]] | None = None,
+                              preview_diagnosis: dict[str, Any] | None = None) -> dict[str, Any]:
     """Collect currently available values; never reads private data or reruns engines."""
     components = getattr(circuit, "components", {})
     connections = getattr(circuit, "connections", [])
@@ -73,11 +89,55 @@ def build_diagnostic_snapshot(*, root: Path, workspace: dict[str, Any], circuit:
                        for key, value in components.items()}
     unique_nets = sorted({str(getattr(connection, "net", "")) for connection in connections})
     now = datetime.now(timezone.utc).isoformat()
+    effective_simulation_status = simulation_status
+    simulation_context = dict(simulation_context or {})
+    cached_fingerprint = simulation_context.get("fingerprint", {})
+    cached_verified = (simulation_context.get("status") == "VERIFIED"
+                       and isinstance(cached_fingerprint, dict)
+                       and len(cached_fingerprint.get("fingerprint_sha256", "")) == 64
+                       and bool(simulation_context.get("result_sha256")))
+    if simulation_status in {"CACHED", "CACHED_SIMULATION"} and not cached_verified:
+        comparison, risk_assessment = None, None
+        effective_simulation_status = "PROVENANCE_UNVERIFIED"
+    elif simulation_status == "STALE":
+        comparison, risk_assessment = None, None
     comparison = _portable_artifact(comparison) if comparison else None
     risk_assessment = _portable_artifact(risk_assessment) if risk_assessment else None
     scenario_id = (risk_assessment or {}).get("scenario_id") or (comparison or {}).get("scenario_id")
-    simulation_source = "ngspice_cached_or_live" if comparison else "NOT_EVALUATED"
-    measurements = observations or []
+    simulation_source = ("LIVE_SIMULATION" if simulation_status == "SUCCESS" else
+                         "CACHED_SIMULATION" if comparison and cached_verified else
+                         "PROVENANCE_UNVERIFIED" if effective_simulation_status == "PROVENANCE_UNVERIFIED" else
+                         "NOT_EVALUATED")
+    measurements = normalize_measurements(observations or [])
+    measurements = _portable_artifact(measurements)
+    preview_measurements = normalize_measurements(preview_measurements or [])
+    preview_measurements = _portable_artifact(preview_measurements)
+    measurement_hash = measurement_set_sha256(measurements)
+    diagnosis_context = dict(diagnosis_context or {})
+    diagnosis_mismatch = bool(diagnosis and diagnosis_context.get("measurement_set_sha256")
+                              and diagnosis_context["measurement_set_sha256"] != measurement_hash)
+    if diagnosis_mismatch:
+        diagnosis = {"status": "NOT_EVALUATED", "reason": "MEASUREMENT_DIAGNOSIS_MISMATCH"}
+    diagnosis = _portable_artifact(diagnosis or {"status": "NOT_EVALUATED"})
+    inspection_recommendations = _portable_artifact(inspection_recommendations or {"status": "NOT_EVALUATED"})
+    raw_candidate_rows = (active_fault_candidates or {}).get("hypotheses", [])
+    source_hypothesis_hash = hashlib.sha256(json.dumps(raw_candidate_rows, sort_keys=True, ensure_ascii=False,
+        separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+    active_fault_candidates = _portable_artifact(active_fault_candidates or {"status": "NOT_EVALUATED"})
+    fault = _portable_artifact(fault)
+    workspace = _portable_artifact(workspace)
+    candidate_measurement_hash = active_fault_candidates.get("measurement_set_sha256")
+    candidate_rows = active_fault_candidates.get("hypotheses", [])
+    actual_hypothesis_hash = hashlib.sha256(json.dumps(candidate_rows, sort_keys=True, ensure_ascii=False,
+        separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+    candidate_context_status = "MATCHED"
+    if candidate_measurement_hash and candidate_measurement_hash != measurement_hash:
+        candidate_context_status = "MEASUREMENT_HYPOTHESIS_MISMATCH"
+    if active_fault_candidates.get("hypothesis_set_sha256") and active_fault_candidates["hypothesis_set_sha256"] != source_hypothesis_hash:
+        candidate_context_status = "HYPOTHESIS_SET_MISMATCH"
+    if candidate_context_status != "MATCHED":
+        active_fault_candidates["hypotheses"] = []
+        active_fault_candidates["rule_candidates"] = []
     comparison_hash = hashlib.sha256(json.dumps(comparison, sort_keys=True, separators=(",", ":")).encode()).hexdigest() if comparison else None
     risk_hash = hashlib.sha256(json.dumps(risk_assessment, sort_keys=True, separators=(",", ":")).encode()).hexdigest() if risk_assessment else None
     evidence = [{"evidence_id": "EV-SPICE", "evidence_type": "SPICE_SIMULATION",
@@ -88,9 +148,14 @@ def build_diagnostic_snapshot(*, root: Path, workspace: dict[str, Any], circuit:
                      "source_artifact": "fault influence graph", "verification_status": "CONNECTIVITY_ONLY",
                      "circuit_hash": workspace.get("circuit_hash"), "scenario_id": scenario_id})
     if measurements:
-        observation_type = "SYNTHETIC_DEMO" if any(item.get("source") == "simulated_demo" for item in measurements) else "USER_REPORTED_OBSERVATION"
+        source_class = measurement_source_class(measurements)
+        observation_type = {"simulated_demo": "SYNTHETIC_DEMO", "user_measurement": "USER_REPORTED_OBSERVATION",
+                            "simulation": "SPICE_SIMULATION", "imported_measurement": "USER_REPORTED_OBSERVATION",
+                            "MIXED_SOURCES": "MIXED_SOURCES", "unknown": "NOT_EVALUATED"}.get(source_class, "NOT_EVALUATED")
         evidence.append({"evidence_id": "EV-OBS", "evidence_type": observation_type,
-                         "source_artifact": None, "verification_status": "SIMULATED" if observation_type == "SYNTHETIC_DEMO" else "USER_REPORTED",
+                         "source_artifact": None, "verification_status": "SIMULATED" if observation_type == "SYNTHETIC_DEMO" else
+                         "USER_REPORTED" if observation_type == "USER_REPORTED_OBSERVATION" else
+                         "MODEL_OUTPUT" if observation_type == "SPICE_SIMULATION" else "UNVERIFIED",
                          "circuit_hash": workspace.get("circuit_hash"), "scenario_id": scenario_id})
     candidates = (active_fault_candidates or {}).get("hypotheses", [])
     rule_candidates = (active_fault_candidates or {}).get("rule_candidates", [])
@@ -127,15 +192,30 @@ def build_diagnostic_snapshot(*, root: Path, workspace: dict[str, Any], circuit:
         "fault_or_symptom": {"mode": "UNKNOWN_FAULT_MODE" if (active_fault_candidates or {}).get("hypothesis_symptom") else "KNOWN_FAULT",
                              "symptom": (active_fault_candidates or {}).get("hypothesis_symptom"), **fault,
                              "observations": measurements,
-                             "observation_classification": "SYNTHETIC_DEMO" if measurements and any(item.get("source") == "simulated_demo" for item in measurements) else ("USER_REPORTED" if measurements else "NONE")},
+                             "observation_classification": measurement_source_class(measurements)},
+        "measurement_context": {"measurement_set_sha256": measurement_hash,
+                                 "source_classification": measurement_source_class(measurements),
+                                 "verification_status": "USER_REPORTED" if measurement_source_class(measurements) == "user_measurement" else "NOT_PHYSICALLY_VERIFIED"},
+        "diagnosis_context": {**diagnosis_context,
+                              "measurement_set_sha256": diagnosis_context.get("measurement_set_sha256", measurement_hash),
+                              "circuit_hash": diagnosis_context.get("circuit_hash", workspace.get("circuit_hash")),
+                              "validation_status": "MEASUREMENT_DIAGNOSIS_MISMATCH" if diagnosis_mismatch else "MATCHED"},
+        "hypothesis_context": {"measurement_set_sha256": candidate_measurement_hash or measurement_hash,
+                               "hypothesis_set_sha256": actual_hypothesis_hash,
+                               "validation_status": candidate_context_status},
+        "preview_context": ({**preview_context, "mode": "WHAT_IF_PREVIEW", "status": "PREVIEW_ONLY"}
+                            if preview_context and preview_diagnosis else None),
+        "preview_measurements": preview_measurements if preview_context and preview_diagnosis else [],
+        "preview_diagnosis": preview_diagnosis if preview_context and preview_diagnosis else None,
         "parameter_identification": parameter_identification or {"status": "NOT_EVALUATED"},
         "analysis_status": {"circuit_validation": workspace.get("validation_status", "READY"),
                             "graph_analysis": "COMPLETE", "fault_hypotheses": "PARTIAL" if candidates or rule_candidates else "NOT_EVALUATED",
-                            "spice_verification": simulation_status,
+                            "spice_verification": effective_simulation_status,
                             "risk_assessment": "COMPLETE" if risk_assessment else "NOT_EVALUATED"},
         "fault_influence": active_fault_candidates or {"status": "NOT_EVALUATED", "note": "Connectivity candidates are not damage evidence."},
-        "spice_verification": {"status": simulation_status, "source": simulation_source,
+        "spice_verification": {"status": effective_simulation_status, "source": simulation_source,
                                "scenario_id": scenario_id, "comparison": comparison},
+        "simulation_context": simulation_context or None,
         "diagnosis": diagnosis or {"status": "NOT_EVALUATED"},
         "secondary_damage_risk": {**(risk_assessment or {"status": "NOT_EVALUATED"}),
                                   "artifact_sha256": risk_hash, "damage_confirmed": False},

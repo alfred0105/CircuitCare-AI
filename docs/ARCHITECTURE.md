@@ -60,3 +60,11 @@ Default to power-off inspection. Avoid powering damaged boards until basic isola
 - Phase 15 fault metrics use three injected synthetic cases and are development diagnostics. The four-family datasheet pilot informed parser changes; its post-fix score is also development-only. Neither result is an independent accuracy estimate; the separate evaluation reports record dataset versions, hashes, source PDFs, and limits.
 
 - Repair feedback is local by default under ignored `data/private/repair_feedback/`. Synthetic, simulated, LLM-generated, unverified, duplicate, validation, and holdout cases cannot enter real-repair prior learning. Outcome verification does not itself prove unique root cause. Learned weights are conditional priors for a compatible hypothesis set, not real-world failure probabilities; no prior is activated without sufficient reviewed physical cases and explicit approval. Current real-case count is zero. See [Phase 16 evaluation](PHASE16_EVALUATION.md).
+
+## Phase 18.1 diagnostic integrity
+
+- Active measurement diagnosis and Bayesian What-if preview use separate hashes and storage. A preview is exported only by explicit selection and remains `PREVIEW_ONLY`.
+- Measurement source codes are canonical; `user_measurement` means user reported. Zero voltage is a valid recorded value.
+- Simulation cache identity includes content hashes for the netlist, deck/includes, mapping, probes, fault parameters, and settings. Legacy results without a verified manifest are retained but cannot be used as current evidence.
+- Prior activation and rollback share source eligibility checks and commit status/event updates transactionally. Invalidated source cases cannot be restored.
+- The report and bundle validators cross-check measurement/hypothesis, circuit/scenario, artifact, and archive context. See [Phase 18.1 hotfix record](PHASE18_1_RELIABILITY_HOTFIX.md).

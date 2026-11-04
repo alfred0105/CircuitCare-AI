@@ -17,12 +17,14 @@ ngspice is optional for saved-result review and required for live circuit simula
 1. Choose the cached regulator example in the sidebar, or choose **KiCad XML 업로드** for connectivity-only review of a local XML netlist.
 2. Confirm the displayed reference and fault type. For the default cached scenario, U1 uses an 8 V output-rise demo.
 3. Review the component/net map and its connectivity-only interpretation.
-4. Open **SPICE 파형** and **2차 손상 위험** to inspect the saved comparison and configured rating assumptions.
+4. Open **SPICE 파형** and **2차 손상 위험**. Saved legacy results without an input fingerprint are labeled `PROVENANCE_UNVERIFIED` and withheld from the active analysis until a live run records provenance.
 5. To run a fresh simulation, install ngspice and explicitly press **ngspice 실행**.
 6. Use **AI 고장 가설 분석** to enter observations and generate rule candidates. LLM proposal and SPICE verification each require a separate explicit action.
 7. For a continuous/off-grid value, generate the rule catalog first. The report then compares the entered value with candidates generated for the same reference and fault mode. If absent, it labels `EXACT_FAULT_PARAMETER_NOT_IDENTIFIED`; catalog coverage is not the same as a system-selected diagnosis.
 8. Review the Workspace and analysis states on **분석 개요**.
 9. Download the JSON, Markdown, HTML, or Evidence Bundle report from that overview.
+
+In the Bayesian measurement form, submitting a reading records the entered value including `0.0 V`. The source `user_measurement` means user reported; it is not independently instrument verified. The What-if controls are a separate simulated preview. They do not replace the active diagnosis and appear in the main report only when the separate preview checkbox is selected; the preview remains `PREVIEW_ONLY`.
 
 The sample can also be run from the command line with the commands in the README. For a guided description of all existing workflow tabs, see [Diagnostic workflow](DIAGNOSTIC_WORKFLOW.md).
 

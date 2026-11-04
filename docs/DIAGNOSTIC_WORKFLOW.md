@@ -10,15 +10,15 @@ The overview map and circuit tab show component/net connectivity candidates. A s
 
 ## 3. Enter known faults or observed symptoms
 
-The main sidebar uses a known component and fault mode for the supported demo workflow. For symptom-led fault hypotheses, use **AI 고장 가설 분석** to enter an observation and request deterministic rule candidates. A local LLM proposal is optional and requires an explicit button press. Unsupported hypotheses are not sent to SPICE.
+The main sidebar uses a known component and fault mode for the supported demo workflow. For symptom-led fault hypotheses, use **AI 고장 가설 분석** to enter an observation and request deterministic rule candidates. Check **측정값을 기록함** to record a measurement; a checked 0.0 V is valid, while an unchecked widget default is not an observation. The source code is stored separately from its Korean display label. `user_measurement` means user reported, not independently verified. A local LLM proposal is optional and requires an explicit button press. Unsupported hypotheses are not sent to SPICE.
 
 ## 4. Verify selected cases
 
-Review mapping and probe coverage. Press **ngspice 실행** to run the selected known scenario, or explicitly select validated hypotheses in the AI fault tab. Cached demonstration artifacts are labeled `CACHED`; they are not a new simulation. Missing ngspice leaves saved results viewable and live simulation unavailable.
+Review mapping and probe coverage. Press **ngspice 실행** to run the selected known scenario, or explicitly select validated hypotheses in the AI fault tab. Live runs record input and result fingerprints. A legacy cache without generation-time fingerprints is labeled `PROVENANCE_UNVERIFIED`, and a changed input/result is `STALE`; neither is used as current evidence. Missing ngspice leaves non-simulation workflow and report generation available.
 
 ## 5. Review evidence and uncertainty
 
-Compare observations with the correct circuit and fault context. Keep physical/user measurements, simulated demo values, SPICE predictions, unverified AI proposals, and approved datasheet ratings distinct. Model mismatch, tied hypotheses, missing mappings, and unknown ratings must remain visible.
+Compare observations with the correct circuit and fault context. The active diagnosis uses its own observation-set hash. Bayesian What-if is a separate `simulated_demo` preview and never replaces the active result. It is included in a report only when explicitly selected, in a separate `PREVIEW_ONLY` section. Keep user-reported observations, simulated demo values, SPICE predictions, unverified AI proposals, and approved datasheet ratings distinct.
 
 ## 6. Export a report
 

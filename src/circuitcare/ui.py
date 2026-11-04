@@ -23,6 +23,7 @@ from circuitcare.local_llm import LocalLLMError, OllamaClient
 from circuitcare.netlist import load_netlist
 from circuitcare.repair_advisor import build_repair_advice
 from circuitcare.workspace import build_workspace_context, reconcile_session_workspace, store_uploaded_netlist
+from circuitcare.workspace.simulation_context import build_simulation_fingerprint, verify_simulation_manifest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -161,7 +162,8 @@ def main() -> None:
         with st.spinner("Fault Injection → ngspice → stress/rating assessment 실행 중…"):
             try:
                 completed = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=180, check=False)
-                result_dir = _validate_live_result(completed, output, selected_fault, fault_type)
+                result_dir = _validate_live_result(completed, output, selected_fault, fault_type,
+                                                   case=case, fault_value=fault_value if needs_value else None)
                 st.session_state.live_result_dir = str(result_dir)
                 st.session_state.live_context_key = context_key
                 st.session_state.pop("live_error", None)
@@ -183,6 +185,13 @@ def main() -> None:
     comparison = _json_if_exists(comparison_path)
     risk = _json_if_exists(risk_path)
     stress = _json_if_exists(stress_path)
+    current_simulation_fingerprint = _current_simulation_fingerprint(case, selected_fault, fault_type, fault_value)
+    cache_manifest = _json_if_exists(result_dir / "simulation_context.json")
+    cache_integrity, _ = verify_simulation_manifest(result_dir, cache_manifest, current_simulation_fingerprint)
+    cached_selection_for_integrity = bool(case.get("cached")) and _is_cached_case(
+        case, selected_fault, fault_type, fault_value, needs_value)
+    if (not live_used and cached_selection_for_integrity and cache_integrity != "VERIFIED"):
+        comparison, risk, stress = {}, {}, {}
     base_risk = risk
     component_mapping = _json_if_exists(ROOT / case["mapping"]) if case.get("mapping") else {}
     stress_signature = hashlib.sha256(stress_path.read_bytes()).hexdigest() if stress_path.is_file() else None
@@ -206,16 +215,24 @@ def main() -> None:
             st.session_state.pop(f"datasheet_applied_{context_key}", None)
     is_cached_selection = bool(case.get("cached")) and _is_cached_case(case, selected_fault, fault_type, fault_value, needs_value)
     status = _simulation_status(live_used, st.session_state.get("live_error"), is_cached_selection)
+    if status == "CACHED":
+        status = "CACHED_SIMULATION" if cache_integrity == "VERIFIED" else cache_integrity
+    if status in {"STALE", "PROVENANCE_UNVERIFIED"} or (
+            status == "FAILED" and is_cached_selection and cache_integrity != "VERIFIED"):
+        comparison, risk, stress = {}, {}, {}
     if status != "RUNNING":
         st.session_state.simulation_status = status
         state_display.markdown({
             "SUCCESS": "🟢 SUCCESS · Live Simulation",
-            "FAILED": "🔴 FAILED" + (" · Cached fallback" if is_cached_selection else ""),
-            "CACHED": "🔵 CACHED · 저장된 시연 결과",
+            "FAILED": "🔴 FAILED" + (" · 이전 저장 결과는 출처 미검증으로 사용하지 않음" if is_cached_selection else ""),
+            "CACHED_SIMULATION": "🔵 CACHED_SIMULATION · 입력 지문 확인됨",
+            "STALE": "🟠 STALE · 입력 지문 불일치 · 결과 사용 차단",
+            "PROVENANCE_UNVERIFIED": "🟠 PROVENANCE_UNVERIFIED · 저장 결과 출처 미검증",
             "NOT_RUN": "⚪ NOT_RUN · 분석 준비 · 미실행",
         }[status])
     spice_record_status = ("UNSUPPORTED" if case.get("uploaded") else
-                           "COMPLETE" if status in {"SUCCESS", "CACHED"} and comparison else
+                           status if status in {"STALE", "PROVENANCE_UNVERIFIED"} else
+                           "COMPLETE" if status in {"SUCCESS", "CACHED_SIMULATION"} and comparison else
                            "FAILED" if status == "FAILED" else "READY")
     active_workspace["analysis_records"] = [
         {"analysis_type": "circuit_validation", "status": "COMPLETE",
@@ -245,6 +262,9 @@ def main() -> None:
             failed_component=selected_fault, fault_type=fault_type, fault_value=fault_value,
             risk=risk, comparison=comparison, status=status, bayesian_supported=bayesian_supported,
             workspace=active_workspace,
+            simulation_context={"status": "VERIFIED" if cache_integrity == "VERIFIED" else cache_integrity,
+                                "fingerprint": cache_manifest.get("fingerprint"),
+                                "result_sha256": cache_manifest.get("result_sha256")},
         )
     with tabs[1]:
         st.subheader("회로 및 고장 설정")
@@ -318,7 +338,9 @@ def main() -> None:
                 node = st.selectbox("측정 노드", current["diagnosis"].get("available_measurement_nodes", []), index=0)
                 value = st.number_input("측정 전압 (V)", value=7.9, format="%.4f")
                 uncertainty = st.number_input("불확실도 σ (V)", min_value=0.0001, value=0.2, format="%.4f")
-                source = st.selectbox("출처", ["user_measurement", "simulated_demo"], help="실제 계측값을 직접 입력한 경우에만 user_measurement를 선택하세요.")
+                source = st.selectbox("출처", ["user_measurement", "simulated_demo"],
+                    format_func=lambda item: {"user_measurement": "실제 측정 (사용자 신고)", "simulated_demo": "가상 데모"}[item],
+                    help="user_measurement는 사용자가 실제 계측값이라고 신고한 값이며 독립 검증을 뜻하지 않습니다.")
                 submitted = st.form_submit_button("측정 추가 후 재계산")
             if submitted:
                 measurements = _upsert_measurement(measurements, {"node": node, "value": value, "unit": "V", "uncertainty": uncertainty, "source": source})
@@ -475,7 +497,7 @@ def _load_diagnosis(case: dict) -> dict:
 
 def _render_analysis_overview(st, *, circuit, case_name, case, context_key, failed_component,
                               fault_type, fault_value, risk, comparison, status, bayesian_supported,
-                              workspace):
+                              workspace, simulation_context):
     """Unified read-only overview plus an isolated simulated-demo What-if preview."""
     from circuitcare.visualization.fault_map import build_fault_map, fault_map_json, render_fault_map_dot
 
@@ -497,7 +519,8 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
     from circuitcare.workspace.workflow import workflow_steps
     steps = workflow_steps(
         circuit_status=workspace.get("validation_status", "FAILED"), graph_ready=True,
-        fault_status="COMPLETE", spice_status={"SUCCESS": "COMPLETE", "CACHED": "COMPLETE",
+        fault_status="COMPLETE", spice_status={"SUCCESS": "COMPLETE", "CACHED_SIMULATION": "COMPLETE",
+            "STALE": "STALE", "PROVENANCE_UNVERIFIED": "NOT_EVALUATED",
             "NOT_RUN": "READY", "FAILED": "FAILED"}.get(
                 status, "UNSUPPORTED" if case.get("uploaded") else "NOT_EVALUATED"),
         report_ready=True,
@@ -636,21 +659,36 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
     from circuitcare.reporting.report_validator import validate_report
     report_context_id = hashlib.sha256(repr(context_key).encode()).hexdigest()[:16]
     fault_ai_state = st.session_state.get(f"fault_ai_state_{report_context_id}", {})
-    report_hypotheses = fault_ai_state.get("hypotheses", []) if fault_ai_state.get("context_key") == report_context_id else []
     report_observations = (st.session_state.get("measurements", []) if bayesian_supported
                            else fault_ai_state.get("observations", []))
-    report_diagnosis = (what_if_result.get("diagnosis") if what_if_result else
-                        ({"status": "CANDIDATES_AVAILABLE", "hypotheses": report_hypotheses,
-                          "llm_metadata": fault_ai_state.get("llm_metadata")} if report_hypotheses
-                         else {"status": "NOT_EVALUATED"}))
-    active_ranking = (what_if_result.get("inspection_ranking") if what_if_result else
-                      fault_ai_state.get("bayesian_result"))
+    fault_hypothesis_context_matches = (
+        fault_ai_state.get("context_key") == report_context_id
+        and fault_ai_state.get("measurement_set_sha256") == _measurement_set_id(report_observations)
+    )
+    report_hypotheses = fault_ai_state.get("hypotheses", []) if fault_hypothesis_context_matches else []
+    active_diagnosis_result = st.session_state.get("diagnosis_result") if bayesian_supported else None
+    report_diagnosis = (active_diagnosis_result.get("diagnosis") if active_diagnosis_result
+                        else ({"status": "CANDIDATES_AVAILABLE", "hypotheses": report_hypotheses,
+                               "llm_metadata": fault_ai_state.get("llm_metadata")} if report_hypotheses
+                              else {"status": "NOT_EVALUATED"}))
+    active_ranking = (active_diagnosis_result.get("inspection_ranking") if active_diagnosis_result
+                      else fault_ai_state.get("bayesian_result"))
+    include_preview = st.checkbox("별도 What-if Preview를 보고서에 포함", value=False,
+                                  help="기본 진단과 분리된 PREVIEW_ONLY 절로만 추가됩니다.") if what_if_result else False
+    actual_set_hash = _measurement_set_id(report_observations)
+    diagnosis_context = {"mode": "ACTIVE_DIAGNOSIS", "measurement_set_sha256": actual_set_hash,
+                         "circuit_hash": workspace.get("circuit_hash"),
+                         "hypothesis_set_sha256": _file_sha256(DEMO_HYPOTHESES) if bayesian_supported else None,
+                         "prior_version": "default", "status": "COMPLETE" if active_diagnosis_result else "NOT_EVALUATED"}
+    preview_context = ({"mode": "WHAT_IF_PREVIEW", "measurement_source": "simulated_demo",
+                       "measurement_set_sha256": _measurement_set_id(st.session_state.get("what_if_measurements", [])),
+                       "status": "PREVIEW_ONLY"} if include_preview else None)
     inspection_recommendations = ({"status": "CONDITIONAL_INSPECTION_RANKING",
                                    "ranking": active_ranking,
                                    "measurement_recommendations": what_if_result.get("recommendations") if what_if_result else None,
                                    "interpretation": "Conditional inspection ordering only; separate from electrical stress and not damage probability."}
                                   if active_ranking else None)
-    rule_candidates = fault_ai_state.get("rule_candidates", []) if fault_ai_state.get("context_key") == report_context_id else []
+    rule_candidates = fault_ai_state.get("rule_candidates", []) if fault_hypothesis_context_matches else []
     parameter_identification = classify_parameter_grid_coverage(
         component_ref=failed_component, fault_type=fault_type,
         fault_parameter=fault_value if fault_type in {"resistance_drift", "regulator_output_rise", "regulator_output_drop"} else None,
@@ -665,11 +703,18 @@ def _render_analysis_overview(st, *, circuit, case_name, case, context_key, fail
         diagnosis=report_diagnosis,
         inspection_recommendations=inspection_recommendations,
         parameter_identification=parameter_identification,
+        diagnosis_context=diagnosis_context,
+        simulation_context=simulation_context,
+        preview_context=preview_context,
+        preview_measurements=st.session_state.get("what_if_measurements", []) if include_preview else [],
+        preview_diagnosis=what_if_result.get("diagnosis") if include_preview and what_if_result else None,
         active_fault_candidates={"status": "CONNECTIVITY_CANDIDATES",
                                   "failed_component": failed_component,
                                   "direct_candidate_count": len(direct_candidates(circuit, failed_component)),
                                   "hypotheses": report_hypotheses,
                                   "rule_candidates": rule_candidates,
+                                  "measurement_set_sha256": fault_ai_state.get("measurement_set_sha256") if fault_hypothesis_context_matches else None,
+                                  "hypothesis_set_sha256": fault_ai_state.get("hypothesis_set_sha256") if fault_hypothesis_context_matches else None,
                                   "hypothesis_symptom": fault_ai_state.get("symptom") if report_hypotheses else None,
                                   "paths": payload.get("paths", []),
                                   "interpretation": "Potential connectivity only; not confirmed damage."},
@@ -725,11 +770,7 @@ def _analysis_context_key(case_name: str, case: dict, fault: str, fault_type: st
         if not value:
             continue
         path = ROOT / value
-        try:
-            stat = path.stat()
-            identity = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
-        except OSError:
-            identity = (str(path.resolve()), None, None)
+        identity = (str(path.resolve()), _file_sha256(path))
         files.append((name, identity))
     context_paths = [("what_if_hypotheses", DEMO_HYPOTHESES)]
     if case.get("cached"):
@@ -749,13 +790,9 @@ def _analysis_context_key(case_name: str, case: dict, fault: str, fault_type: st
             source = source if source.is_absolute() else DEMO_HYPOTHESES.parent / source
             context_paths.append((f"hypothesis_{index}_{key}", source / filename if source.is_dir() else source))
     for name, path in context_paths:
-        try:
-            stat = path.stat()
-            identity = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
-        except OSError:
-            identity = (str(path.resolve()), None, None)
+        identity = (str(path.resolve()), _file_sha256(path))
         files.append((name, identity))
-    return (case_name, fault, fault_type, fault_value, tuple(files))
+    return (case_name, fault, fault_type, fault_value, tuple(files), _file_sha256(DEMO_HYPOTHESES))
 
 
 def _supports_bayesian_demo(case_name: str, fault: str, fault_type: str, fault_value: str | None) -> bool:
@@ -777,19 +814,20 @@ def _simulation_status(live_matches: bool, live_error: str | None, is_cached_sel
 
 
 def _measurement_set_id(measurements: list[dict]) -> str:
-    serialized = json.dumps(measurements, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    from circuitcare.workspace.measurement_provenance import measurement_set_sha256
+    return measurement_set_sha256(measurements)
+
+
+def _file_sha256(path: Path) -> str | None:
+    from circuitcare.workspace.context import file_sha256
+    return file_sha256(path)
 
 
 def _simulation_result_id(result_dir: Path) -> tuple:
     identity = [str(result_dir.resolve())]
-    for name in ("comparison.json", "component_stress.json", "risk_assessment.json"):
+    for name in ("comparison.json", "component_stress.json", "risk_assessment.json", "simulation_context.json"):
         path = result_dir / name
-        try:
-            stat = path.stat()
-            identity.append((name, stat.st_mtime_ns, stat.st_size))
-        except OSError:
-            identity.append((name, None, None))
+        identity.append((name, _file_sha256(path)))
     return tuple(identity)
 
 
@@ -810,7 +848,31 @@ def _upsert_measurement(measurements: list[dict], measurement: dict) -> list[dic
     return updated
 
 
-def _validate_live_result(completed: subprocess.CompletedProcess, output: Path, fault: str, fault_type: str) -> Path:
+def _current_simulation_fingerprint(case: dict, fault: str, fault_type: str,
+                                    fault_value: str | None) -> dict:
+    if not case.get("base") or not case.get("mapping") or not case.get("probes"):
+        return {"fingerprint_sha256": None}
+    deck = ROOT / case["base"]
+    model_paths = []
+    try:
+        for line in deck.read_text(encoding="utf-8").splitlines():
+            match = re.match(r"^\s*\.(?:include|inc|lib)\s+[\"']?([^\"'\s]+)", line, flags=re.IGNORECASE)
+            if match:
+                model_paths.append((deck.parent / match.group(1)).resolve())
+    except OSError:
+        return {"fingerprint_sha256": None}
+    return build_simulation_fingerprint(
+        netlist=ROOT / case["netlist"], spice_deck=deck,
+        component_mapping=ROOT / case["mapping"], probes=ROOT / case["probes"],
+        fault={"component_ref": fault, "fault_type": fault_type, "parameter": fault_value},
+        settings={"engine": "ngspice", "analysis": "transient", "runner": "circuitcare-cli"},
+        relevant_models=model_paths,
+        ratings=ROOT / case["ratings"] if case.get("ratings") else None,
+    )
+
+
+def _validate_live_result(completed: subprocess.CompletedProcess, output: Path, fault: str, fault_type: str,
+                          *, case: dict | None = None, fault_value: str | None = None) -> Path:
     if completed.returncode != 0:
         raise SimulationRunError(_simulation_error_details(completed, output))
     try:
@@ -838,6 +900,12 @@ def _validate_live_result(completed: subprocess.CompletedProcess, output: Path, 
             or risk.get("simulation_status") != "success" or risk.get("scenario_id") != scenario_id
             or risk.get("failed_component") != fault or risk.get("fault_type") != fault_type):
         raise SimulationRunError(f"결과 파일 상태 또는 고장 조건이 일치하지 않습니다.\n{_simulation_error_details(completed, output)}")
+    if case is None:
+        raise SimulationRunError("성공한 시뮬레이션에 입력 Fingerprint를 기록할 회로 설정이 없습니다.")
+    fingerprint = _current_simulation_fingerprint(case, fault, fault_type, fault_value)
+    manifest = {"status": "LIVE_SUCCESS", "fingerprint": fingerprint,
+                "result_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths.values()}}
+    (result_dir / "simulation_context.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
     return result_dir
 
 

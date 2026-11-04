@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import sys
+from io import BytesIO
 from pathlib import Path
+import zipfile
 
 import pytest
 
@@ -15,6 +20,12 @@ from circuitcare.workspace.provenance import artifact_record
 from circuitcare.workspace.session import reconcile_session_workspace
 from circuitcare.workspace.state_validator import stale_analysis_records
 from circuitcare.workspace.workflow import workflow_steps
+from circuitcare.workspace.measurement_provenance import (
+    measurement_set_sha256, measurement_source_class, normalize_measurement,
+)
+from circuitcare.workspace.simulation_context import (
+    build_simulation_fingerprint, verify_cached_fingerprint, verify_simulation_manifest,
+)
 
 
 def _report(tmp_path: Path) -> dict:
@@ -98,11 +109,18 @@ def test_report_snapshot_portable_paths_and_simulated_observation_are_labelled(t
         fault={"component_ref": "U1", "fault_type": "regulator_output_rise", "parameter": "8"},
         simulation_status="SUCCESS", comparison={"scenario_id": "S1", "baseline": {"circuit": "/private/tmp/base.cir"}},
         risk_assessment={"risk_assessment_json": "/private/tmp/risk_assessment.json"},
-        observations=[{"node": "VOUT", "value": 7.9, "source": "simulated_demo"}])
+        observations=[{"node": "VOUT", "value": 7.9, "source": "simulated_demo"}],
+        active_fault_candidates={"hypotheses": [], "private_notes": "operator private memo",
+                                 "llm_metadata": {"error": "failed at /Users/alice/private/model.bin"}})
     assert report["spice_verification"]["comparison"]["baseline"]["circuit"] == "base.cir"
     assert report["secondary_damage_risk"]["risk_assessment_json"] == "risk_assessment.json"
-    assert report["fault_or_symptom"]["observation_classification"] == "SYNTHETIC_DEMO"
+    assert report["fault_or_symptom"]["observation_classification"] == "simulated_demo"
     assert report["evidence"][1]["evidence_type"] == "HEURISTIC_ESTIMATE"
+    assert "측정값" in export_markdown(report) and "진단 순위" in export_markdown(report)
+    assert "<table>" in export_html(report) and "가설 및 검증 상태" in export_html(report)
+    serialized = export_json(report)
+    assert "operator private memo" not in serialized
+    assert "/Users/alice/private" not in serialized
 
 
 def test_export_security_rejects_paths_outside_root_and_unknown_names(tmp_path: Path) -> None:
@@ -151,6 +169,159 @@ def test_workflow_shows_spice_failure_without_blocking_report() -> None:
     assert steps[4]["status"] == "READY"
 
 
+def test_measurement_provenance_preserves_zero_and_rejects_nonfinite_values() -> None:
+    from circuitcare.fault_ai_ui import _collect_observation
+    assert _collect_observation(False, "VOUT", 0.0, 0.2, "user_measurement") == []
+    assert _collect_observation(True, "VOUT", 0.0, 0.2, "user_measurement")[0]["value"] == 0.0
+    zero = normalize_measurement({"node": "VOUT", "value": 0, "unit": "V", "source": "실제 측정"})
+    assert zero["value"] == 0.0
+    assert zero["source"] == "user_measurement"
+    assert zero["verification_status"] == "USER_REPORTED"
+    assert normalize_measurement({"node": "VOUT", "value": -1, "source": "simulation"})["value"] == -1
+    with pytest.raises(ValueError):
+        normalize_measurement({"node": "VOUT", "value": float("nan"), "source": "unknown"})
+    with pytest.raises(ValueError):
+        normalize_measurement({"node": "VOUT", "value": 1, "uncertainty": -0.1})
+    assert measurement_source_class([zero, {"node": "VIN", "value": 5, "source": "simulation"}]) == "MIXED_SOURCES"
+    assert measurement_source_class([{"node": "VOUT", "value": 0, "source": "mystery"}]) == "unknown"
+
+
+def test_active_measurement_and_what_if_preview_stay_separate(tmp_path: Path) -> None:
+    circuit = Circuit(components={}, connections=[])
+    actual = [{"node": "VOUT", "value": 5.0, "unit": "V", "source": "user_measurement"}]
+    preview = [{"node": "VOUT", "value": 7.9, "unit": "V", "source": "simulated_demo"}]
+    context = {"circuit_hash": "a" * 64, "measurement_set_sha256": measurement_set_sha256(actual),
+               "mode": "ACTIVE_DIAGNOSIS"}
+    report = build_diagnostic_snapshot(root=tmp_path,
+        workspace={"workspace_id": "ws", "circuit_id": "demo", "circuit_hash": "a" * 64,
+                   "netlist_path": "demo.xml", "input_hashes": {}, "validation_status": "READY"},
+        circuit=circuit, fault={"component_ref": "U1", "fault_type": "regulator_output_rise"},
+        simulation_status="NOT_EVALUATED", observations=actual,
+        diagnosis={"status": "ACTIVE_CONDITIONAL", "posterior": [{"hypothesis_id": "h5", "posterior": 1.0}]},
+        diagnosis_context=context,
+        preview_context={"measurement_source": "simulated_demo", "measurement_set_sha256": measurement_set_sha256(preview)},
+        preview_diagnosis={"posterior": [{"hypothesis_id": "h79", "posterior": 1.0}]})
+    assert report["fault_or_symptom"]["observations"][0]["value"] == 5.0
+    assert report["diagnosis"]["posterior"][0]["hypothesis_id"] == "h5"
+    assert report["preview_context"]["status"] == "PREVIEW_ONLY"
+    assert report["preview_diagnosis"]["posterior"][0]["hypothesis_id"] == "h79"
+    assert "MEASUREMENT_DIAGNOSIS_MISMATCH" not in validate_report(report)
+    report["diagnosis_context"]["measurement_set_sha256"] = "f" * 64
+    assert "MEASUREMENT_DIAGNOSIS_MISMATCH" in validate_report(report)
+
+
+def test_simulation_fingerprint_detects_same_size_content_change(tmp_path: Path) -> None:
+    paths = [tmp_path / name for name in ("board.xml", "deck.cir", "mapping.json", "probes.json")]
+    for path in paths:
+        path.write_text("AAAA")
+    fault = {"component_ref": "R1", "fault_type": "resistance_drift", "parameter": "10k"}
+    first = build_simulation_fingerprint(netlist=paths[0], spice_deck=paths[1], component_mapping=paths[2],
+        probes=paths[3], fault=fault, settings={"stop": "10ms"})
+    stat = paths[1].stat()
+    paths[1].write_text("BBBB")
+    import os
+    os.utime(paths[1], ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    changed = build_simulation_fingerprint(netlist=paths[0], spice_deck=paths[1], component_mapping=paths[2],
+        probes=paths[3], fault=fault, settings={"stop": "10ms"})
+    assert verify_cached_fingerprint(first, first)[0] == "VERIFIED"
+    assert verify_cached_fingerprint(first, changed)[0] == "STALE"
+    assert verify_cached_fingerprint(None, changed)[0] == "PROVENANCE_UNVERIFIED"
+    result_dir = tmp_path / "result"
+    result_dir.mkdir()
+    result_file = result_dir / "comparison.json"
+    result_file.write_text("saved")
+    import hashlib
+    manifest = {"fingerprint": first, "result_sha256": {"comparison.json": hashlib.sha256(b"saved").hexdigest()}}
+    assert verify_simulation_manifest(result_dir, manifest, first)[0] == "VERIFIED"
+    result_file.write_text("tampered")
+    assert verify_simulation_manifest(result_dir, manifest, first)[0] == "STALE"
+
+
+def test_legacy_cached_simulation_is_not_reported_as_verified(tmp_path: Path) -> None:
+    report = build_diagnostic_snapshot(root=tmp_path,
+        workspace={"workspace_id": "ws", "circuit_id": "demo", "circuit_hash": "a" * 64,
+                   "netlist_path": "demo.xml", "input_hashes": {}, "validation_status": "READY"},
+        circuit=Circuit(components={}, connections=[]),
+        fault={"component_ref": "U1", "fault_type": "regulator_output_rise", "parameter": "8"},
+        simulation_status="CACHED", comparison={"scenario_id": "S1"},
+        risk_assessment={"scenario_id": "S1", "damage_confirmed": False})
+    assert report["spice_verification"]["status"] == "PROVENANCE_UNVERIFIED"
+    assert report["spice_verification"]["comparison"] is None
+    assert report["secondary_damage_risk"]["status"] == "NOT_EVALUATED"
+
+
+def test_live_ngspice_result_manifest_is_verified_then_detects_tamper(tmp_path: Path) -> None:
+    if not shutil.which("ngspice"):
+        pytest.skip("ngspice is optional; live simulation integration requires the executable")
+    root = Path(__file__).resolve().parents[1]
+    case = {"netlist": "tests/fixtures/fault_demo_netlist.xml", "base": "data/circuits/fault_demo.cir",
+            "mapping": "data/circuits/fault_demo_mapping.json", "probes": "data/circuits/fault_demo_probes.json",
+            "ratings": "data/component_specs/fault_demo_ratings.json"}
+    output = tmp_path / "live-run"
+    command = [sys.executable, "-m", "circuitcare.cli", "--netlist", case["netlist"], "--fault", "R1",
+        "--fault-type", "resistance_drift", "--fault-value", "10k", "--spice-base", case["base"],
+        "--spice-mapping", case["mapping"], "--output", str(output), "--simulate", "--probes", case["probes"],
+        "--ratings", case["ratings"], "--assess-risk"]
+    completed = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=120)
+    from circuitcare.ui import _validate_live_result
+    verified_dir = _validate_live_result(completed, output, "R1", "resistance_drift", case=case, fault_value="10k")
+    fingerprint = build_simulation_fingerprint(netlist=root / case["netlist"], spice_deck=root / case["base"],
+        component_mapping=root / case["mapping"], probes=root / case["probes"],
+        fault={"component_ref": "R1", "fault_type": "resistance_drift", "parameter": "10k"},
+        settings={"engine": "ngspice", "analysis": "transient", "runner": "circuitcare-cli"},
+        ratings=root / case["ratings"])
+    manifest = json.loads((verified_dir / "simulation_context.json").read_text())
+    assert verify_simulation_manifest(verified_dir, manifest, fingerprint)[0] == "VERIFIED"
+    (verified_dir / "comparison.json").write_text("{}")
+    assert verify_simulation_manifest(verified_dir, manifest, fingerprint)[0] == "STALE"
+
+
+def test_report_rejects_cross_scenario_and_cross_component_risk(tmp_path: Path) -> None:
+    report = _report(tmp_path)
+    report["fault_or_symptom"] = {"component_ref": "U1", "fault_type": "regulator_output_rise"}
+    report["spice_verification"] = {"scenario_id": "S1", "comparison": {"scenario_id": "S1"}}
+    report["secondary_damage_risk"] = {"damage_confirmed": False, "scenario_id": "S2", "failed_component": "R1"}
+    errors = validate_report(report)
+    assert "CROSS_SCENARIO_EVIDENCE" in errors
+    assert "SIMULATION_CONTEXT_MISMATCH" in errors
+
+
+def test_bundle_evidence_references_match_included_artifact(tmp_path: Path) -> None:
+    report = _report(tmp_path)
+    report["evidence"][0].update(source_artifact="comparison.json", artifact_sha256=None)
+    artifact = tmp_path / "comparison.json"
+    artifact.write_text('{"scenario_id":"S1"}')
+    bundle = export_bundle(report, root=tmp_path, selected_artifacts={"spice_results.json": artifact})
+    manifest = verify_bundle(bundle)
+    assert manifest["evidence_sources"][0]["included_in_bundle"] is True
+    assert manifest["evidence_sources"][0]["source_artifact"] == "evidence/spice_results.json"
+    with zipfile.ZipFile(BytesIO(bundle)) as archive:
+        contents = {name: archive.read(name) for name in archive.namelist()}
+    contents["evidence/spice_results.json"] = b"tampered"
+    changed = BytesIO()
+    with zipfile.ZipFile(changed, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, value in contents.items():
+            archive.writestr(name, value)
+    with pytest.raises(ValueError, match="hash mismatch"):
+        verify_bundle(changed.getvalue())
+
+
+def test_bundle_verifier_rejects_duplicate_and_traversal_paths() -> None:
+    duplicate = BytesIO()
+    with zipfile.ZipFile(duplicate, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("report.md", "one")
+        archive.writestr("report.md", "two")
+    with pytest.raises(ValueError, match="Duplicate"):
+        verify_bundle(duplicate.getvalue())
+    traversal = BytesIO()
+    with zipfile.ZipFile(traversal, "w") as archive:
+        archive.writestr("../private.txt", "private")
+        archive.writestr("manifest.json", "{}")
+    with pytest.raises(ValueError, match="Unsafe"):
+        verify_bundle(traversal.getvalue())
+
+
 def test_streamlit_app_keeps_original_tabs_and_displays_workspace_reports() -> None:
     pytest.importorskip("streamlit")
     from streamlit.testing.v1 import AppTest
@@ -158,6 +329,7 @@ def test_streamlit_app_keeps_original_tabs_and_displays_workspace_reports() -> N
     script = Path(__file__).resolve().parents[1] / "src/circuitcare/ui.py"
     app = AppTest.from_file(str(script), default_timeout=30).run()
     assert not app.exception
+    assert any("PROVENANCE_UNVERIFIED" in item.value for item in app.markdown)
     labels = [tab.label for tab in app.tabs]
     assert "분석 개요" in labels and "AI 성능 평가" in labels
     assert any(button.label == "Evidence Bundle ZIP" for button in app.download_button)
