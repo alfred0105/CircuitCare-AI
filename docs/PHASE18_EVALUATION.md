@@ -30,8 +30,9 @@
 | Tests | Local Python 3.12 run: `153 passed, 2 warnings`; warning is upstream Pandas deprecation from Streamlit chart utility |
 | Packaging | `python -m pip install -e ".[dev,ui,vision,datasheet]"` succeeded in the local Python 3.12 environment |
 | Static checks | `python -m compileall -q src/circuitcare` and `git diff --check` passed |
+| GitHub Actions | Run [41748230692](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41748230692) succeeded on Ubuntu for Python 3.11 and 3.12, including optional dependency installation and the full test suite |
 
-CI is configured for Ubuntu with Python 3.11 and 3.12. Local execution for this change was on macOS Apple Silicon with Python 3.12.14, Streamlit 1.66.1, and ngspice 47. Windows was not directly exercised. GitHub Actions status is pending the pushed revision and will be recorded before release tagging.
+CI is configured for Ubuntu with Python 3.11 and 3.12. Local execution for this change was on macOS Apple Silicon with Python 3.12.14, Streamlit 1.66.1, and ngspice 47. Windows was not directly exercised. The Phase 18 revision passed GitHub Actions before the final evaluation record update; the final documentation commit is also required to pass CI before release tagging.
 
 Generated examples are in [`examples/phase18_demo/`](../examples/phase18_demo/). They describe a cached synthetic SPICE demo, not a physical repair. The separate live smoke run was a synthetic fault deck and does not establish physical accuracy. Ollama was installed locally but was not invoked during report generation.
 
