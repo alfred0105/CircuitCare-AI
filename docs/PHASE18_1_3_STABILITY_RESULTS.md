@@ -33,8 +33,8 @@ The full suite ran on Python 3.12 only. Earlier local measurements from this run
 | HARNESS_VERIFIED | PASS |
 | OLLAMA_CHAT_VERIFIED | PASS (real local client fallback path) |
 | SPICE_VERIFIED | PASS for direct CLI/native repeats; browser child launch needs clean rerun |
-| NATIVE_VISION_VERIFIED | PARTIAL (synthetic board detection runtime only; no OCR/reference end-to-end accuracy claim) |
-| BROWSER_E2E_VERIFIED | PASS for known-fault simulation, JSON report download, and Vision view switch |
+| NATIVE_VISION_VERIFIED | PASS for isolated ONNX/OCR inference and browser upload/rectification/inference panel; no accuracy claim and no complete Reference/overlay flow |
+| BROWSER_E2E_VERIFIED | PARTIAL (known fault, measured hypothesis candidate, report download, context switch pass; Vision Reference/overlay and datasheet approval/reassessment incomplete) |
 | CONCURRENT_SESSION_VERIFIED | PARTIAL (separate circuit selections in 2 concurrent browser contexts; heavy tasks not concurrent) |
 | MEMORY_STABILITY_VERIFIED | PARTIAL (bounded repeats and samples; mixed workload passed without ONNX; not a long-duration soak) |
 | CRASH_ROOT_CAUSE_IDENTIFIED | PASS for captured at-fork SIGSEGV and affected call sites; relationship to any earlier report remains unconfirmed |

@@ -8,8 +8,11 @@ Environment: macOS 27.0.1, Apple Silicon arm64, Python 3.12.14, local Streamlit 
 |---|---|---|
 | Streamlit startup | PASS | Browser title `CircuitCare AI`; health endpoint returned 200. |
 | Known fault, browser-triggered ngspice | PASS after fix | Fresh Streamlit process launched the divider fault; comparison, risk, and simulation-context artifacts were created. The UI did not reuse a saved result. |
+| Measurement-based fault AI | PASS for exercised candidate | A `VOUT=0.2 V` simulated-demo observation was submitted; local LLM metadata appeared, executable hypotheses were shown, and the selected candidate reached `SIMULATION_SUCCESS`. It remains a proposal and a simulated observation, not a confirmed real fault. |
 | Report JSON download | PASS | Browser downloaded non-empty JSON (24,131 bytes after the successful live run). |
-| Direct Vision view switch | PASS | Browser selected `PCB 사진 인식`; no page errors. |
+| Vision upload and inference UI | PARTIAL | A synthetic PCB image uploaded. Automatic board candidate detection found none, so the user-confirmed manual corner fallback was used; rectification, local ONNX/OCR output panel, and inference JSON download completed without page errors. No KiCad position CSV was uploaded, so Reference confirmation and risk overlay were not exercised. |
+| Datasheet PDF and proposal | PARTIAL | A synthetic text PDF parsed in the worker and a local LLM rating proposal appeared. No approval or risk reassessment was made because the synthetic document does not prove a real component MPN. |
+| Context switching | PASS | One browser session selected circuit A → circuit B → circuit A and retained each selection without page errors. |
 | Two browser sessions | PASS, limited | Two isolated Chromium contexts retained different circuit selections simultaneously. This did not run SPICE/PDF/ONNX tasks concurrently. |
 | 100-view AppTest soak | PASS | 100 switches over 4 case choices and 11 views; warm-up RSS 164.56 MiB, samples: switch 10 201.17 MiB, switch 50 230.53 MiB, switch 100 218.98 MiB. |
 
@@ -26,7 +29,7 @@ The first browser runs exposed a real `-11` child crash. A macOS DiagnosticRepor
 
 ## Not completed
 
-- Browser end-to-end for unknown-fault AI, complete Vision/OCR, and datasheet approval/risk reassessment.
+- Complete Vision/OCR including KiCad Reference confirmation and risk overlay; datasheet approval and risk reassessment against genuine component evidence.
 - Simultaneous user sessions running Circuit A SPICE, Circuit B PDF, and Vision/ONNX at once. Only separate circuit selection state across two concurrent browser contexts was checked.
 - Mixed Ollama + ngspice + PDF worker + Streamlit health workload passed in parallel (4.1 seconds); ONNX was not included in that mixed run.
 - Ollama soak beyond the bounded direct requests already recorded.
