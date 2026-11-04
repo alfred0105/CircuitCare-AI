@@ -22,12 +22,45 @@ def test_csv_download_cache_is_bounded_and_invalidates_on_content_change(tmp_pat
     _cached_download_bytes.cache_clear()
     path.write_bytes(b"time,value\n0,1\n")
     first_digest = _download_file_digest(path)
-    assert _cached_download_bytes(str(path), first_digest) == path.read_bytes()
+    assert _cached_download_bytes(str(path), first_digest, "context-a") == path.read_bytes()
     path.write_bytes(b"time,value\n0,2\n")
     second_digest = _download_file_digest(path)
     assert second_digest != first_digest
-    assert _cached_download_bytes(str(path), second_digest) == path.read_bytes()
+    assert _cached_download_bytes(str(path), second_digest, "context-a") == path.read_bytes()
     assert _cached_download_bytes.cache_info().maxsize == 4
+
+
+def test_csv_download_cache_is_context_scoped_and_detects_racing_change(tmp_path, monkeypatch):
+    path = tmp_path / "comparison.csv"
+    path.write_bytes(b"a,b\n1,2\n")
+    digest = _download_file_digest(path)
+    _cached_download_bytes.cache_clear()
+    assert _cached_download_bytes(str(path), digest, "circuit-a") == path.read_bytes()
+    assert _cached_download_bytes(str(path), digest, "circuit-b") == path.read_bytes()
+    assert _cached_download_bytes.cache_info().misses == 2
+
+    _cached_download_bytes.cache_clear()
+    original_open = type(path).open
+
+    def mutate_after_open(target, *args, **kwargs):
+        opened = original_open(target, *args, **kwargs)
+        if target == path and args and args[0] == "rb":
+            target.write_bytes(b"a,b\n3,4\n")
+        return opened
+
+    monkeypatch.setattr(type(path), "open", mutate_after_open)
+    with pytest.raises(ValueError, match="changed"):
+        _cached_download_bytes(str(path), digest, "circuit-a")
+
+
+def test_csv_download_size_limit_is_enforced(tmp_path):
+    from circuitcare.ui import MAX_DOWNLOAD_CSV_BYTES
+
+    path = tmp_path / "large.csv"
+    with path.open("wb") as output:
+        output.truncate(MAX_DOWNLOAD_CSV_BYTES + 1)
+    with pytest.raises(ValueError, match="64 MiB"):
+        _download_file_digest(path)
 
 
 def test_ui_context_and_measurement_updates_are_isolated():

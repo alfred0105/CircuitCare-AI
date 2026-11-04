@@ -8,11 +8,11 @@ import datetime as dt
 import json
 import os
 import platform
-import resource
 import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -27,9 +27,24 @@ SUITES = {
 
 def _disable_core_dumps() -> None:
     if os.name == "posix":
+        import resource
+
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        resource.setrlimit(resource.RLIMIT_FSIZE,
-                           (MAX_DIAGNOSTIC_LOG_BYTES, MAX_DIAGNOSTIC_LOG_BYTES))
+
+
+def _copy_bounded_log(source, path: Path) -> bool:
+    """Drain child output completely while retaining at most the configured log bytes."""
+    written = 0
+    truncated = False
+    with path.open("wb") as output:
+        while block := source.read(64 * 1024):
+            remaining = MAX_DIAGNOSTIC_LOG_BYTES - written
+            if remaining > 0:
+                output.write(block[:remaining])
+                written += min(len(block), remaining)
+            if len(block) > remaining:
+                truncated = True
+    return truncated
 
 
 def _probe_import(module: str, timeout: float = 20) -> dict:
@@ -158,30 +173,39 @@ def _run(name: str, command: list[str], output_dir: Path, timeout: int) -> dict:
     peak_rss = None
     baseline_rss = None
     final_rss = None
-    with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-        child_environment = os.environ.copy()
-        child_environment["CIRCUITCARE_DIAGNOSTICS_DIR"] = str(output_dir.resolve())
-        process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr, env=child_environment,
-                                   start_new_session=(os.name == "posix"),
-                                   preexec_fn=_disable_core_dumps if os.name == "posix" else None)
-        timed_out = False
-        try:
-            # Let the interpreter exec and become visible in ps before recording its first sample.
-            time.sleep(0.05)
-            baseline_rss = _process_tree_rss_bytes(process.pid)
-            while process.poll() is None:
-                current_rss = _process_tree_rss_bytes(process.pid)
-                if current_rss is not None:
-                    peak_rss = max(peak_rss or 0, current_rss)
-                    final_rss = current_rss
-                if time.monotonic() - started > timeout:
-                    timed_out = True
-                    _terminate_tree(process)
-                    break
-                time.sleep(0.1)
-            exit_code = process.wait()
-        finally:
-            _terminate_tree(process)
+    child_environment = os.environ.copy()
+    child_environment["CIRCUITCARE_DIAGNOSTICS_DIR"] = str(output_dir.resolve())
+    process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               env=child_environment, start_new_session=(os.name == "posix"),
+                               preexec_fn=_disable_core_dumps if os.name == "posix" else None)
+    stdout_result: list[bool] = []
+    stderr_result: list[bool] = []
+    stdout_thread = threading.Thread(target=lambda: stdout_result.append(
+        _copy_bounded_log(process.stdout, stdout_path)), daemon=True)
+    stderr_thread = threading.Thread(target=lambda: stderr_result.append(
+        _copy_bounded_log(process.stderr, stderr_path)), daemon=True)
+    stdout_thread.start()
+    stderr_thread.start()
+    timed_out = False
+    try:
+        # Let the interpreter exec and become visible in ps before recording its first sample.
+        time.sleep(0.05)
+        baseline_rss = _process_tree_rss_bytes(process.pid)
+        while process.poll() is None:
+            current_rss = _process_tree_rss_bytes(process.pid)
+            if current_rss is not None:
+                peak_rss = max(peak_rss or 0, current_rss)
+                final_rss = current_rss
+            if time.monotonic() - started > timeout:
+                timed_out = True
+                _terminate_tree(process)
+                break
+            time.sleep(0.1)
+        exit_code = process.wait()
+    finally:
+        _terminate_tree(process)
+        stdout_thread.join(timeout=3)
+        stderr_thread.join(timeout=3)
     elapsed = time.monotonic() - started
     final_rss = _process_tree_rss_bytes(process.pid) or final_rss
     sig = -exit_code if exit_code < 0 else None
@@ -190,6 +214,7 @@ def _run(name: str, command: list[str], output_dir: Path, timeout: int) -> dict:
     signal_name = signal.Signals(sig).name if sig and sig in signal.Signals._value2member_map_ else sig
     termination = ("TIMEOUT" if status == "TIMEOUT" else "NORMAL_EXIT" if exit_code == 0
                    else "CHILD_PROCESS_SIGSEGV" if signal_name == "SIGSEGV"
+                   else "CHILD_PROCESS_SIGTERM" if signal_name == "SIGTERM"
                    else "PROCESS_KILLED" if signal_name == "SIGKILL"
                    else "PYTHON_EXCEPTION" if "Traceback (most recent call last)" in stderr_text
                    else "CHILD_PROCESS_FAILURE" if exit_code != 0 else "UNKNOWN_TERMINATION")
@@ -204,6 +229,9 @@ def _run(name: str, command: list[str], output_dir: Path, timeout: int) -> dict:
             "architecture": platform.machine(), "working_directory": str(ROOT), "git_sha": _git_sha(),
             "last_started_stage": name, "last_completed_stage": name if exit_code == 0 else None,
             "max_stdout_or_stderr_bytes": MAX_DIAGNOSTIC_LOG_BYTES,
+            "stdout_truncated": stdout_result[0] if stdout_result else False,
+            "stderr_truncated": stderr_result[0] if stderr_result else False,
+            "log_status": "LOG_TRUNCATED" if any(stdout_result + stderr_result) else "COMPLETE",
             "wall_time_seconds": round(elapsed, 3), "baseline_rss_mb": round(baseline_rss / 1048576, 2) if baseline_rss else None,
             "peak_rss_mb": round(peak_rss / 1048576, 2) if peak_rss else None,
             "final_rss_mb": round(final_rss / 1048576, 2) if final_rss else None,

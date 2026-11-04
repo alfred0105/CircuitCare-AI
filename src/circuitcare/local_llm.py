@@ -47,6 +47,7 @@ class OllamaClient:
             "options": {"temperature": 0.1, "num_predict": 1300},
         }
         json_mode = True
+        fallback_reason = None
         try:
             response = self._request("POST", "/api/chat", body)
         except LocalLLMError as exc:
@@ -56,6 +57,7 @@ class OllamaClient:
             # The system prompt still requires JSON, which is parsed and validated below.
             body.pop("format", None)
             json_mode = False
+            fallback_reason = "structured_output_unavailable"
             response = self._request("POST", "/api/chat", body)
         message = response.get("message")
         content = message.get("content") if isinstance(message, dict) else None
@@ -84,6 +86,8 @@ class OllamaClient:
                 "details": model_info.get("details", {}),
             },
             "json_mode": json_mode,
+            "fallback_used": fallback_reason is not None,
+            "fallback_reason": fallback_reason,
             "done": response.get("done"),
             "done_reason": response.get("done_reason"),
             "total_duration_ns": response.get("total_duration"),

@@ -12,7 +12,7 @@ import pytest
 
 from circuitcare.reporting.exporters import export_bundle, export_html, export_json, export_markdown
 from circuitcare.reporting.report_builder import classify_parameter_grid_coverage
-from circuitcare.reporting.report_builder import build_diagnostic_snapshot
+from circuitcare.reporting.report_builder import _git_sha, build_diagnostic_snapshot
 from circuitcare.models import Circuit
 from circuitcare.reporting.report_validator import validate_report, verify_bundle
 from circuitcare.workspace.context import build_workspace_context, store_uploaded_netlist
@@ -369,3 +369,17 @@ def test_streamlit_app_keeps_original_tabs_and_displays_workspace_reports() -> N
     selector.select("KiCad XML 업로드 (연결 그래프 전용)").run()
     assert not app.exception
     assert any("KiCad XML을 올리면" in item.value for item in app.info)
+
+
+def test_git_sha_reads_checkout_metadata_without_subprocess(tmp_path, monkeypatch):
+    git_dir = tmp_path / ".git"
+    (git_dir / "refs/heads").mkdir(parents=True)
+    sha = "a" * 40
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="ascii")
+    (git_dir / "refs/heads/main").write_text(sha + "\n", encoding="ascii")
+
+    def reject_subprocess(*args, **kwargs):
+        raise AssertionError("report rendering must not spawn git")
+
+    monkeypatch.setattr("subprocess.run", reject_subprocess)
+    assert _git_sha(tmp_path) == sha

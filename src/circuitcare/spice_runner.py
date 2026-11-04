@@ -2,7 +2,6 @@
 
 import csv
 import math
-import os
 import re
 import shutil
 import subprocess
@@ -54,9 +53,9 @@ def run_ngspice(
     program = shutil.which(executable)
     if program is None:
         raise SimulationError(f"ngspice executable {executable!r} was not found")
-    source_path = Path(circuit_path)
+    source_path = Path(circuit_path).resolve()
     source = source_path.read_text(encoding="utf-8")
-    output = Path(output_dir)
+    output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     safe_name = _safe_name(run_name)
     runner_path = output / f"{safe_name}.runner.cir"
@@ -74,7 +73,7 @@ def run_ngspice(
     vector_columns = {f"v({node})".casefold(): f"voltage:{node}" for node in voltage_nodes}
     vector_columns.update({f"i({element})".casefold(): f"current:{reference}" for reference, element in current_elements})
 
-    runner_text = _instrument_deck(source, raw_path.name, expressions)
+    runner_text = _instrument_deck(source, str(raw_path), expressions)
     runner_path.write_text(runner_text, encoding="utf-8")
     attempts: list[tuple[int, Path, Path]] = []
     max_attempts = 2
@@ -85,8 +84,11 @@ def run_ngspice(
         stderr_path = output / f"{safe_name}.attempt{attempt + 1}.stderr"
         try:
             with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-                completed = subprocess.run([program, "-b", "-o", attempt_log.name, runner_path.name],
-                    cwd=output, stdout=stdout_file, stderr=stderr_file, timeout=timeout_seconds, check=False)
+                # Absolute paths and close_fds=False select posix_spawn on macOS;
+                # forking from native-library threads was observed to SIGSEGV.
+                completed = subprocess.run([program, "-b", "-o", str(attempt_log), str(runner_path)],
+                    stdout=stdout_file, stderr=stderr_file, timeout=timeout_seconds, check=False,
+                    close_fds=False)
         except subprocess.TimeoutExpired as exc:
             _preserve_attempt_logs(log_path, attempts + [(attempt + 1, attempt_log, None),
                                                            (attempt + 1, stdout_path, None),

@@ -157,7 +157,7 @@ def main() -> None:
         output.mkdir(parents=True, exist_ok=True)
         active_marker = output / ".circuitcare-active"
         active_marker.write_text(str(__import__("os").getpid()), encoding="ascii")
-        cmd = [sys.executable, "-m", "circuitcare.cli", "--netlist", str(netlist_path), "--fault", selected_fault,
+        cmd = [sys.executable, "-X", "faulthandler", "-m", "circuitcare.cli", "--netlist", str(netlist_path), "--fault", selected_fault,
                "--fault-type", fault_type, "--spice-base", str(ROOT / case["base"]),
                "--spice-mapping", str(ROOT / case["mapping"]), "--output", str(output), "--simulate", "--probes", str(ROOT / case["probes"]),
                "--ratings", str(ROOT / case["ratings"]), "--assess-risk"]
@@ -165,7 +165,10 @@ def main() -> None:
             cmd.extend(["--fault-value", fault_value])
         with st.spinner("Fault Injection → ngspice → stress/rating assessment 실행 중…"):
             try:
-                completed = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=180, check=False)
+                # Absolute paths plus close_fds=False select posix_spawn on macOS;
+                # fork from Streamlit's multithreaded runtime was observed to SIGSEGV.
+                completed = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
+                                           check=False, close_fds=False)
                 result_dir = _validate_live_result(completed, output, selected_fault, fault_type,
                                                    case=case, fault_value=fault_value if needs_value else None)
                 st.session_state.live_result_dir = str(result_dir)
@@ -262,6 +265,7 @@ def main() -> None:
     active_view = st.selectbox("분석 영역", views, key="active_analysis_view")
     client, models = _ollama_models() if active_view in {views[5], views[7], views[8]} else (None, [])
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Local LLM은 해당 영역을 열 때 확인합니다")
+    what_if_result = None
     if active_view == views[0]:
         what_if_result = _render_analysis_overview(
             st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
@@ -988,25 +992,58 @@ def _downloads(st, case, result_dir, comparison, risk, diagnosis, selected_fault
             st.download_button("Bayesian 진단 JSON", json.dumps(diagnosis["diagnosis"], ensure_ascii=False, indent=2), "diagnosis.json", "application/json")
         csv_path = result_dir / "comparison.csv"
         if csv_path.is_file():
-            digest = _download_file_digest(csv_path)
-            st.download_button("시뮬레이션 CSV", _cached_download_bytes(str(csv_path), digest), "comparison.csv", "text/csv")
+            download_context = hashlib.sha256(json.dumps(
+                {"circuit": case.get("netlist"), "fault": selected_fault,
+                 "fault_type": fault_type, "fault_value": fault_value},
+                sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+            try:
+                digest = _download_file_digest(csv_path)
+                try:
+                    data = _cached_download_bytes(str(csv_path), digest, download_context)
+                except ValueError:
+                    # The file changed between hashing and reading; refresh the snapshot once.
+                    digest = _download_file_digest(csv_path)
+                    data = _cached_download_bytes(str(csv_path), digest, download_context)
+                st.download_button("시뮬레이션 CSV", data, "comparison.csv", "text/csv")
+            except (OSError, ValueError) as exc:
+                st.warning(f"CSV 파일이 바뀌었거나 다운로드 한도를 넘었습니다. 다시 실행해 주세요. ({exc})")
         report = ["# CircuitCare AI Analysis", "", f"- Circuit: {case['netlist']}", f"- Fault: {selected_fault} / {fault_type} / {fault_value or 'n/a'}", f"- Simulation source: {'live' if 'ui_runs' in str(result_dir) else ('cached' if comparison else 'unsupported or not run')}", "- Ratings are explicit inputs; demo assumptions are not datasheet facts.", "- UNKNOWN does not mean safe; priority scores are not failure probabilities.", "- Physical damage is not confirmed."]
         st.download_button("통합 Markdown 보고서", "\n".join(report), "circuitcare_report.md", "text/markdown")
 
 
+MAX_DOWNLOAD_CSV_BYTES = 64 * 1024 * 1024
+
+
 @lru_cache(maxsize=4)
-def _cached_download_bytes(path: str, digest: str) -> bytes:
-    """Keep at most four unchanged CSV download payloads across Streamlit reruns."""
-    data = Path(path).read_bytes()
-    if hashlib.sha256(data).hexdigest() != digest:
-        return Path(path).read_bytes()
+def _cached_download_bytes(path: str, digest: str, context_key: str) -> bytes:
+    """Cache a bounded, immutable CSV snapshot for one analysis context and content hash."""
+    del context_key  # Part of the cache key to prevent cross-context reuse.
+    csv_path = Path(path)
+    before = csv_path.stat()
+    if before.st_size > MAX_DOWNLOAD_CSV_BYTES:
+        raise ValueError("CSV exceeds the 64 MiB download limit")
+    with csv_path.open("rb") as source:
+        data = source.read(MAX_DOWNLOAD_CSV_BYTES + 1)
+    if len(data) > MAX_DOWNLOAD_CSV_BYTES:
+        raise ValueError("CSV exceeds the 64 MiB download limit")
+    after = csv_path.stat()
+    stable = (before.st_size == after.st_size and before.st_mtime_ns == after.st_mtime_ns
+              and getattr(before, "st_ino", 0) == getattr(after, "st_ino", 0))
+    if not stable or len(data) != after.st_size or hashlib.sha256(data).hexdigest() != digest:
+        raise ValueError("CSV changed while its download snapshot was being prepared")
     return data
 
 
 def _download_file_digest(path: Path) -> str:
+    if path.stat().st_size > MAX_DOWNLOAD_CSV_BYTES:
+        raise ValueError("CSV exceeds the 64 MiB download limit")
     digest = hashlib.sha256()
+    total = 0
     with path.open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            total += len(chunk)
+            if total > MAX_DOWNLOAD_CSV_BYTES:
+                raise ValueError("CSV exceeds the 64 MiB download limit")
             digest.update(chunk)
     return digest.hexdigest()
 

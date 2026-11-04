@@ -1,8 +1,9 @@
 """Bounded local PDF text and optional table extraction."""
 from __future__ import annotations
+
+import copy
 import hashlib
 import io
-import copy
 from collections import OrderedDict
 from typing import Any
 
@@ -40,22 +41,19 @@ def _cache_put(cache: OrderedDict, key: tuple, value: Any) -> None:
 class DatasheetError(ValueError):
     """Invalid, unsupported, or over-limit local PDF."""
 
-def load_pdf(data: bytes, filename: str, *, max_bytes: int = MAX_PDF_BYTES, max_pages: int = MAX_PDF_PAGES) -> dict[str, Any]:
+def _validate_pdf(data: bytes, max_bytes: int) -> str:
     if not isinstance(data, bytes) or not data:
         raise DatasheetError("The uploaded PDF is empty.")
     if len(data) > max_bytes:
         raise DatasheetError(f"PDF exceeds the {max_bytes // (1024 * 1024)} MiB size limit.")
     if not data.startswith(b"%PDF-"):
         raise DatasheetError("The uploaded file does not have a PDF signature.")
-    digest = hashlib.sha256(data).hexdigest()
-    cache_key = (digest, PARSER_VERSION, max_bytes, max_pages)
-    if cache_key in _document_cache:
-        _cache_stats["document_hits"] += 1
-        _document_cache.move_to_end(cache_key)
-        document = copy.deepcopy(_document_cache[cache_key])
-        document["filename"] = filename
-        return document
-    _cache_stats["document_misses"] += 1
+    return hashlib.sha256(data).hexdigest()
+
+
+def _load_pdf_local(data: bytes, filename: str, *, max_bytes: int = MAX_PDF_BYTES,
+                    max_pages: int = MAX_PDF_PAGES) -> dict[str, Any]:
+    digest = _validate_pdf(data, max_bytes)
     try:
         from pypdf import PdfReader
     except ImportError as exc:
@@ -89,17 +87,9 @@ def load_pdf(data: bytes, filename: str, *, max_bytes: int = MAX_PDF_BYTES, max_
             "page_count": len(pages), "metadata": metadata, "pages": pages,
             "text_status": "TEXT_EXTRACTED" if extracted else "OCR_REQUIRED", "pages_with_text": extracted,
             "truncated_by_text_limit": total_chars >= MAX_EXTRACTED_TEXT_CHARS}
-    _cache_put(_document_cache, cache_key, result)
     return result
 
-def extract_pdf_tables(data: bytes) -> list[dict[str, Any]]:
-    digest = hashlib.sha256(data).hexdigest()
-    cache_key = (digest, PARSER_VERSION, MAX_TABLE_CELLS)
-    if cache_key in _table_cache:
-        _cache_stats["table_hits"] += 1
-        _table_cache.move_to_end(cache_key)
-        return copy.deepcopy(_table_cache[cache_key])
-    _cache_stats["table_misses"] += 1
+def _extract_pdf_tables_local(data: bytes) -> list[dict[str, Any]]:
     try:
         import pdfplumber
     except ImportError:
@@ -129,7 +119,44 @@ def extract_pdf_tables(data: bytes) -> list[dict[str, Any]]:
                         break
                 if cells_used >= MAX_TABLE_CELLS or len(tables) >= MAX_TABLES:
                     break
-        _cache_put(_table_cache, cache_key, tables)
         return tables
     except Exception as exc:
         raise DatasheetError(f"PDF table extraction failed: {exc}") from exc
+
+
+def load_pdf(data: bytes, filename: str, *, max_bytes: int = MAX_PDF_BYTES,
+             max_pages: int = MAX_PDF_PAGES) -> dict[str, Any]:
+    digest = _validate_pdf(data, max_bytes)
+    cache_key = (digest, PARSER_VERSION, max_bytes, max_pages)
+    if cache_key in _document_cache:
+        _cache_stats["document_hits"] += 1
+        _document_cache.move_to_end(cache_key)
+        document = copy.deepcopy(_document_cache[cache_key])
+        document["filename"] = filename
+        return document
+    _cache_stats["document_misses"] += 1
+    from .pdf_supervisor import run_pdf_worker
+    document, worker = run_pdf_worker(data, "document", filename=filename,
+                                      max_bytes=max_bytes, max_pages=max_pages)
+    if document.get("sha256") != digest or not isinstance(document.get("pages"), list):
+        raise DatasheetError("PDF worker returned an invalid or mismatched document result.")
+    document["worker"] = worker
+    _cache_put(_document_cache, cache_key, document)
+    return document
+
+
+def extract_pdf_tables(data: bytes) -> list[dict[str, Any]]:
+    digest = _validate_pdf(data, MAX_PDF_BYTES)
+    cache_key = (digest, PARSER_VERSION, MAX_TABLE_CELLS)
+    if cache_key in _table_cache:
+        _cache_stats["table_hits"] += 1
+        _table_cache.move_to_end(cache_key)
+        return copy.deepcopy(_table_cache[cache_key])
+    _cache_stats["table_misses"] += 1
+    from .pdf_supervisor import run_pdf_worker
+    tables, _worker = run_pdf_worker(data, "tables", max_bytes=MAX_PDF_BYTES,
+                                     max_pages=MAX_PDF_PAGES)
+    if not isinstance(tables, list):
+        raise DatasheetError("PDF worker returned an invalid table result.")
+    _cache_put(_table_cache, cache_key, tables)
+    return tables

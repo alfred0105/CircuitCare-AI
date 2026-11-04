@@ -165,14 +165,15 @@ def test_ngspice_single_sigsegv_retry_preserves_failed_attempt_log(tmp_path: Pat
     deck.write_text("Demo\nV1 out 0 5\n.tran 1n 2n\n.end\n", encoding="utf-8")
     calls = []
 
-    def fake_run(command, *, cwd, **kwargs):
+    def fake_run(command, **kwargs):
         calls.append(command)
-        log = Path(cwd) / command[command.index("-o") + 1]
+        log = Path(command[command.index("-o") + 1])
+        assert kwargs["close_fds"] is False
         if len(calls) == 1:
             log.write_text("first attempt crashed\n", encoding="utf-8")
             return subprocess.CompletedProcess(command, -11)
         log.write_text("retry succeeded\n", encoding="utf-8")
-        (Path(cwd) / "sim.wrdata").write_text("time v(out)\n0 4.9\n1 5.0\n", encoding="utf-8")
+        (tmp_path / "sim.wrdata").write_text("time v(out)\n0 4.9\n1 5.0\n", encoding="utf-8")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(spice_runner.shutil, "which", lambda _program: "/fake/ngspice")
@@ -190,8 +191,9 @@ def test_ngspice_two_sigsegv_attempts_fail_and_preserve_both_logs(tmp_path: Path
     deck = tmp_path / "input.cir"
     deck.write_text("Demo\nV1 out 0 5\n.tran 1n 2n\n.end\n", encoding="utf-8")
 
-    def fake_run(command, *, cwd, **kwargs):
-        Path(cwd, command[command.index("-o") + 1]).write_text("segfault log\n", encoding="utf-8")
+    def fake_run(command, **kwargs):
+        assert kwargs["close_fds"] is False
+        Path(command[command.index("-o") + 1]).write_text("segfault log\n", encoding="utf-8")
         return subprocess.CompletedProcess(command, -11)
 
     monkeypatch.setattr(spice_runner.shutil, "which", lambda _program: "/fake/ngspice")
@@ -211,8 +213,9 @@ def test_ngspice_timeout_is_failure_and_preserves_attempt_logs(tmp_path: Path, m
     deck = tmp_path / "input.cir"
     deck.write_text("Demo\nV1 out 0 5\n.tran 1n 2n\n.end\n", encoding="utf-8")
 
-    def fake_run(command, *, cwd, **kwargs):
-        Path(cwd, command[command.index("-o") + 1]).write_text("started\n", encoding="utf-8")
+    def fake_run(command, **kwargs):
+        assert kwargs["close_fds"] is False
+        Path(command[command.index("-o") + 1]).write_text("started\n", encoding="utf-8")
         raise subprocess.TimeoutExpired(command, timeout=0.01)
 
     monkeypatch.setattr(spice_runner.shutil, "which", lambda _program: "/fake/ngspice")

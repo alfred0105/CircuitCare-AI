@@ -8,6 +8,16 @@ from pathlib import Path
 import pytest
 
 
+def test_direct_vision_view_switch_keeps_app_live():
+    pytest.importorskip("streamlit")
+    from streamlit.testing.v1 import AppTest
+
+    root = Path(__file__).resolve().parents[1]
+    app = AppTest.from_file(str(root / "src/circuitcare/ui.py"), default_timeout=30).run()
+    next(widget for widget in app.selectbox if widget.key == "active_analysis_view").select("PCB 사진 인식").run()
+    assert not app.exception
+
+
 @pytest.mark.stress
 def test_streamlit_twenty_circuit_switches_keep_app_live():
     pytest.importorskip("streamlit")

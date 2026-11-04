@@ -6,21 +6,44 @@ import hashlib
 import json
 import platform
 import re
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from circuitcare.workspace.measurement_provenance import (
-    measurement_set_sha256, measurement_source_class, normalize_measurements,
+    measurement_set_sha256,
+    measurement_source_class,
+    normalize_measurements,
 )
 
+
 def _git_sha(root: Path) -> str | None:
+    """Read the checkout revision without spawning a child during UI reruns."""
     try:
-        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True,
-                              capture_output=True, text=True, timeout=2).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
+        git_dir = root / ".git"
+        if git_dir.is_file():
+            pointer = git_dir.read_text(encoding="utf-8").strip()
+            if not pointer.startswith("gitdir:"):
+                return None
+            git_dir = (root / pointer.partition(":")[2].strip()).resolve()
+        head = (git_dir / "HEAD").read_text(encoding="ascii").strip()
+        if re.fullmatch(r"[0-9a-fA-F]{40,64}", head):
+            return head
+        if not head.startswith("ref: "):
+            return None
+        ref = head[5:]
+        ref_path = git_dir / ref
+        if ref_path.is_file():
+            sha = ref_path.read_text(encoding="ascii").strip()
+            return sha if re.fullmatch(r"[0-9a-fA-F]{40,64}", sha) else None
+        for line in (git_dir / "packed-refs").read_text(encoding="ascii").splitlines():
+            if line and not line.startswith(("#", "^")):
+                sha, packed_ref = line.split(" ", 1)
+                if packed_ref == ref and re.fullmatch(r"[0-9a-fA-F]{40,64}", sha):
+                    return sha
+    except (OSError, ValueError):
         return None
+    return None
 
 
 def _portable_artifact(value: Any, key: str = "") -> Any:
