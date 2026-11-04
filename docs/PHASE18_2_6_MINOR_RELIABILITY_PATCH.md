@@ -33,5 +33,7 @@ Manifest 스키마, 기존 JSON 결과 키, Fingerprint 구조는 유지한다. 
 - mypy: `NOT_VERIFIED` (로컬 가상환경에 mypy 실행 파일이 없음)
 - Crash injection: `NOT_VERIFIED` (저장소 지침대로 격리 CI 환경에서만 실행)
 - 브라우저: 별도 포트 8503에서 앱 로드 확인. 라이브 시뮬레이션/CSV 변조/다운로드 브라우저 E2E는 `NOT_VERIFIED`; 이 경계는 회귀 테스트와 ngspice Integration으로 확인.
-- GitHub Actions: `NOT_VERIFIED` (commit/push 후 확인 예정)
-- 완료 여부: CI 확인 대기
+- GitHub Actions: PASS — run [41837419673](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41837419673), all six jobs passed (Python 3.11, Python 3.12, ngspice integration, OCR, bounded stress, isolated crash injection).
+- 구현 커밋: `40bed6f91b710556a9c0333c56b86a6bcc5c8653` (pushed to `main`).
+- 이 범위에서는 새 P0/P1 문제가 발견되지 않았다. 이전 Repository Audit의 PDF resource isolation P1과 기존 종료 보고서의 원인 미확정 상태는 이 패치의 범위 밖에 남아 있다.
+- Phase 18.2.6 완료. Phase 18 hotfix 작업의 종료는 가능하지만, 저장소 전체의 `RELEASE_STABILITY_VERIFIED`는 기존 P1 및 미검증 브라우저 혼합 부하 경로가 남아 있어 계속 `NOT_VERIFIED`로 둔다.
