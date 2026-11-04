@@ -21,7 +21,7 @@
 | Coverage | 62% (8,122 statements, 3,048 missed) |
 | Ruff | 178 repository-wide findings; mostly pre-existing style/import/shebang findings. No broad autofix applied. |
 | Mypy | 166 repository-wide errors across 33 files; no broad type rewrite applied. |
-| Python 3.11 / 3.12 CI | Not yet verified for this commit. |
+| Python 3.11 / 3.12 CI | PASS on both versions; all 6 jobs passed (Python 3.11, Python 3.12, ngspice integration, native OCR inference, bounded stress, isolated crash injection). [GitHub Actions run #41794469574](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41794469574). |
 
 The full suite ran on Python 3.12 only. Earlier local measurements from this run included 100 AppTest view switches, 20 ngspice repeats, 20 PDF cache loads, and 30 synthetic board detections. RSS observations are samples; they do not prove a memory leak or its absence.
 

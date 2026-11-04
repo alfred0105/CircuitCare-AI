@@ -32,3 +32,5 @@ The first browser runs exposed a real `-11` child crash. A macOS DiagnosticRepor
 - Ollama soak beyond the bounded direct requests already recorded.
 
 Raw output and diagnostic records are local-only and excluded from Git.
+
+GitHub Actions run #41794469574 completed successfully on commit `5853c4e01e78b2df21081c0edd8e950ded9f8b2c`; all six configured jobs passed, including Python 3.11/3.12, ngspice, OCR, stress, and isolated crash injection.
