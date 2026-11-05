@@ -29,6 +29,9 @@ circuitcare-advise = "circuitcare.repair_cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+circuitcare = ["schematic/assets/*.html", "schematic/assets/*.css", "schematic/assets/*.js"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

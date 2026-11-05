@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -46,11 +47,19 @@ def _svg_safe(path: Path) -> bool:
     except (ET.ParseError, OSError):
         return False
     for element in root.iter():
-        if element.tag.rsplit("}", 1)[-1].lower() in {"script", "foreignobject"}:
+        if element.tag.rsplit("}", 1)[-1].lower() in {"script", "foreignobject", "iframe", "object", "embed"}:
             return False
+        if element.tag.rsplit("}", 1)[-1].lower() == "style":
+            style_text = "".join(element.itertext()).lower()
+            if "@import" in style_text or re.search(r"url\(\s*['\"]?(?!#)", style_text):
+                return False
         for key, value in element.attrib.items():
             name = key.rsplit("}", 1)[-1].lower()
             if name.startswith("on") or (name in {"href", "src"} and not value.startswith("#")):
+                return False
+            if name == "style" and ("@import" in value.lower() or re.search(r"url\(\s*['\"]?(?!#)", value.lower())):
+                return False
+            if "javascript:" in value.lower():
                 return False
     return True
 
