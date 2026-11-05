@@ -15,14 +15,17 @@ def build_simulation_fingerprint(*, netlist: Path, spice_deck: Path,
                                  fault: dict[str, Any], settings: dict[str, Any] | None = None,
                                  relevant_models: list[Path] | None = None,
                                  ratings: Path | None = None) -> dict[str, Any]:
-    inputs = {
+    model_file_hashes: dict[str, str | None] = {
+        _portable_model_name(path, spice_deck.parent): file_sha256(path)
+        for path in sorted(relevant_models or [])
+    }
+    inputs: dict[str, Any] = {
         "netlist_sha256": file_sha256(netlist),
         "spice_deck_sha256": file_sha256(spice_deck),
         "mapping_sha256": file_sha256(component_mapping),
         "probes_sha256": file_sha256(probes),
         "ratings_sha256": file_sha256(ratings),
-        "model_files_sha256": {_portable_model_name(path, spice_deck.parent): file_sha256(path)
-                                for path in sorted(relevant_models or [])},
+        "model_files_sha256": model_file_hashes,
         "fault_scenario": fault,
         "simulation_settings": settings or {},
     }
@@ -42,10 +45,12 @@ def _portable_model_name(path: Path, deck_directory: Path) -> str:
 
 def verify_cached_fingerprint(cached: dict[str, Any] | None,
                               current: dict[str, Any]) -> tuple[str, list[str]]:
-    if (not isinstance(cached, dict) or len(cached.get("fingerprint_sha256", "")) != 64
-            or len(current.get("fingerprint_sha256", "")) != 64):
+    cached_digest = cached.get("fingerprint_sha256") if isinstance(cached, dict) else None
+    current_digest = current.get("fingerprint_sha256") if isinstance(current, dict) else None
+    if (not isinstance(cached_digest, str) or len(cached_digest) != 64
+            or not isinstance(current_digest, str) or len(current_digest) != 64):
         return "PROVENANCE_UNVERIFIED", ["UNVERIFIED_SIMULATION_CACHE"]
-    if cached.get("fingerprint_sha256") != current.get("fingerprint_sha256"):
+    if cached_digest != current_digest:
         return "STALE", ["UNVERIFIED_SIMULATION_CACHE"]
     return "VERIFIED", []
 

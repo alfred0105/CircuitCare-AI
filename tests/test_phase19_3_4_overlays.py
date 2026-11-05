@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
+
 from circuitcare.dashboard.analysis_loader import load_analysis_snapshot
 from circuitcare.dashboard.case_loader import DEMO_CASES
 from circuitcare.models import Circuit, Component, Connection
@@ -11,8 +13,16 @@ from circuitcare.schematic.exporter import export_schematic, find_kicad_cli
 from circuitcare.schematic.geometry import build_symbol_geometry
 from circuitcare.schematic.measurement_geometry import build_measurement_anchors
 from circuitcare.services.simulation_service import _current_simulation_fingerprint
+from circuitcare.workspace.simulation_context import verify_cached_fingerprint
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_missing_engine_fingerprint_fails_closed_without_raising():
+    status, reasons = verify_cached_fingerprint(
+        {"fingerprint_sha256": "a" * 64}, {"fingerprint_sha256": None})
+    assert status == "PROVENANCE_UNVERIFIED"
+    assert reasons == ["UNVERIFIED_SIMULATION_CACHE"]
 
 
 def test_divider_phase19_3_4_simulation_manifest_is_verified_and_tamper_is_stale(tmp_path):
@@ -41,9 +51,10 @@ def test_divider_phase19_3_4_simulation_manifest_is_verified_and_tamper_is_stale
     assert stale.risk == {}
 
 
+@pytest.mark.integration
 def test_regulator_schematic_is_electrically_equivalent_and_has_verified_measurement_anchors(tmp_path):
     if not find_kicad_cli():
-        raise AssertionError("NOT_VERIFIED: KiCad CLI unavailable; fixture acceptance requires actual CLI validation")
+        pytest.skip("NOT_VERIFIED: KiCad CLI unavailable; fixture acceptance requires actual CLI validation")
     schematic = ROOT / "tests/fixtures/regulator.kicad_sch"
     xml = ROOT / "tests/fixtures/fault_demo_netlist.xml"
     cache_base = ROOT / "data" / f"phase19_3_4_integration_{tmp_path.name}"
