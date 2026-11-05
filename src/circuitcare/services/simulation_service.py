@@ -33,11 +33,22 @@ def _current_simulation_fingerprint(case: dict, fault: str, fault_type: str,
                 model_paths.append((deck.parent / match.group(1)).resolve())
     except OSError:
         return {"fingerprint_sha256": None}
+    settings = {"engine": "ngspice", "analysis": "transient", "runner": "circuitcare-cli"}
+    if case.get("fingerprint_ngspice_version"):
+        try:
+            version_result = subprocess.run(["ngspice", "--version"], capture_output=True,
+                                            text=True, timeout=5, check=True, close_fds=False)
+        except (OSError, subprocess.SubprocessError):
+            return {"fingerprint_sha256": None}
+        version_match = re.search(r"\bngspice-[A-Za-z0-9._-]+", version_result.stdout)
+        if not version_match:
+            return {"fingerprint_sha256": None}
+        settings["ngspice_version"] = version_match.group(0)
     return build_simulation_fingerprint(
         netlist=ROOT / case["netlist"], spice_deck=deck,
         component_mapping=ROOT / case["mapping"], probes=ROOT / case["probes"],
         fault={"component_ref": fault, "fault_type": fault_type, "parameter": fault_value},
-        settings={"engine": "ngspice", "analysis": "transient", "runner": "circuitcare-cli"},
+        settings=settings,
         relevant_models=model_paths,
         ratings=ROOT / case["ratings"] if case.get("ratings") else None,
     )

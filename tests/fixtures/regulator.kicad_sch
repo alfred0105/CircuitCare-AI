@@ -1,0 +1,768 @@
+(kicad_sch (version 20250114) (generator "eeschema") (generator_version "10.0")
+ (uuid "eb6be75c-7b6f-4a17-90a1-1783a1f80113") (paper "A4")
+ (lib_symbols (symbol "Connector_Generic:Conn_01x02"
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "J"
+			(at 0 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 0 -5.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "connector"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "Connector*:*_1x??_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "Conn_01x02_1_1"
+			(rectangle
+				(start -1.27 1.27)
+				(end 1.27 -3.81)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+			(rectangle
+				(start -1.27 0.127)
+				(end 0 -0.127)
+				(stroke
+					(width 0.1524)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(rectangle
+				(start -1.27 -2.413)
+				(end 0 -2.667)
+				(stroke
+					(width 0.1524)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(pin passive line
+				(at -5.08 0 0)
+				(length 3.81)
+				(name "Pin_1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at -5.08 -2.54 0)
+				(length 3.81)
+				(name "Pin_2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Regulator_Linear:L7805"
+		(pin_names
+			(offset 0.254)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "U"
+			(at -3.81 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "L7805"
+			(at 0 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 0.635 -3.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(justify left)
+			)
+		)
+		(property "Datasheet" "http://www.st.com/content/ccc/resource/technical/document/datasheet/41/4f/b3/b0/12/d4/47/88/CD00000444.pdf/files/CD00000444.pdf/jcr:content/translations/en.CD00000444.pdf"
+			(at 0 -1.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Positive 1.5A 35V Linear Regulator, Fixed Output 5V, TO-220/TO-263/TO-252"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "Voltage Regulator 1.5A Positive"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "TO?252* TO?263* TO?220*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "L7805_0_1"
+			(rectangle
+				(start -5.08 1.905)
+				(end 5.08 -5.08)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+		(symbol "L7805_1_1"
+			(pin power_in line
+				(at -7.62 0 0)
+				(length 2.54)
+				(name "IN"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_in line
+				(at 0 -7.62 90)
+				(length 2.54)
+				(name "GND"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_out line
+				(at 7.62 0 180)
+				(length 2.54)
+				(name "OUT"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Device:R"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "R"
+			(at 2.032 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "R"
+			(at 0 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at -1.778 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "R res resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "R_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "R_0_1"
+			(rectangle
+				(start -1.016 -2.54)
+				(end 1.016 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "R_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Device:C"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0.254)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "C"
+			(at 0.635 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "C"
+			(at 0.635 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 0.9652 -3.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "cap capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "C_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "C_0_1"
+			(polyline
+				(pts
+					(xy -2.032 0.762) (xy 2.032 0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -2.032 -0.762) (xy 2.032 -0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "C_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+(symbol "Switch:SW_SPST"
+		(pin_names
+			(offset 0)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "SW"
+			(at 0 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SW_SPST"
+			(at 0 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Single Pole Single Throw (SPST) switch"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "switch lever"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "SW_SPST_0_0"
+			(circle
+				(center -2.032 0)
+				(radius 0.508)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.524 0.254) (xy 1.524 1.778)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(circle
+				(center 2.032 0)
+				(radius 0.508)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "SW_SPST_1_1"
+			(pin passive line
+				(at -5.08 0 0)
+				(length 2.54)
+				(name "A"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 5.08 0 180)
+				(length 2.54)
+				(name "B"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	))
+ (symbol (lib_id "Connector_Generic:Conn_01x02") (at 40 60 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c3a86e4d-1e97-47ca-adee-c5874daaff37") (property "Reference" "J1" (at 40 53 0) (effects (font (size 1.27 1.27)))) (property "Value" "12V Input" (at 40 67 0) (effects (font (size 1.27 1.27)))) (property "Footprint" "" (at 40 60 0) (effects (font (size 1.27 1.27)) (hide yes))) (property "Datasheet" "~" (at 40 60 0) (effects (font (size 1.27 1.27)) (hide yes))) (pin "1" (uuid "c7edbc24-79fd-4879-a6d3-1e97a210f5b2")) (pin "2" (uuid "e5e12105-6b30-4342-845d-2bb76f48bcdf")) (instances (project "regulator" (path "/eb6be75c-7b6f-4a17-90a1-1783a1f80113" (reference "J1") (unit 1))))) (symbol (lib_id "Regulator_Linear:L7805") (at 90 50 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "1ad5ea1d-e33a-47ea-abfb-a2a21381f7e6") (property "Reference" "U1" (at 90 43 0) (effects (font (size 1.27 1.27)))) (property "Value" "Regulator" (at 90 57 0) (effects (font (size 1.27 1.27)))) (property "Footprint" "" (at 90 50 0) (effects (font (size 1.27 1.27)) (hide yes))) (property "Datasheet" "~" (at 90 50 0) (effects (font (size 1.27 1.27)) (hide yes))) (pin "1" (uuid "ca5dea95-4c25-4997-8123-d8bdc97a8fe2")) (pin "2" (uuid "93cdbdd0-4114-45a3-a0a2-9d72a4229969")) (pin "3" (uuid "b11d9bfd-2694-491c-aec8-bf1f6f508f65")) (instances (project "regulator" (path "/eb6be75c-7b6f-4a17-90a1-1783a1f80113" (reference "U1") (unit 1))))) (symbol (lib_id "Device:R") (at 125 53.81 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "5ebbb41c-4703-44b6-b0a9-f4fb6197e65b") (property "Reference" "R1" (at 125 46.81 0) (effects (font (size 1.27 1.27)))) (property "Value" "1k" (at 125 60.81 0) (effects (font (size 1.27 1.27)))) (property "Footprint" "" (at 125 53.81 0) (effects (font (size 1.27 1.27)) (hide yes))) (property "Datasheet" "~" (at 125 53.81 0) (effects (font (size 1.27 1.27)) (hide yes))) (pin "1" (uuid "f9724637-2cf5-4742-b518-1ab401ce62da")) (pin "2" (uuid "fa566a53-ae9d-4f86-9069-1618c3bb5ce9")) (instances (project "regulator" (path "/eb6be75c-7b6f-4a17-90a1-1783a1f80113" (reference "R1") (unit 1))))) (symbol (lib_id "Device:R") (at 155 61.43 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "98ab61f2-2dbf-4583-8d0b-e5373c4080d2") (property "Reference" "RLOAD" (at 155 54.43 0) (effects (font (size 1.27 1.27)))) (property "Value" "1k" (at 155 68.43 0) (effects (font (size 1.27 1.27)))) (property "Footprint" "" (at 155 61.43 0) (effects (font (size 1.27 1.27)) (hide yes))) (property "Datasheet" "~" (at 155 61.43 0) (effects (font (size 1.27 1.27)) (hide yes))) (pin "1" (uuid "60d25223-4c30-4367-aa18-65fa5da7f3e6")) (pin "2" (uuid "3e3a755e-666e-460a-84b1-8af827ffed83")) (instances (project "regulator" (path "/eb6be75c-7b6f-4a17-90a1-1783a1f80113" (reference "RLOAD") (unit 1))))) (symbol (lib_id "Device:C") (at 110 53.81 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "9043a18a-694e-42ce-959c-fec7299bdd40") (property "Reference" "C1" (at 110 46.81 0) (effects (font (size 1.27 1.27)))) (property "Value" "100uF" (at 110 60.81 0) (effects (font (size 1.27 1.27)))) (property "Footprint" "" (at 110 53.81 0) (effects (font (size 1.27 1.27)) (hide yes))) (property "Datasheet" "~" (at 110 53.81 0) (effects (font (size 1.27 1.27)) (hide yes))) (pin "1" (uuid "110664bd-4463-4ea0-81aa-95681bd5f6ef")) (pin "2" (uuid "8a6cb4bb-5973-47e3-8048-2d00b7b0e576")) (instances (project "regulator" (path "/eb6be75c-7b6f-4a17-90a1-1783a1f80113" (reference "C1") (unit 1))))) (symbol (lib_id "Switch:SW_SPST") (at 65 60 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "2cd02eea-90f3-4335-ab03-5e162e286083") (property "Reference" "Q1" (at 65 53 0) (effects (font (size 1.27 1.27)))) (property "Value" "NMOS switch" (at 65 67 0) (effects (font (size 1.27 1.27)))) (property "Footprint" "" (at 65 60 0) (effects (font (size 1.27 1.27)) (hide yes))) (property "Datasheet" "~" (at 65 60 0) (effects (font (size 1.27 1.27)) (hide yes))) (pin "1" (uuid "7ed5ea3f-e4b8-4d07-b71b-6a6bf04cee9a")) (pin "2" (uuid "d3caa0a6-46be-4841-b7d9-ed14405c62c5")) (pin "3" (uuid "d2c113bf-5207-4338-8fda-020afd933292")) (instances (project "regulator" (path "/eb6be75c-7b6f-4a17-90a1-1783a1f80113" (reference "Q1") (unit 1)))))
+ (label "VIN" (at 34.92 60 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "94f5f20f-6494-409b-92be-616ec9595645")) (label "VIN" (at 82.38 50 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "282ec143-631a-478a-992e-117e7da2e3bf")) (label "VIN" (at 59.92 60 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "cd8bbf0c-7cb8-42a2-a28b-9213ed44db28")) (label "VOUT" (at 97.62 50 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "8a8a8bf0-7498-45ca-95ee-d0ea167cccb1")) (label "VOUT" (at 125 50 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "cda88e4b-d438-4805-ab2e-cc29d8fc4ef6")) (label "VOUT" (at 110 50 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "5989be7a-b2a0-4521-aa06-5b1bc6dbcdc7")) (label "LOAD" (at 125 57.62 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "fe59fa7c-45ba-4e82-b4e5-d09c198c6f4d")) (label "LOAD" (at 155 57.62 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "7c6d0a33-4a5a-4f4d-a4ce-6d72cb2d9df6")) (label "GND" (at 34.92 62.54 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "41174b57-cbad-4286-b7bc-02f4a858e10c")) (label "GND" (at 90 57.62 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "34b06b30-acd1-435b-874c-499d03b54a00")) (label "GND" (at 155 65.24 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "2dd4774b-dbb9-46c6-854c-afe9ce647813")) (label "GND" (at 110 57.62 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "6a034f41-425b-467a-8e5e-a5f5a9e7b7b9")) (label "GND" (at 70.08 60 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "0ec704cb-a9c6-45ff-a13a-a206c809465c"))
+
+ (sheet_instances (path "/" (page "1"))) (embedded_fonts no)
+)
