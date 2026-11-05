@@ -17,6 +17,7 @@ DEMO_CASES = {
     "Independent resistor divider (evaluation circuit A)": {
         "netlist": "tests/fixtures/divider_netlist.xml", "fault": "R1", "fault_type": "resistance_drift", "value": "10k",
         "fault_types": ["resistance_drift", "resistor_open", "resistor_short"],
+        "schematic": "tests/fixtures/divider.kicad_sch",
         "base": "data/circuits/divider.cir", "mapping": "data/circuits/divider_mapping.json", "probes": "data/circuits/divider_probes.json", "ratings": "data/component_specs/divider_ratings.json",
         "cached": "data/evaluations/divider/simulation_results/fault_r1_resistance_drift", "prior": None,
     },

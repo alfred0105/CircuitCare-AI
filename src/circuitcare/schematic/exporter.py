@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import os
-import re
 import shutil
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
+
+from circuitcare.schematic.identity import discover_schematic_files
 
 MAX_SOURCE_BYTES = 20_000_000
 MAX_SVG_BYTES = 12_000_000
@@ -74,13 +75,12 @@ def export_schematic(path: str | Path, *, project_root: str | Path, cache_root: 
                                  timeout=5, check=True, close_fds=False).stdout.strip()
     except (OSError, subprocess.SubprocessError) as exc:
         return ExportResult("CLI_ERROR", f"KiCad CLI 버전 확인 실패: {exc}")
-    related = [source]
-    text = source.read_text(encoding="utf-8")
-    for match in re.finditer(r'\(property\s+"Sheet file"\s+"([^"\\]+\.kicad_sch)"', text):
-        child = (source.parent / match.group(1)).resolve()
-        if not child.is_relative_to(root) or not child.is_file() or child.stat().st_size > MAX_SOURCE_BYTES:
-            return ExportResult("INCOMPLETE_PROJECT", f"하위 시트를 검증할 수 없습니다: {match.group(1)}")
-        related.append(child)
+    try:
+        related, incomplete = discover_schematic_files(source, project_root=root)
+    except (OSError, ValueError) as exc:
+        return ExportResult("REJECTED", str(exc))
+    if incomplete:
+        return ExportResult("INCOMPLETE_PROJECT", "; ".join(incomplete))
     digest = hashlib.sha256()
     for item in sorted(set(related)):
         digest.update(str(item.relative_to(root)).encode())

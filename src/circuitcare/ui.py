@@ -286,12 +286,15 @@ def main() -> None:
                                 "result_sha256": cache_manifest.get("result_sha256")},
         )
     elif active_view == views[1]:
-        from circuitcare.dashboard.views.schematic_workspace import render_schematic_workspace
+        from circuitcare.dashboard.views.schematic_workspace import (
+            render_schematic_workspace,
+        )
         render_schematic_workspace(st, circuit=circuit, case_name=case_name, case=case,
                                    selected_fault=selected_fault, fault_type=str(fault_type or case["fault_type"]),
                                    fault_value=fault_value if needs_value else None,
                                    root=ROOT, comparison_path=comparison_path,
-                                   simulation_status=status)
+                                   simulation_status=status,
+                                   simulation_integrity=analysis_snapshot.integrity)
     elif active_view == views[2]:
         from circuitcare.dashboard.views.waveforms import render_waveform_view
         render_waveform_view(st, comparison=comparison, result_dir=result_dir, stress=stress,

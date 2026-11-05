@@ -11,6 +11,15 @@ from circuitcare.schematic.exporter import export_schematic
 from circuitcare.schematic.identity import map_component_refs, read_symbol_identities
 
 
+def spice_verification_label(status: str, integrity: str) -> str:
+    """Describe trusted simulation status only when both provenance signals agree."""
+    if status == "SUCCESS" and integrity == "VERIFIED":
+        return "VERIFIED · Live Simulation"
+    if status == "CACHED_SIMULATION" and integrity == "VERIFIED":
+        return "VERIFIED · Cached Simulation"
+    return f"NOT VERIFIED · {status} / {integrity}"
+
+
 def _store_schematic(raw: bytes, root: Path) -> Path:
     if not raw or len(raw) > 20_000_000:
         raise ValueError("회로도 파일은 20 MB 이하이어야 합니다.")
@@ -27,7 +36,8 @@ def _store_schematic(raw: bytes, root: Path) -> Path:
 
 def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: dict,
                                selected_fault: str, fault_type: str, fault_value: str | None,
-                               root: Path, comparison_path: Path, simulation_status: str) -> None:
+                               root: Path, comparison_path: Path, simulation_status: str,
+                               simulation_integrity: str) -> None:
     st.subheader("회로도 작업공간")
     context_token = hashlib.sha256(case_name.encode()).hexdigest()[:12]
     uploaded = st.file_uploader("KiCad 회로도 (.kicad_sch)", type=["kicad_sch"], key=f"schematic_source_{context_token}")
@@ -67,13 +77,16 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         try:
             identities, missing_sheets = read_symbol_identities(schematic_path, project_root=root)
             mapping = map_component_refs(refs, identities)
+            if missing_sheets:
+                mapping = {ref: {"component_ref": ref, "status": "INCOMPLETE_PROJECT"}
+                           for ref in refs}
             result = export_schematic(schematic_path, project_root=root,
                                       cache_root=root / "data" / "schematic_svg_cache")
             if result.status == "EXPORTED" and result.svg_paths:
-                paths = result.svg_paths
+                svg_paths = result.svg_paths
                 with nav:
-                    page = st.selectbox("시트 페이지", range(1, len(paths) + 1), key=f"schematic_page_{result.cache_key}")
-                svg = paths[page - 1]
+                    page = st.selectbox("시트 페이지", range(1, len(svg_paths) + 1), key=f"schematic_page_{result.cache_key}")
+                svg = svg_paths[page - 1]
                 status = "SVG_EXPORTED"
                 with canvas:
                     st.caption(f"시트 {page} · KiCad CLI SVG · {schematic_path.relative_to(root)}")
@@ -100,7 +113,7 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
     with inspector:
         item = circuit.components[component_ref]
         candidates = direct_candidates(circuit, component_ref)
-        paths = find_paths_result(circuit, component_ref, max_hops=2)
+        path_search = find_paths_result(circuit, component_ref, max_hops=2)
         st.markdown(f"**{item.ref}** · {item.value or '값 없음'}")
         st.caption(item.library_id or "Library ID 없음")
         st.write("**연결 Net**")
@@ -114,8 +127,9 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         st.write("**연결 분석 후보**")
         for candidate in candidates:
             st.caption(f"{candidate.target_ref} · {', '.join(candidate.shared_nets)}")
-        st.caption(f"경로 검색 · {paths.status} · {len(paths.paths)}개 후보 경로")
+        st.caption(f"경로 검색 · {path_search.status} · {len(path_search.paths)}개 후보 경로")
         st.write("**Simulation**")
-        st.caption(f"상태 · {simulation_status if comparison_path.exists() else status}")
-        st.caption("실제 SPICE 검증 여부 · " + ("확인된 기존 결과" if comparison_path.exists() else "NOT_EVALUATED"))
+        st.caption(f"상태 · {simulation_status}")
+        st.caption(f"SPICE 검증 · {spice_verification_label(simulation_status, simulation_integrity)}")
+        st.caption(f"SVG Export 상태 · {status}")
         st.caption("연결 후보는 손상이나 전기적 위험의 증거가 아닙니다.")
