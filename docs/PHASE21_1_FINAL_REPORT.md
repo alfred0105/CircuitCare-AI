@@ -58,7 +58,7 @@ This phase reuses PRISM reference JSON and does not add a native `.kicad_pcb` ge
 - Existing PRISM baseline pipeline: ran all 12 samples / 24 images; pipeline completed for all; its JSON continues to label geometry and electrical metrics `NOT_VERIFIED` because alignment is absent.
 - Registration record integrity validation: **24 views checked, 0 verified, no record-integrity issues**.
 - New transforms tests use synthetic correspondences only and demonstrate software behavior, not PCB registration accuracy.
-- GitHub Actions: triggered after push; result is recorded in the final repository status/report.
+- GitHub Actions: [run 42051982612](https://github.com/alfred0105/CircuitCare-AI/actions/runs/42051982612) completed successfully for result commit `eaf2b79d4351052e9bba70cf21d96bec59da5019` (Python 3.11/3.12, integration, stress, OCR and isolated crash-injection jobs).
 
 ## Phase 21.2 readiness
 
