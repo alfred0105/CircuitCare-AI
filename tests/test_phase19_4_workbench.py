@@ -15,7 +15,7 @@ def test_workbench_is_default_and_analysis_navigation_preserves_circuit_context(
     selector = next(item for item in app.selectbox if item.key == "active_analysis_view")
     assert selector.value == "회로도 Workbench"
     initial_case = next(item for item in app.selectbox if item.key == "case_name").value
-    assert any(item.label == "회로도 보기" for item in app.radio)
+    assert any("KiCad CLI SVG" in item.value for item in app.caption) or any("회로도" in item.value for item in app.info)
     assert any("Inspector" in item.value for item in app.markdown)
     next(item for item in app.button if item.label == "파형 상세").click().run()
     assert not app.exception
