@@ -48,6 +48,7 @@ Bayesian 근거는 지원되는 U1 Regulator 조건에만 연결된다. Prior-on
 | Ruff 변경 파일 | 통과 |
 | mypy 변경 핵심 모듈 | 통과 (Workspace, Overlay, Measurement Geometry, Geometry, Viewer) |
 | JavaScript Syntax (`node --input-type=module --check`) | 통과 |
+| GitHub Actions | [Tests run 41975680483](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41975680483) · Python 3.11/3.12, ngspice Integration, OCR Integration, Stress, Crash Injection 모두 통과 |
 
 전체 `ui.py`에 대해 mypy를 실행할 경우 이 변경 이전부터 이어지는 UI 전반의 기존 타입 문제 40개가 출력된다. 새 Workspace/Overlay 모듈과 View 호출 인접 모듈의 검사 결과는 위와 같이 분리해 기록한다.
 
@@ -66,7 +67,7 @@ Bayesian 근거는 지원되는 U1 Regulator 조건에만 연결된다. Prior-on
 - Regulator Bayesian 회로도 Fixture가 없어 Pin Marker의 회로도 시연은 미완료다.
 - Multi-sheet Geometry는 기존처럼 partial 상태이며 Overlay Gate가 닫힌다.
 - Browser에서 확대/이동 및 marker 정렬의 별도 시나리오를 수행하지 않았다. FPS/지연 시간은 측정하지 않았다.
-- Python 3.11은 로컬 검증하지 않았다. CI Actions 결과는 Push 이후 기록한다.
+- Python 3.11은 로컬이 아닌 위 GitHub Actions에서 검증했다.
 - 19.4 전체 UI 정리 전에 Divider Risk provenance와 Regulator Schematic Fixture를 검증하고, 아래 미실행 Browser E2E 항목을 추가 수행한다.
 
 ## Phase 판정
