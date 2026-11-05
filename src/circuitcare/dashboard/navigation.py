@@ -46,5 +46,16 @@ def korean_status(value: object) -> str:
         "regulator_output_rise": "레귤레이터 출력 상승",
         "regulator_output_drop": "레귤레이터 출력 하락",
         "resistance_drift": "저항값 변화", "resistor_open": "저항 단선",
-        "resistor_short": "저항 단락", "unspecified": "미지정",
-    }.get(str(value), str(value))
+        "resistor_short": "저항 단락", "regulator_output_loss": "레귤레이터 출력 손실",
+        "unspecified": "미지정",
+        "NOT_VERIFIED": "검증되지 않음", "VERIFIED_DESIGN": "설계 기준 확인",
+        "VERIFIED_PHYSICAL": "실물 확인", "VERIFIED_SYNTHETIC": "합성 자료 확인",
+        "SVG_EXPORTED": "회로도 표시 준비됨", "EXPORT_FAILED": "회로도 표시 실패",
+        "REGISTRATION_UNVERIFIED": "사진 정합 미검증",
+        "OBSERVED_TOPOLOGY_ONLY": "사진 접촉 후보만 확인",
+        "PARTIAL_DEPTH_LIMIT": "경로 일부만 표시",
+        "INCOMPLETE_PROJECT": "프로젝트 일부 누락",
+        "MODEL_MISMATCH": "모델과 측정 차이 큼",
+        "UNSUPPORTED": "지원되지 않음", "PARTIAL": "일부 완료",
+        "BLOCKED": "선행 확인 필요", "READY": "준비됨", "EXPORTED": "내보내기 완료",
+    }.get(str(value), "상태 확인 필요")

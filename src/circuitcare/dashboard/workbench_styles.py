@@ -14,7 +14,9 @@ def apply_workbench_theme(st: Any) -> None:
         .stApp { background:var(--cc-bg); }
         [data-testid="stHeader"] { background:rgba(14,20,27,.94); }
         [data-testid="stSidebar"] { background:#111923; border-right:1px solid var(--cc-line); }
-        [data-testid="stMainBlockContainer"] { padding-top:.7rem; padding-bottom:1rem; max-width:100%; }
+        /* Keep Streamlit's responsive top safe-area so the workbench header is not
+           painted under the native toolbar on different viewport heights. */
+        [data-testid="stMainBlockContainer"] { padding-bottom:1rem; max-width:100%; }
         .cc-workbench-header { box-sizing:border-box; display:flex; align-items:center;
           justify-content:space-between; gap:1rem; width:100%; padding:.55rem .9rem;
           border:1px solid var(--cc-line); border-radius:5px 5px 0 0;
@@ -40,17 +42,15 @@ def apply_workbench_theme(st: Any) -> None:
         [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] iframe) { min-width:0; }
         @media (max-width:1400px) {
           [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) { display:grid!important;
-            grid-template-columns:minmax(0,1fr) minmax(235px,280px)!important; gap:1rem!important; }
-          [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) > [data-testid="stColumn"]:first-child { display:none!important; }
-          [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) > [data-testid="stColumn"]:nth-child(2),
-          [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) > [data-testid="stColumn"]:nth-child(3) {
+            grid-template-columns:minmax(145px, .8fr) minmax(0, 4.8fr) minmax(195px, 1.15fr)!important; gap:.65rem!important; }
+          [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) > [data-testid="stColumn"] {
             width:auto!important; min-width:0!important; }
           .cc-workbench-project { text-align:left; }
         }
         @media (max-width:850px) {
           .cc-workbench-header { align-items:flex-start; flex-direction:column; }
           [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) { grid-template-columns:minmax(0,1fr)!important; }
-          [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) > [data-testid="stColumn"]:nth-child(3) {
+          [data-testid="stHorizontalBlock"]:has([class*="st-key-schematic_viewer"]) > [data-testid="stColumn"] + [data-testid="stColumn"] {
             border-top:1px solid var(--cc-line); padding-top:.8rem; }
         }
         </style>

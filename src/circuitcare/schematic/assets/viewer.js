@@ -133,7 +133,11 @@ export default function(component) {
         addText(group, cx, Math.min(...ys) - 1.2, `${marker.kind === "DIRECT_CANDIDATE" ? "직접" : "간접"} · ${marker.hop_count}단계`, "cc-overlay-label");
       } else if (marker.kind === "RISK") {
         const levelClass = { EXCEEDED: "exceeded", NEAR_LIMIT: "near", WITHIN_LIMIT: "within", UNKNOWN: "unknown" }[marker.risk_level] || "unknown";
-        group.appendChild(make("circle", { cx: Math.max(...xs), cy: Math.min(...ys), r: 2.1, class: `cc-overlay-risk cc-overlay-risk-${levelClass}` }));
+        const markerX = Math.max(...xs), markerY = Math.min(...ys);
+        const symbol = { EXCEEDED: "▲", NEAR_LIMIT: "◆", WITHIN_LIMIT: "○", UNKNOWN: "?" }[marker.risk_level] || "?";
+        const riskMark = make("text", { x: markerX, y: markerY, class: `cc-overlay-risk cc-overlay-risk-${levelClass}`, "text-anchor": "middle", "dominant-baseline": "central" });
+        riskMark.textContent = symbol;
+        group.appendChild(riskMark);
         const riskLabel = { EXCEEDED: "정격 초과", NEAR_LIMIT: "정격 근접", WITHIN_LIMIT: "정격 이내", UNKNOWN: "미평가" }[marker.risk_level] || "미평가";
         addText(group, cx, Math.min(...ys) - 1.6, riskLabel, "cc-overlay-label");
       } else if (marker.kind === "INSPECTION_PRIORITY") {

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from circuitcare.graph import direct_candidates, find_paths_result
+from circuitcare.dashboard.navigation import korean_status
 from circuitcare.schematic.electrical_equivalence import verify_schematic_netlist
 from circuitcare.schematic.exporter import export_schematic
 from circuitcare.schematic.geometry import (
@@ -68,6 +69,9 @@ def _korean_overlay_reason(reason: object) -> str:
         return "측정 Node는 논리 회로도 후보입니다. PCB의 안전하거나 접근 가능한 프로브 지점을 뜻하지 않습니다."
     if text.startswith("No verified recommendation or inspection markers"):
         return "현재 Context에 검증된 측정 추천이나 점검 표시가 없습니다."
+    for code in ("PROVENANCE_UNVERIFIED", "UNVERIFIED_GEOMETRY", "NOT_VERIFIED",
+                 "UNVERIFIED_MEASUREMENT_LOCATION", "UNVERIFIED_MAPPING", "BLOCKED", "UNKNOWN"):
+        text = text.replace(code, korean_status(code))
     return text
 
 
@@ -243,6 +247,10 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                         horizontal=True,
                         key=mode_key,
                     )
+                    if overlay_mode == "전기적 위험":
+                        st.caption("범례 · ▲ 정격 초과 · ◆ 정격 근접 · ○ 평가 항목 정격 이내 · ? 정보 부족 — 실제 손상 확정을 뜻하지 않습니다.")
+                    elif overlay_mode == "측정·점검":
+                        st.caption("측정 표시는 논리적 후보 위치입니다. PCB의 안전하거나 접근 가능한 프로브 위치를 의미하지 않습니다.")
                     if overlay_mode == "연결 후보":
                         overlay_payload = build_fault_overlay(
                             circuit=circuit, failed_component=selected_fault,
@@ -322,7 +330,7 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                             st.caption(_korean_overlay_reason(overlay_payload["reason"]))
                         if overlay_mode == "연결 후보" and overlay_payload.get("status") == "READY":
                             path_status = overlay_payload.get("path_search", {}).get("status", "UNKNOWN")
-                            st.caption(f"보라: 사용자 고장 가정 · 파랑: 연결 후보 (손상 증거 아님) · 배선은 표시하지 않음 · 경로 검색: {path_status}")
+                            st.caption(f"보라: 사용자 고장 가정 · 파랑: 연결 후보 (손상 증거 아님) · 배선은 표시하지 않음 · 경로 검색: {korean_status(path_status)}")
                         elif overlay_mode == "전기적 위험" and overlay_payload.get("status") == "READY":
                             st.caption("정격 초과·근접 결과는 실제 손상 확정이 아닙니다. 정격 이내 판정은 평가된 항목에만 적용됩니다.")
                         elif overlay_mode == "측정·점검" and overlay_payload.get("status") == "READY":
@@ -376,7 +384,7 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                             st.warning("회로도와 넷리스트의 전기적 정합성을 확인하지 못했습니다. 선택 및 Overlay가 제한됩니다.")
             else:
                 with canvas:
-                    st.warning(f"회로도 Export를 사용할 수 없습니다 ({result.status}). {result.message}")
+                    st.warning(f"회로도 Export를 사용할 수 없습니다 ({korean_status(result.status)}). {result.message}")
             if missing_sheets:
                 st.warning("누락되거나 허용 경로 밖인 하위 시트: " + ", ".join(missing_sheets))
         except (OSError, ValueError) as exc:
@@ -392,6 +400,10 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                 horizontal=True,
                 key=mode_key,
             )
+            if overlay_mode == "전기적 위험":
+                st.caption("범례 · ▲ 정격 초과 · ◆ 정격 근접 · ○ 평가 항목 정격 이내 · ? 정보 부족 — 실제 손상 확정을 뜻하지 않습니다.")
+            elif overlay_mode == "측정·점검":
+                st.caption("측정 표시는 회로도의 논리적 후보 위치입니다. PCB의 안전하거나 접근 가능한 프로브 위치를 의미하지 않습니다.")
             if overlay_mode == "측정·점검":
                 # Bayesian evidence can be useful in the inspector without a
                 # schematic, but no physical or page coordinate is inferred.
@@ -478,10 +490,11 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         identity = mapping.get(component_ref, {"status": "UNVERIFIED_MAPPING"})
         with st.expander("근거 및 검증 정보", expanded=False):
             st.caption(f"시뮬레이션 · {korean_status(simulation_status)} · {spice_verification_label(simulation_status, simulation_integrity)}")
+            st.caption(f"내부 상태 코드 · 시뮬레이션 `{simulation_status}` · 출처 `{simulation_integrity}`")
             st.caption(f"회로도 Export · {korean_status(status)}")
             st.caption(f"전기적 정합성 · {equivalence.status if equivalence else 'NOT_VERIFIED'} · {equivalence.message if equivalence else '회로도 없음'}")
             st.caption(f"부품 매칭 · {identity.get('status', 'UNVERIFIED_MAPPING')}")
-            st.caption(f"경로 검색 · {path_search.status} · {len(path_search.paths)}개 후보 경로")
+            st.caption(f"경로 검색 · {korean_status(path_search.status)} · {len(path_search.paths)}개 후보 경로")
             for instance in identity.get("symbol_instances", []):
                 st.caption(f"UUID · {instance['symbol_uuid']} · Unit {instance['unit']} · {instance['sheet_path']}")
             st.caption("연결 후보는 손상 또는 전기적 위험의 증거가 아닙니다.")

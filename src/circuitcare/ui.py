@@ -282,14 +282,10 @@ def main() -> None:
     status = analysis_snapshot.status
     if status != "RUNNING":
         st.session_state.simulation_status = status
-        state_display.markdown({
-            "SUCCESS": "🟢 완료 · 새 시뮬레이션",
-            "FAILED": "🔴 실패" + (" · 저장 결과 출처 미검증, 사용 차단" if is_cached_selection else ""),
-            "CACHED_SIMULATION": "🔵 저장 결과 · 입력 지문 검증됨",
-            "STALE": "🟠 입력 변경 · 결과 사용 차단",
-            "PROVENANCE_UNVERIFIED": "🟠 결과 출처 미검증",
-            "NOT_RUN": "⚪ 미실행 · 분석 준비",
-        }[status])
+    state_icon = {"SUCCESS": "🟢", "FAILED": "🔴", "CACHED_SIMULATION": "🔵",
+                  "STALE": "🟠", "PROVENANCE_UNVERIFIED": "🟠", "NOT_RUN": "⚪"}.get(status, "🟡")
+    state_note = " · 저장 결과 출처 미검증, 사용 차단" if status == "FAILED" and is_cached_selection else ""
+    state_display.markdown(f"{state_icon} {korean_status(status)}{state_note}")
     render_workbench_header(
         st,
         circuit_name=case_name,
@@ -300,6 +296,10 @@ def main() -> None:
         verification_status=analysis_snapshot.integrity,
     )
     st.caption("연결 후보는 손상 증거가 아닙니다. 위험 등급은 평가된 정격 스트레스이며 실제 고장 확률이 아닙니다.")
+    if status == "PROVENANCE_UNVERIFIED":
+        st.info("저장된 결과의 출처를 확인하지 못해 분석 자료로 사용하지 않았습니다. 조건을 확인한 뒤 회로를 새로 실행하거나 검증된 결과를 선택하세요.")
+    elif status == "NOT_RUN":
+        st.info("회로를 선택하고 고장 부품·유형을 확인한 뒤 SPICE 실행을 누르세요. 실행 전에는 검증되지 않은 저장 결과를 켜지 않습니다.")
     active_workspace["analysis_records"] = build_analysis_records(
         workspace_context=workspace_context, active_workspace=active_workspace,
         comparison=comparison, risk=risk, status=status, uploaded=bool(case.get("uploaded")),
