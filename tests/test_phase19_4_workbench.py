@@ -33,6 +33,11 @@ def test_workbench_navigation_uses_korean_eda_areas_and_keeps_routes():
     assert app.session_state["active_analysis_view"] == "AI 성능 평가"
     assert app.session_state["workbench_area"] == "고급 도구"
 
+    next(item for item in app.button if item.label == "다중 사진 PCB 복원").click().run()
+    assert not app.exception
+    assert app.session_state["active_analysis_view"] == "다중 사진 PCB 복원"
+    assert any("PCB 사진 여러 장 추가" in item.label for item in app.file_uploader)
+
     assert next(item for item in app.selectbox if item.key == "case_name").value == initial_case
 
 

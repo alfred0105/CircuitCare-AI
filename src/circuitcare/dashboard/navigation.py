@@ -6,14 +6,14 @@ WORKBENCH_VIEW = "회로도 Workbench"
 WORKSPACE_VIEWS = [
     WORKBENCH_VIEW, "분석 개요", "SPICE 파형", "2차 손상 위험", "Bayesian 진단",
     "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석",
-    "수리 이력 및 AI 학습", "AI 성능 평가",
+    "수리 이력 및 AI 학습", "AI 성능 평가", "다중 사진 PCB 복원",
 ]
 
 AREAS = ("회로도", "분석", "측정·진단", "보고서")
 ANALYSIS_VIEWS = ("분석 개요", "SPICE 파형", "2차 손상 위험")
 ADVANCED_VIEWS = (
-    "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI",
-    "AI 고장 가설 분석", "수리 이력 및 AI 학습", "AI 성능 평가",
+    "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석",
+    "수리 이력 및 AI 학습", "AI 성능 평가", "다중 사진 PCB 복원",
 )
 VIEW_TO_AREA = {
     WORKBENCH_VIEW: "회로도", "분석 개요": "분석", "SPICE 파형": "분석",

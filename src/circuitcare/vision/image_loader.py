@@ -56,8 +56,8 @@ def load_board_image(data: bytes, *, max_file_bytes: int = MAX_FILE_BYTES,
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             source = Image.open(io.BytesIO(data))
-            if source.format not in {"JPEG", "PNG"}:
-                raise ImageLoadError("JPG/JPEG 또는 PNG 이미지만 지원합니다.")
+            if source.format not in {"JPEG", "PNG", "WEBP"}:
+                raise ImageLoadError("JPG/JPEG, PNG 또는 WebP 이미지만 지원합니다.")
             if source.width <= 0 or source.height <= 0 or source.width * source.height > max_pixels:
                 raise ImageLoadError(f"이미지는 최대 {max_pixels:,} 픽셀까지 지원합니다.")
             image = ImageOps.exif_transpose(source).convert("RGB")

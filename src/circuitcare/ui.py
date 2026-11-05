@@ -433,6 +433,9 @@ def main() -> None:
     elif active_view == views[10]:
         from circuitcare.benchmark_ui import render_benchmark_tab
         render_benchmark_tab(st, root=ROOT)
+    elif active_view == "다중 사진 PCB 복원":
+        from circuitcare.vision.reconstruction.ui import render_multiview_reconstruction
+        render_multiview_reconstruction(st)
 
     _downloads(st, case, result_dir, comparison, risk, st.session_state.get("diagnosis_result"), selected_fault, fault_type, fault_value if needs_value else None,
                 simulation_verified=(cache_integrity == "VERIFIED" and status in {"SUCCESS", "CACHED_SIMULATION"}),
