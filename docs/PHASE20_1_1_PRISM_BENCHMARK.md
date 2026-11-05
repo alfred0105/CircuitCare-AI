@@ -27,7 +27,7 @@ python scripts/benchmark_prism.py --all --baseline-only
 
 ## 실제 실행
 
-고정 버전에서 12개 전체를 실행했다. TOP/BOTTOM 24장 모두 기존 파이프라인과 adaptive 후보 실험을 완료했다. 첫 처리 실행은 약 2.3초였으며 실행 시간은 하드웨어·캐시 영향을 받는다. 파이프라인은 기존 보드 외곽 후보 검출, 가능한 경우 원근 보정, Copper 후보 segmentation, vectorization, Pad/Via 후보 탐지, same-side 관측 접촉 그래프를 호출했다.
+고정 버전에서 12개 전체를 실행했다. TOP/BOTTOM 24장 모두 기존 파이프라인과 adaptive 후보 실험을 완료했다. 마지막 전체 실행은 약 2.5초였으며 실행 시간은 하드웨어·캐시 영향을 받는다. 파이프라인은 기존 보드 외곽 후보 검출, 원근 보정 후보, Copper 후보 segmentation, vectorization, Pad/Via 후보 탐지, same-side 관측 접촉 그래프를 호출했다. 실행별 요약은 `baseline/summary.json`과 `improved/summary.json`에 분리된다.
 
 | PCB | Baseline 후보 픽셀 비율 TOP/BOTTOM | Adaptive 실험 후보 픽셀 비율 TOP/BOTTOM |
 |---|---:|---:|

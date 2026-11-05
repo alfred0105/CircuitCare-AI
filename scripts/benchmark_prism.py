@@ -175,6 +175,15 @@ def main() -> int:
                 result_path.parent.mkdir(parents=True, exist_ok=True)
                 result_path.write_text(
                     json.dumps(sample_result, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
+                failures = {side: payload for side, payload in sample_result[variant].items()
+                            if payload.get("status") != "PIPELINE_COMPLETED"}
+                error_path = out_root / variant / "error_cases" / f"{sample.sample_id}.json"
+                if failures:
+                    error_path.parent.mkdir(parents=True, exist_ok=True)
+                    error_path.write_text(json.dumps(failures, indent=2, ensure_ascii=False)+"\n",
+                                          encoding="utf-8")
+                elif error_path.exists():
+                    error_path.unlink()
         print(f"{sample.sample_id}: baseline complete" + (" + adaptive experiment" if not args.baseline_only else ""), flush=True)
     summary = {
         "source": "https://github.com/KamMalinski/PRISM", "prism_commit": commit,
@@ -191,6 +200,13 @@ def main() -> int:
     }
     out_root.mkdir(parents=True, exist_ok=True)
     (out_root / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
+    for variant in ("baseline", "improved"):
+        if any(variant in row for row in results):
+            variant_summary = {**summary, "pipeline_variant": variant}
+            variant_root = out_root / variant
+            variant_root.mkdir(parents=True, exist_ok=True)
+            (variant_root / "summary.json").write_text(
+                json.dumps(variant_summary, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
     print(f"Saved benchmark outputs to {out_root}")
     return 0 if all(any(row.get(v, {}).get(side, {}).get("status") == "PIPELINE_COMPLETED"
                         for v in ("baseline", "improved") for side in ("TOP", "BOTTOM")) for row in results) else 1
