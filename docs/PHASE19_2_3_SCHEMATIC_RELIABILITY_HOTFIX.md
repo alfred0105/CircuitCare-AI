@@ -65,5 +65,5 @@ The same Divider fixture passed electrical-equivalence checking with KiCad CLI 1
 - Ruff passed for all changed Python modules and tests; mypy passed for the five changed application modules; JavaScript syntax check passed.
 - Streamlit AppTest is included in the non-integration suite. KiCad CLI XML/SVG exports and asymmetric geometry comparisons ran against KiCad 10.0.6.
 - Browser E2E used coordinate-based clicks on the visible Divider canvas. No browser error or warning log entries were returned.
-- Python 3.11 is not installed locally; both 3.11 and 3.12 are configured in GitHub Actions and must be confirmed after push.
+- Python 3.11 is not installed locally. GitHub Actions Run #575 passed on Python 3.11 and 3.12, plus ngspice integration, isolated crash injection, native OCR inference, and bounded stress jobs.
 - Existing suite emitted 12 known warnings from duplicate ZIP fixture naming and Pandas `reset_index(inplace=...)` deprecation; no test failed.
