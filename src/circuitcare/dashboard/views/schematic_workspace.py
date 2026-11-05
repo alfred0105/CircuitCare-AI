@@ -68,7 +68,6 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                                comparison: dict, analysis_snapshot: Any,
                                current_fingerprint: dict, bayesian_supported: bool,
                                analysis_context_key: Any) -> None:
-    st.subheader("회로도 작업공간")
     fingerprint = {
         "case": case_name,
         "components": [(ref, item.value, item.library_id) for ref, item in sorted(circuit.components.items())],
@@ -77,7 +76,10 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
     digest = hashlib.sha256(json.dumps(fingerprint, sort_keys=True).encode())
     schematic_path = None
     upload_token = hashlib.sha256(case_name.encode()).hexdigest()[:12]
-    uploaded = st.file_uploader("KiCad 회로도 (.kicad_sch)", type=["kicad_sch"], key=f"schematic_source_{upload_token}")
+    uploaded = st.sidebar.file_uploader(
+        "KiCad 회로도 (.kicad_sch)", type=["kicad_sch"],
+        key=f"schematic_source_{upload_token}", max_upload_size=20,
+    )
     # Include the actual schematic bytes in the selection scope, including child sheets.
     if uploaded is not None:
         try:
@@ -114,7 +116,7 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
     if initial_ref not in circuit.components:
         initial_ref = selected_fault if selected_fault in circuit.components else min(circuit.components)
 
-    nav, canvas, inspector = st.columns([1, 3, 1.2], gap="small")
+    nav, canvas, inspector = st.columns([0.85, 3.0, 1.4], gap="small")
     refs = sorted(circuit.components)
     query = ""
     component_ref = initial_ref
@@ -398,8 +400,12 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         item = circuit.components[component_ref]
         candidates = direct_candidates(circuit, component_ref)
         path_search = find_paths_result(circuit, component_ref, max_hops=2)
+        st.markdown("#### Inspector")
         st.markdown(f"**{item.ref}** · {item.value or '값 없음'}")
         st.caption(item.library_id or "Library ID 없음")
+        st.caption(f"FAULT SOURCE · {selected_fault}    INSPECTED · {component_ref}")
+        st.divider()
+        st.caption("SUMMARY · 현재 회로의 연결 및 회로도 매칭")
         st.write("**연결 Net**")
         for conn in circuit.connections:
             if conn.ref == component_ref:
@@ -474,3 +480,10 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         st.caption(f"SPICE 검증 · {spice_verification_label(simulation_status, simulation_integrity)}")
         st.caption(f"SVG Export 상태 · {status}")
         st.caption("연결 후보는 손상이나 전기적 위험의 증거가 아닙니다.")
+        action_col, report_col = st.columns(2, gap="small")
+        if action_col.button("파형 상세", key=f"workbench_waveform_{context_token}", use_container_width=True):
+            st.session_state["workbench_navigation_target"] = "SPICE 파형"
+            st.rerun()
+        if report_col.button("보고서", key=f"workbench_report_{context_token}", use_container_width=True):
+            st.session_state["workbench_navigation_target"] = "분석 개요"
+            st.rerun()
