@@ -11,6 +11,8 @@ build/
 .DS_Store
 .env
 data/private/
+data/external/prism/
+data/benchmarks/prism/
 data/ui_runs/
 data/vision_results/
 data/visualizations/

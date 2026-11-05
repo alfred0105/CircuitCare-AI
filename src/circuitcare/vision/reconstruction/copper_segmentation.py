@@ -63,7 +63,6 @@ def vectorize_copper(mask: np.ndarray, *, photo_id: str, board_side: str,
     if binary.ndim != 2:
         raise ValueError("배선 마스크는 2차원이어야 합니다.")
     binary = (binary > 0).astype(np.uint8)
-    skeleton = _skeletonize(binary)
     count, labels, stats, _ = cv2.connectedComponentsWithStats(binary, 8)
     observations = []
     for label in range(1, count):
@@ -71,28 +70,44 @@ def vectorize_copper(mask: np.ndarray, *, photo_id: str, board_side: str,
         if area < min_component_area:
             continue
         region = labels[y:y+h, x:x+w] == label
-        center = _skeletonize(region.astype(np.uint8))
-        ys, xs = np.where(center)
-        if not len(xs):
-            continue
-        degree = cv2.filter2D(center.astype(np.uint8), cv2.CV_16S,
-                              np.ones((3, 3), np.uint8), borderType=cv2.BORDER_CONSTANT) - center.astype(np.int16)
-        ey, ex = np.where((center > 0) & (degree == 1))
-        jy, jx = np.where((center > 0) & (degree >= 3))
-        paths = _trace_chains(center, x, y)
-        width_estimate = float(area / max(1, int(center.sum())))
-        local_mask = np.zeros_like(binary, dtype=np.uint8)
-        local_mask[y:y+h, x:x+w] = region.astype(np.uint8)
         area_fraction = float(area / max(1, binary.size))
         aspect_ratio = max(w, h) / max(1, min(w, h))
-        kind = "COPPER_PLANE_CANDIDATE" if area_fraction >= 0.025 and aspect_ratio < 3.0 else "COPPER_TRACE_CANDIDATE"
+        kind = ("COPPER_PLANE_CANDIDATE"
+                if (area_fraction >= 0.025 and aspect_ratio < 3.0) or area >= 10_000
+                else "COPPER_BROAD_REGION_CANDIDATE" if area >= 600
+                else "COPPER_TRACE_CANDIDATE")
+        # Broad connected fills do not need medial-axis extraction. Skeletonizing
+        # a board-sized plane is both wasteful and can dominate image-only runs.
+        skip_skeleton = (area >= 8_000 or (area >= 2_000 and min(w, h) >= 12)
+                         or (area >= 600 and max(w, h) >= 120))
+        if skip_skeleton:
+            local_mask = np.zeros_like(binary, dtype=np.uint8)
+            local_mask[y:y+h, x:x+w] = region.astype(np.uint8)
+            paths = []
+            endpoints = junctions = ()
+            width_estimate = None
+        else:
+            center = _skeletonize(region.astype(np.uint8))
+            ys, xs = np.where(center)
+            if not len(xs):
+                continue
+            degree = cv2.filter2D(center.astype(np.uint8), cv2.CV_16S,
+                                  np.ones((3, 3), np.uint8), borderType=cv2.BORDER_CONSTANT) - center.astype(np.int16)
+            ey, ex = np.where((center > 0) & (degree == 1))
+            jy, jx = np.where((center > 0) & (degree >= 3))
+            endpoints = tuple((float(x0+x), float(y0+y)) for x0, y0 in zip(ex, ey))
+            junctions = tuple((float(x0+x), float(y0+y)) for x0, y0 in zip(jx, jy))
+            paths = _trace_chains(center, x, y)
+            width_estimate = float(area / max(1, int(center.sum())))
+            local_mask = np.zeros_like(binary, dtype=np.uint8)
+            local_mask[y:y+h, x:x+w] = region.astype(np.uint8)
         observations.append(CopperObservation(
             observation_id=hashlib.sha256(f"{photo_id}:{board_side}:{label}".encode()).hexdigest()[:20],
             photo_id=photo_id, board_side=board_side, kind=kind,
             mask_size_px=(binary.shape[1], binary.shape[0]),
             mask_rle=tuple(_rle(local_mask.ravel())), polylines_px=tuple(paths),
-            endpoints_px=tuple((float(x0+x), float(y0+y)) for x0, y0 in zip(ex, ey)),
-            junctions_px=tuple((float(x0+x), float(y0+y)) for x0, y0 in zip(jx, jy)),
+            endpoints_px=endpoints,
+            junctions_px=junctions,
             width_estimate_px=width_estimate, confidence=0.25,
             uncertainty="EXPOSED_COPPER_UNVERIFIED; SILK_OR_GLARE_MAY_MATCH"))
     return observations

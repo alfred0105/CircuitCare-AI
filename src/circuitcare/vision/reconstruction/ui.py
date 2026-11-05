@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import subprocess
+import sys
 from typing import Any
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -34,6 +38,11 @@ def render_multiview_reconstruction(st: Any) -> None:
     """Render local multi-photo upload, quality, alignment, and trace candidates."""
     st.subheader("다중 사진 PCB 복원")
     st.caption("원본 사진을 보존하고, 사진에서 보이는 형상 후보만 표시합니다. 이 초기 복원 그래프는 전기적 넷리스트가 아니며 배선 연속성은 별도 측정이 필요합니다.")
+    input_mode = st.radio("입력", ["내 사진 업로드", "예제 PCB로 테스트"], horizontal=True,
+                          key="pcb_reconstruction_input_mode")
+    if input_mode == "예제 PCB로 테스트":
+        _render_prism_example(st)
+        return
     uploads = st.file_uploader("PCB 사진 여러 장 추가", type=["jpg", "jpeg", "png", "webp"],
                                accept_multiple_files=True, key="pcb_reconstruction_uploads")
     if not uploads:
@@ -264,6 +273,69 @@ def render_multiview_reconstruction(st: Any) -> None:
                       "연결 그래프": graph.status,
                       "미관측 영역": "솔더마스크/가림 아래 배선은 NOT_OBSERVABLE"})
             st.caption("접촉 후보는 전기적 Net이나 연속성 확인이 아닙니다. 사진이 바뀌면 후보와 근거도 새로 계산됩니다.")
+
+
+def _render_prism_example(st: Any) -> None:
+    """Run pinned PRISM sample images through the local image-only pipeline."""
+    from circuitcare.vision.reconstruction.prism_dataset import SAMPLES, load_references, load_sample
+
+    repo_root = Path(__file__).resolve().parents[4]
+    dataset_root = repo_root / "data" / "external" / "prism"
+    if not (dataset_root / "Dataset").is_dir():
+        st.info("예제 데이터는 PRISM 저장소에서 고정 버전으로 자동 다운로드합니다. 원본 데이터는 CircuitCare Git 이력에 추가하지 않습니다.")
+        if st.button("PRISM 예제 데이터 다운로드", key="pcb_prism_download"):
+            script = repo_root / "scripts" / "fetch_prism_dataset.py"
+            result = subprocess.run([sys.executable, str(script)], cwd=repo_root,
+                                    capture_output=True, text=True, timeout=300)
+            if result.returncode == 0:
+                st.success(result.stdout.strip())
+                st.rerun()
+            else:
+                st.error(result.stderr.strip() or "PRISM 예제 데이터 다운로드에 실패했습니다.")
+        return
+
+    sample_id = st.selectbox("예제 PCB", list(SAMPLES), key="pcb_prism_sample")
+    st.caption("출처: PRISM · 고정 Commit 9189c87bbec6995b745b809db99cef6d3269401f · 실제 회로 기판이 아닌 렌더 기반 예제입니다.")
+    st.caption("KiCad 정답은 이미지 복원 입력으로 전달되지 않습니다. 이미지 좌표와 KiCad mm 좌표의 검증된 변환이 없어 Pixel 정확도 점수는 표시하지 않습니다.")
+    if not st.button("이미지 복원 후보 실행", key=f"pcb_prism_run_{sample_id}"):
+        try:
+            sample = load_sample(dataset_root, sample_id)
+            col_a, col_b = st.columns(2)
+            col_a.image(sample.top_image, caption="TOP 원본 이미지", use_container_width=True)
+            col_b.image(sample.bottom_image, caption="BOTTOM 원본 이미지", use_container_width=True)
+        except (OSError, ValueError) as exc:
+            st.error(f"예제 파일을 읽을 수 없습니다: {exc}")
+        return
+
+    with st.spinner(f"{sample_id}의 TOP/BOTTOM 이미지를 처리하고 있습니다…"):
+        script = repo_root / "scripts" / "benchmark_prism.py"
+        result = subprocess.run([sys.executable, str(script), "--dataset-root", str(dataset_root),
+                                 "--sample", sample_id], cwd=repo_root,
+                                capture_output=True, text=True, timeout=300)
+    if result.returncode:
+        st.error(result.stderr.strip() or "이미지 후보 처리가 실패했습니다.")
+        return
+    output_root = repo_root / "data" / "benchmarks" / "prism"
+    sample = load_sample(dataset_root, sample_id)
+    report_path = output_root / "baseline" / "sample_results" / f"{sample_id}.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    reference_stats = load_references(dataset_root, sample_id)["expected_stats"]
+    st.info("결과는 이미지에서 관측한 후보입니다. 정답 geometry와의 pixel 비교는 좌표 정합이 검증되지 않아 수행하지 않았습니다.")
+    st.write({"예제": sample_id, "정답 부품 수": reference_stats.get("component_count", "미기재"),
+              "정답 배선 segment 수": reference_stats.get("segment_count", "미기재"),
+              "정답 via 수": reference_stats.get("via_count", "미기재"),
+              "Connectivity 평가": "NOT_VERIFIED"})
+    for side in ("TOP", "BOTTOM"):
+        source = sample.top_image if side == "TOP" else sample.bottom_image
+        overlay = output_root / "baseline" / "overlays" / f"{sample_id}_{side}.png"
+        col_a, col_b = st.columns(2)
+        col_a.image(source, caption=f"{side} 원본", use_container_width=True)
+        if overlay.is_file():
+            col_b.image(overlay, caption=f"{side} 배선 후보 overlay · baseline", use_container_width=True)
+        st.write({"면": side, "파이프라인": report["baseline"][side]["status"],
+                  "배선 후보 component": report["baseline"][side].get("trace_component_count"),
+                  "Pad/Via 후보": report["baseline"][side].get("pad_via_candidate_count"),
+                  "동일 면 접촉 후보": report["baseline"][side].get("same_side_contact_candidate_count")})
 
 
 def _render_zoomable_canvas(st: Any, image: Image.Image, *, caption: str) -> None:
