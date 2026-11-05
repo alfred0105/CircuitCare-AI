@@ -294,7 +294,12 @@ def main() -> None:
                                    fault_value=fault_value if needs_value else None,
                                    root=ROOT, comparison_path=comparison_path,
                                    simulation_status=status,
-                                   simulation_integrity=analysis_snapshot.integrity)
+                                   simulation_integrity=analysis_snapshot.integrity,
+                                   risk_assessment=risk, comparison=comparison,
+                                   analysis_snapshot=analysis_snapshot,
+                                   current_fingerprint=current_simulation_fingerprint,
+                                   bayesian_supported=bayesian_supported,
+                                   analysis_context_key=context_key)
     elif active_view == views[2]:
         from circuitcare.dashboard.views.waveforms import render_waveform_view
         render_waveform_view(st, comparison=comparison, result_dir=result_dir, stress=stress,

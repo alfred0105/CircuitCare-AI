@@ -16,6 +16,7 @@ export default function(component) {
   const image = root.querySelector("[data-schematic-image]");
   const hitLayer = root.querySelector("[data-hit-regions]");
   const selectionLayer = root.querySelector("[data-selection-overlay]");
+  const analysisLayer = root.querySelector("[data-analysis-overlay]");
   const zoomLabel = root.querySelector("[data-zoom-label]");
   const geometryLabel = root.querySelector("[data-geometry-label]");
   const empty = root.querySelector("[data-empty]");
@@ -80,6 +81,50 @@ export default function(component) {
     const selected = (data.regions || []).filter((r) => r.component_ref === data.selected_ref);
     for (const region of selected) {
       selectionLayer.appendChild(make("polygon", { points: region.polygon.map((p) => p.join(",")).join(" "), class: "cc-highlight" }));
+    }
+  };
+  const buildOverlay = () => {
+    analysisLayer.replaceChildren();
+    const overlay = state.data.overlay;
+    if (!overlay || overlay.status !== "READY") return;
+    const regions = new Map((state.data.regions || []).map((region) => [region.component_ref, region]));
+    const addText = (group, x, y, value, className) => {
+      const label = make("text", { x, y, class: className, "text-anchor": "middle" });
+      label.textContent = String(value);
+      group.appendChild(label);
+    };
+    for (const marker of (overlay.markers || [])) {
+      if (marker.kind === "MEASUREMENT_NODE_CANDIDATE") {
+        const group = make("g", { class: "cc-overlay-measurement" });
+        group.appendChild(make("circle", { cx: marker.x, cy: marker.y, r: 1.7 }));
+        addText(group, marker.x + 2.4, marker.y - 1.2, marker.node, "cc-overlay-label");
+        analysisLayer.appendChild(group);
+        continue;
+      }
+      const region = regions.get(marker.component_ref);
+      if (!region) continue;
+      const points = region.polygon;
+      const xs = points.map((point) => point[0]);
+      const ys = points.map((point) => point[1]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      const group = make("g", { class: "cc-overlay-marker" });
+      if (marker.kind === "FAULT_SOURCE") {
+        group.appendChild(make("polygon", { points: points.map((point) => point.join(",")).join(" "), class: "cc-overlay-fault" }));
+        addText(group, cx, Math.min(...ys) - 1.2, "FAULT ASSUMPTION", "cc-overlay-label");
+      } else if (marker.kind === "DIRECT_CANDIDATE" || marker.kind === "INDIRECT_CANDIDATE") {
+        const candidateClass = marker.kind === "DIRECT_CANDIDATE" ? "cc-overlay-direct" : "cc-overlay-indirect";
+        group.appendChild(make("polygon", { points: points.map((point) => point.join(",")).join(" "), class: candidateClass }));
+        addText(group, cx, Math.min(...ys) - 1.2, `${marker.kind === "DIRECT_CANDIDATE" ? "DIRECT" : "INDIRECT"} · ${marker.hop_count} hop`, "cc-overlay-label");
+      } else if (marker.kind === "RISK") {
+        const levelClass = { EXCEEDED: "exceeded", NEAR_LIMIT: "near", WITHIN_LIMIT: "within", UNKNOWN: "unknown" }[marker.risk_level] || "unknown";
+        group.appendChild(make("circle", { cx: Math.max(...xs), cy: Math.min(...ys), r: 2.1, class: `cc-overlay-risk cc-overlay-risk-${levelClass}` }));
+        addText(group, cx, Math.min(...ys) - 1.6, marker.risk_level, "cc-overlay-label");
+      } else if (marker.kind === "INSPECTION_PRIORITY") {
+        group.appendChild(make("circle", { cx: Math.max(...xs), cy: Math.max(...ys), r: 2, class: "cc-overlay-inspection" }));
+        addText(group, Math.max(...xs), Math.max(...ys) + 0.8, marker.priority_rank ?? "?", "cc-overlay-rank");
+      }
+      analysisLayer.appendChild(group);
     }
   };
   const setAsset = () => {
@@ -170,6 +215,7 @@ export default function(component) {
     // Rebuilding keeps the Python → canvas highlight synchronized after a rerun.
     buildRegions();
   }
+  buildOverlay();
   renderCamera();
   return () => {
     for (const remove of state.listeners.splice(0)) remove();

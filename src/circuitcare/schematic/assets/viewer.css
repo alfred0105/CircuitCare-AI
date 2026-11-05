@@ -11,6 +11,18 @@
 .cc-hit-region:hover { fill: #2684ff20; stroke: #2684ff; stroke-width: 1.5; }
 .cc-hit-region:focus { stroke: var(--st-primary-color); stroke-width: 2; outline: none; }
 .cc-highlight { fill: #ffcc3333; stroke: var(--st-primary-color); stroke-width: .45; vector-effect: non-scaling-stroke; }
+.cc-overlay-fault { fill: #9b59b620; stroke: #7d3c98; stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+.cc-overlay-direct { fill: #2471a320; stroke: #2471a3; stroke-width: .9; vector-effect: non-scaling-stroke; }
+.cc-overlay-indirect { fill: #5dade220; stroke: #5dade2; stroke-width: .8; stroke-dasharray: 2 1.2; vector-effect: non-scaling-stroke; }
+.cc-overlay-risk { stroke: #fff; stroke-width: .45; vector-effect: non-scaling-stroke; }
+.cc-overlay-risk-exceeded { fill: #c0392b; }
+.cc-overlay-risk-near { fill: #e67e22; }
+.cc-overlay-risk-within { fill: #2874a6; }
+.cc-overlay-risk-unknown { fill: #7f8c8d; }
+.cc-overlay-measurement circle { fill: #17a589; stroke: #064; stroke-width: .6; vector-effect: non-scaling-stroke; }
+.cc-overlay-inspection { fill: #f4d03f; stroke: #7d6608; stroke-width: .5; vector-effect: non-scaling-stroke; }
+.cc-overlay-label { fill: #18212b; stroke: #fff; stroke-width: .45; paint-order: stroke; font-size: 2.15px; font-weight: 700; }
+.cc-overlay-rank { fill: #17202a; stroke: #f4d03f; stroke-width: .5; paint-order: stroke; font-size: 2.2px; font-weight: 700; }
 .cc-viewport[data-dragging="true"] { cursor: grabbing; }
 .cc-viewport[data-dragging="false"] { cursor: grab; }
 .cc-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #555; }

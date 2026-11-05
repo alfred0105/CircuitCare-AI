@@ -118,6 +118,20 @@ def _symbol_mirror(placed: list[SExpr]) -> tuple[bool, bool]:
     raise ValueError(f"Unsupported KiCad mirror mode: {value}")
 
 
+def transform_symbol_point(x: float, y: float, *, cx: float, cy: float,
+                           angle_degrees: float, mirror_x: bool = False,
+                           mirror_y: bool = False) -> tuple[float, float]:
+    """Map a KiCad library point to sheet coordinates using the verified transform."""
+    angle = math.radians(angle_degrees)
+    rotated_x = x * math.cos(angle) - y * math.sin(angle)
+    rotated_y = -(x * math.sin(angle) + y * math.cos(angle))
+    if mirror_y:
+        rotated_x = -rotated_x
+    if mirror_x:
+        rotated_y = -rotated_y
+    return round(cx + rotated_x, 4), round(cy + rotated_y, 4)
+
+
 def read_svg_view_box(svg: str | Path) -> tuple[float, float, float, float] | None:
     """Read a validated numeric page viewBox for pan/zoom, independent of hit geometry."""
     try:
@@ -164,7 +178,7 @@ def _load_page(source: Path, svg: Path, project_root: Path, identities: list[Any
             return GeometryResult("UNVERIFIED_GEOMETRY", f"Missing embedded library definition for {ref}")
         at = _child(placed, "at")
         cx, cy = _number(at, 1, f"{ref} x"), _number(at, 2, f"{ref} y")
-        angle = math.radians(_number(at, 3, f"{ref} angle"))
+        angle_degrees = _number(at, 3, f"{ref} angle")
         unit = int(_atom(_child(placed, "unit"), default="1"))
         try:
             mirror_x, mirror_y = _symbol_mirror(placed)
@@ -178,17 +192,9 @@ def _load_page(source: Path, svg: Path, project_root: Path, identities: list[Any
         # KiCad library y is up; SVG page y is down. The tested page transform is 1 mm to 1 viewBox unit.
         polygon = []
         for x, y in corners:
-            # KiCad rotates local library coordinates, converts to page Y-down,
-            # then reflects across the requested page axis.
-            rotated_x = x * math.cos(angle) - y * math.sin(angle)
-            rotated_y = -(x * math.sin(angle) + y * math.cos(angle))
-            if mirror_y:
-                rotated_x = -rotated_x
-            if mirror_x:
-                rotated_y = -rotated_y
-            page_x = cx + rotated_x
-            page_y = cy + rotated_y
-            polygon.append((round(page_x, 4), round(page_y, 4)))
+            polygon.append(transform_symbol_point(x, y, cx=cx, cy=cy,
+                                                  angle_degrees=angle_degrees,
+                                                  mirror_x=mirror_x, mirror_y=mirror_y))
         symbol_uuid = _atom(_child(placed, "uuid"))
         matches = [item for item in identities if item.component_ref == ref and item.symbol_uuid == symbol_uuid
                    and item.library_id == lib_id and item.unit == unit and item.sheet_path == root_path]
