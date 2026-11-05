@@ -11,7 +11,7 @@ _VIEWER = None
 
 def render_interactive_viewer(st: Any, *, svg: str, asset_key: str, view_box: tuple[float, float, float, float],
                               geometry_status: str, regions: list[dict], selected_ref: str,
-                              navigation_id: int, context_key: str, key: str,
+                              navigation_id: int, context_key: str, event_sequence_seed: int, key: str,
                               on_selection_change: Any) -> Any | None:
     """Mount a v2 viewer, returning None when this Streamlit build lacks that API."""
     global _VIEWER
@@ -28,7 +28,8 @@ def render_interactive_viewer(st: Any, *, svg: str, asset_key: str, view_box: tu
         data={"svg": svg, "asset_key": asset_key, "view_box": list(view_box),
               "geometry_status": geometry_status, "regions": regions,
               "selected_ref": selected_ref, "navigation_id": navigation_id,
-              "navigation_ref": selected_ref, "context_key": context_key},
+              "navigation_ref": selected_ref, "context_key": context_key,
+              "event_sequence_seed": event_sequence_seed},
         default={"selection": None}, on_selection_change=on_selection_change,
         key=key, width="stretch", height=690,
     )

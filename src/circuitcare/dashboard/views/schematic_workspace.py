@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from circuitcare.graph import direct_candidates, find_paths_result
+from circuitcare.schematic.electrical_equivalence import verify_schematic_netlist
 from circuitcare.schematic.exporter import export_schematic
 from circuitcare.schematic.geometry import (
     GeometryResult,
@@ -81,6 +82,13 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
             digest.update(schematic_path.name.encode())
     else:
         digest.update(b"no-kicad-schematic")
+    netlist_path = Path(case["netlist"])
+    if not netlist_path.is_absolute():
+        netlist_path = root / netlist_path
+    try:
+        digest.update(netlist_path.resolve(strict=True).read_bytes())
+    except OSError:
+        digest.update(b"unavailable-netlist")
     context_key = digest.hexdigest()
     context_token = context_key[:16]
     state_key = f"schematic_inspected_{context_token}"
@@ -114,9 +122,14 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
     svg_path = None
     view_box = None
     geometry = GeometryResult("UNVERIFIED_GEOMETRY", "회로도 geometry를 사용할 수 없습니다.")
+    equivalence = None
     mapping: dict[str, dict] = {}
     if schematic_path is not None:
         try:
+            equivalence = verify_schematic_netlist(
+                schematic_path, netlist_path, project_root=root,
+                cache_root=root / "data" / "schematic_equivalence_cache",
+            )
             identities, missing_sheets = read_symbol_identities(schematic_path, project_root=root)
             mapping = map_component_refs(refs, identities)
             if missing_sheets:
@@ -142,6 +155,15 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                 if len(regions) != len(geometry.regions):
                     geometry = GeometryResult("UNVERIFIED_GEOMETRY", "Schematic Reference does not match the current netlist", view_box)
                     regions = []
+                interaction_geometry = geometry
+                if equivalence is None or equivalence.status != "VERIFIED_EQUIVALENT":
+                    reason = equivalence.message if equivalence else "Equivalence check unavailable"
+                    interaction_geometry = GeometryResult(
+                        "UNVERIFIED_GEOMETRY",
+                        f"Electrical equivalence {equivalence.status if equivalence else 'NOT_VERIFIED'}: {reason}",
+                        view_box,
+                    )
+                    regions = []
                 asset_key = f"{result.cache_key}:{svg_path.name}"
                 with canvas:
                     st.caption(f"KiCad CLI SVG · {schematic_path.relative_to(root)} · {svg_path.name}")
@@ -154,24 +176,31 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                             if not isinstance(event, dict) or event.get("event_id") == st.session_state.get(f"last_event_{viewer_key}"):
                                 return
                             valid, reason = validate_selection_event(event, component_refs=set(refs),
-                                                                    geometry=geometry, context_key=context_key)
-                            st.session_state[f"last_event_{viewer_key}"] = event.get("event_id")
-                            if not valid:
+                                                                    geometry=interaction_geometry,
+                                                                    context_key=context_key,
+                                                                    asset_key=asset_key)
+                            prior_sequence = int(st.session_state.get(f"last_seq_{viewer_key}", 0))
+                            event_sequence = event.get("event_seq")
+                            if not valid or type(event_sequence) is not int or event_sequence <= prior_sequence:
                                 st.session_state[f"selection_error_{viewer_key}"] = reason
                                 return
+                            st.session_state[f"last_seq_{viewer_key}"] = event_sequence
+                            st.session_state[f"last_event_{viewer_key}"] = event.get("event_id")
                             st.session_state[state_key] = event["component_ref"]
                             st.session_state[f"schematic_component_{context_token}"] = event["component_ref"]
                             st.session_state[navigation_key] = int(st.session_state.get(navigation_key, 0)) + 1
 
                         viewer_result = render_interactive_viewer(
                             st, svg=svg, asset_key=asset_key, view_box=view_box,
-                            geometry_status=geometry.status,
+                            geometry_status=interaction_geometry.status,
                             regions=[{"component_ref": item.component_ref, "symbol_uuid": item.symbol_uuid,
                                       "sheet_path": item.sheet_path, "unit": item.unit,
                                       "polygon": [list(point) for point in item.polygon]} for item in regions],
                             selected_ref=component_ref,
                             navigation_id=int(st.session_state.get(navigation_key, 0)),
-                            context_key=context_key, key=viewer_key,
+                            context_key=context_key,
+                            event_sequence_seed=int(st.session_state.get(f"last_seq_{viewer_key}", 0)),
+                            key=viewer_key,
                             on_selection_change=handle_viewer_selection,
                         )
                     if viewer_result is None:
@@ -181,6 +210,9 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                         selection_error = st.session_state.pop(f"selection_error_{viewer_key}", None)
                         if selection_error:
                             st.warning(f"회로도 선택 이벤트를 거부했습니다: {selection_error}")
+                        eq_status = equivalence.status if equivalence else "NOT_VERIFIED"
+                        st.caption(f"Electrical equivalence · {eq_status} · "
+                                   f"{equivalence.message if equivalence else 'Schematic unavailable'}")
                         st.caption(f"Symbol Geometry · {geometry.status} · {geometry.message}")
             else:
                 with canvas:
@@ -212,6 +244,8 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
             if conn.ref == component_ref:
                 st.caption(f"{conn.pin} → {conn.net}")
         identity = mapping.get(component_ref, {"status": "UNVERIFIED_MAPPING"})
+        if equivalence is not None:
+            st.caption(f"회로도/넷리스트 정합성 · {equivalence.status} · {equivalence.message}")
         st.caption(f"점검 선택 · {component_ref} · 고장 원인 {selected_fault} (별도 상태)")
         st.caption(f"회로도 매칭 · {identity.get('status', 'UNVERIFIED_MAPPING')}")
         for instance in identity.get("symbol_instances", []):

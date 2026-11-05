@@ -24,6 +24,7 @@ export default function(component) {
     state = { scale: 1, x: 0, y: 0, pageKey: "", assetKey: "", objectUrl: "", selected: null, navigationId: null, drag: null, pointer: null, listeners: [], observer: null, eventCounter: 0 };
     instances.set(root, state);
   }
+  state.eventCounter = Math.max(state.eventCounter, Number(data.event_sequence_seed) || 0);
   state.sendSelection = (region) => {
     state.eventCounter += 1;
     setStateValue("selection", {
@@ -32,6 +33,8 @@ export default function(component) {
       sheet_path: region.sheet_path,
       unit: region.unit,
       context_key: data.context_key,
+      asset_key: data.asset_key,
+      event_seq: state.eventCounter,
       event_id: `${Date.now()}-${state.eventCounter}`,
     });
   };
@@ -119,13 +122,19 @@ export default function(component) {
     state.y = state.drag.ty + point.y - state.drag.y;
     renderCamera();
   };
-  const endDrag = () => { state.drag = null; viewport.dataset.dragging = "false"; };
+  const endDrag = (event) => {
+    if (event?.pointerId !== undefined && state.drag && state.drag.pointerId !== event.pointerId) return;
+    state.drag = null; viewport.dataset.dragging = "false";
+  };
   if (state.listeners.length === 0) {
     listen(viewport, "wheel", onWheel, { passive: false });
     listen(viewport, "pointerdown", onPointerDown);
     listen(viewport, "pointermove", onPointerMove);
     listen(viewport, "pointerup", endDrag);
     listen(viewport, "pointercancel", endDrag);
+    listen(viewport, "lostpointercapture", endDrag);
+    listen(window, "blur", endDrag);
+    listen(window, "pagehide", endDrag);
     listen(hitLayer, "click", (event) => {
       const shape = event.target.closest("[data-region-index]");
       if (!shape) return;

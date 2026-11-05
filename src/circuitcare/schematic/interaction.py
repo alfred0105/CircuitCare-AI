@@ -8,12 +8,14 @@ from circuitcare.schematic.geometry import GeometryResult
 
 
 def validate_selection_event(event: Any, *, component_refs: set[str], geometry: GeometryResult,
-                             context_key: str) -> tuple[bool, str]:
+                             context_key: str, asset_key: str) -> tuple[bool, str]:
     """Re-check every identifier against current trusted geometry and analysis context."""
     if not isinstance(event, dict):
         return False, "Selection event is missing or invalid"
     if event.get("context_key") != context_key:
         return False, "Selection event belongs to another circuit context"
+    if event.get("asset_key") != asset_key:
+        return False, "Selection event belongs to an old schematic page or SVG"
     if geometry.status != "VERIFIED_GEOMETRY":
         return False, "Selection is disabled because geometry is not verified"
     ref, uuid = event.get("component_ref"), event.get("symbol_uuid")
