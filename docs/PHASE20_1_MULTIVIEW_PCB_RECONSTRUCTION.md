@@ -76,7 +76,9 @@ Streamlit 화면에서 두 PNG를 동시에 업로드하고 앞면·뒷면을 �
 - [앞면·뒷면 방향 검토 화면](assets/phase20_1_registration_review_browser.png)
 - [배선 후보 중첩 화면](assets/phase20_1_copper_candidates_browser.png)
 
-회귀 테스트는 `tests/test_vision_reconstruction.py`, 기존 `tests/test_vision.py`, Streamlit AppTest 내비게이션 확인을 포함합니다. 세션 상태 및 내부 상태 코드는 유지됩니다.
+로컬 Python 3.12 회귀 테스트는 **328 passed**이며 `tests/test_vision_reconstruction.py`, 기존 `tests/test_vision.py`, 전체 CircuitCare 회귀 및 Streamlit AppTest 내비게이션을 포함합니다. Python compileall, JavaScript syntax check, `git diff --check`도 통과했습니다. 세션 상태 및 내부 상태 코드는 유지됩니다.
+
+GitHub Actions [Tests run 42017609929](https://github.com/alfred0105/CircuitCare-AI/actions/runs/42017609929)도 성공했습니다. Python 3.11·3.12, ngspice 통합, OCR 통합, bounded stress 및 isolated crash-injection 작업이 모두 통과했습니다.
 
 ## 9. 제한 사항과 Phase 20.2 착수 조건
 
@@ -88,3 +90,5 @@ Streamlit 화면에서 두 PNG를 동시에 업로드하고 앞면·뒷면을 �
 - RC/보드 결함이나 끊어진 패턴을 실제 PCB 고장으로 진단하지 않습니다.
 
 Phase 20.2로 넘어가기 전 실제 PCB 사진의 촬영 권한과 레이블을 확보하고, trace·pad·via 영역별 Ground Truth와 보드별 train/eval 분리를 마련해야 합니다. 이후 임계값 개선은 그 자료에서 평가하고, 사용자 수정 결과와 출처를 보존해야 합니다.
+
+Phase 20.1 구현 커밋 `17134b316b502f8daaa44ed3ae51514cc34f219f`는 `main`에 반영되었습니다. 실제 PCB 정확도는 아직 검증되지 않았으므로 이 단계의 성공 범위는 합성 fixture와 로컬/CI 테스트까지입니다.
