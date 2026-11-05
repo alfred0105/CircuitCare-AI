@@ -25,6 +25,7 @@ def test_missing_engine_fingerprint_fails_closed_without_raising():
     assert reasons == ["UNVERIFIED_SIMULATION_CACHE"]
 
 
+@pytest.mark.integration
 def test_divider_phase19_3_4_simulation_manifest_is_verified_and_tamper_is_stale(tmp_path):
     case = DEMO_CASES["Independent resistor divider (evaluation circuit A)"]
     result = ROOT / case["cached"]
