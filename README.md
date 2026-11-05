@@ -4,7 +4,7 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: integrated local prototype; Phase 21.0 is auditing scope and evaluation readiness.** Existing capabilities include KiCad/netlist analysis, supported SPICE scenarios, stress/risk review, conditional diagnosis and measurement suggestions, schematic and PCB candidate views, and evidence-grounded reports. The three competition research claims are electrical connectivity reconstruction, physics-informed fault reasoning, and active-measurement efficiency. No physical repair accuracy or real-board electrical connectivity performance has been established. Risk levels, detector scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: integrated local prototype; Phase 21.0 audit is recorded and Phase 21.0.1 roadmap alignment is complete, with responsive browser verification still open.** Existing capabilities include KiCad/netlist analysis, supported SPICE scenarios, stress/risk review, conditional diagnosis and measurement suggestions, schematic and PCB candidate views, and evidence-grounded reports. The three competition research claims are electrical connectivity reconstruction, physics-informed fault reasoning, and active-measurement efficiency. No physical repair accuracy or real-board electrical connectivity performance has been established. Risk levels, detector scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
 
 ### Validation at a glance
 
@@ -29,12 +29,11 @@ Graph traversal now enforces global queue, expanded-state, result, depth, and op
 
 Run the fast suite with `python -m pytest -q -m "not integration and not stress"`, native integrations with `python -m pytest -q -m integration`, and synthetic stress coverage with `python -m pytest -q -m stress`. The previously reported Python termination remains unattributed because no crash log was supplied.
 
-## Core differentiator
-- Start from a **known failed component and failure mode**, not just a symptom.
-- Track possible **secondary effects** through the circuit topology.
-- Verify supported candidate impacts using **normal-vs-fault SPICE simulations** and explicitly configured component limits.
-- Use **lightweight local Bayesian inference** and expected information gain to update diagnoses and rank measurements.
-- Return **ranked inspection guidance with evidence**, without presenting conditionally weighted hypotheses as real-world failure probabilities.
+## Current prototype and target product
+
+**Current prototype:** the user selects a circuit and a supported fault component/mode. CircuitCare evaluates candidate connectivity, runs supported normal-vs-fault SPICE analyses, compares stress with configured ratings, and ranks conditional Bayesian hypotheses and measurement candidates. PCB Vision and multiview reconstruction are partial; their electrical connectivity accuracy has not been verified on a CircuitCare physical board.
+
+**Target product:** start with multiview PCB photos and a natural-language symptom, even when the user does not know the failed component. The system will structure symptoms into module and fault candidates, analyze root cause separately from possible secondary stress, recommend measurements, accept measured values, and guide repair. When a net or cause is uncertain, it must ask for design data, user confirmation, or additional measurements, or show explicitly limited candidates. It must not present an LLM hypothesis, image-derived contact, simulated rating stress, or conditional Bayesian score as a confirmed failure.
 
 ## Roadmap
 
@@ -61,7 +60,18 @@ Run the fast suite with `python -m pytest -q -m "not integration and not stress"
 | 18 | Unified workspace, guided workflow, evidence-grounded reports | Implemented; cached synthetic report flow verified; physical repair validation not evaluated |
 | 18.1 | Diagnostic context and evidence integrity | Implemented; see [verification record](docs/PHASE18_1_RELIABILITY_HOTFIX.md) |
 | 19–20 | Schematic workbench, multi-view PCB pipeline, PRISM adapter and segmentation candidates | Partially implemented; real-board registration and electrical reconstruction remain unverified |
-| 21.0 | Scope, technical/evaluation audit, usability fixes and roadmap | In progress; no AI accuracy improvement claimed |
+| 21.0 | Scope, technical/evaluation audit and evidence inventory | Audit and docs pushed; no AI accuracy improvement claimed |
+| 21.0.1 | Roadmap alignment, actual browser UI verification, final documentation | Roadmap/docs aligned; narrow IAB interaction spot-check only. Target viewport screenshots and full browser E2E remain open; see [final alignment record](docs/PHASE21_0_1_FINAL_ALIGNMENT.md) |
+| 21.1 | PCB data and photo↔KiCad registration | Planned; matching physical board data and independent calibration points required |
+| 21.2 | Component/pad/via/copper labels and grouped splits | Planned; registered board samples and independent labels required |
+| 21.3 | Image-only PCB Vision baseline | Planned; sealed board-level holdout required |
+| 21.4 | Design-assisted reconstruction and ablation | Planned; separately reported from Image-only track |
+| 21.5 | Electrical connectivity graph reconstruction | Planned; reviewed pin/pad/net truth required |
+| 21.6 | Physics-informed fault diagnosis | Planned; independent circuit families and supported SPICE cases |
+| 21.7 | Active measurement policy evaluation | Planned; paired Random/Rule/EIG cases and fixed stopping criteria |
+| 21.8 | Natural-language symptom and secondary-damage integration | Planned; structured symptoms, bounded candidates, physical/SPICE evidence separated |
+| 21.9 | Integrated repair workbench and user-centered UI/UX | Planned; photo-to-report workflow, summary/detail, PCB viewer, measurement updates |
+| 21.10 | Competition evaluation and release | Planned; independently evaluate all three research contributions |
 
 Historical phase acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md). Current direction and gates: [Phase 21 roadmap](docs/PHASE21_ROADMAP.md).
 

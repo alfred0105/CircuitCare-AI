@@ -2,7 +2,7 @@
 
 ## Product goal
 
-Given multiview PCB photographs and a reported fault symptom, help a repairer inspect a board by reconstructing visual structure, grounding hypotheses in electrical models, identifying possible secondary stress, and recommending useful measurements. The product must distinguish observed pixels, inferred connections, design connectivity, simulated stress, and physically confirmed outcomes.
+The target product starts from multiview PCB photographs and a natural-language fault symptom, even when the user does not already know the failed component. It helps the repairer interpret symptoms, reconstruct visual structure, ground hypotheses in electrical models, identify possible secondary stress, and recommend useful measurements. The product must distinguish observed pixels, inferred connections, design connectivity, simulated stress, and physically confirmed outcomes. When connectivity or cause remains uncertain, it asks for a design file, confirmation, or measurement instead of presenting an inferred result as confirmed.
 
 Competition claims focus on measurable contributions in: (1) PCB electrical connectivity reconstruction, (2) physics-informed fault-cause reasoning, and (3) active measurement that improves diagnostic efficiency. Feature count is not evidence of technical merit.
 
@@ -14,6 +14,7 @@ Competition claims focus on measurable contributions in: (1) PCB electrical conn
 - Active measurement recommendation, evaluated against matched baselines.
 - Natural-language symptom intake and evidence-gated fault overlays as interfaces to the core methods.
 - Summary and detailed analysis views that expose source, uncertainty, and validation status.
+- A user-centered workbench that connects photo intake, symptom input, analysis, PCB viewing, measurement updates, and repair guidance.
 
 ## Supporting capabilities
 
@@ -21,7 +22,7 @@ KiCad import and viewer, datasheet extraction and human review, local LLM explan
 
 ## Deferred capabilities
 
-Full 3D reconstruction, automatic component purchasing, large-scale LLM training, automatic continual learning, exhaustive multi-fault enumeration, and live camera streaming are deferred. Existing code and public APIs are retained; advanced routes may be separated from the default workflow without breaking compatibility.
+Full 3D reconstruction, automatic component purchasing, large-scale LLM training, automatic continual learning, exhaustive multi-fault enumeration, and live camera streaming are deferred. Phase 21.8 may examine a bounded set of compound-fault hypotheses; exhaustive multi-fault enumeration remains deferred. Existing code and public APIs are retained; advanced routes may be separated from the default workflow without breaking compatibility.
 
 ## Evidence labels
 

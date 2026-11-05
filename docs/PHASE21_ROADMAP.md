@@ -1,18 +1,25 @@
 # Phase 21 Roadmap
 
-Phase 21 targets three measured contributions: electrical connectivity reconstruction, physics-informed fault reasoning, and active measurement efficiency. No stage may upgrade evidence status without the specified data and validation.
+Phase 21 builds toward a repair workflow that can start from multiview PCB photos and natural-language symptoms. The three independently evaluated research contributions remain electrical connectivity reconstruction, physics-informed fault reasoning, and active-measurement efficiency. No stage may upgrade evidence status without the specified data and validation.
 
 | Phase | Focus and dependency | Start condition | Completion evidence |
 |---|---|---|---|
-| 21.0 | Audit, scope, evaluation rules and verified UI fixes | Existing repository | inventory, limits, shared schema, regression + browser evidence, reviewed roadmap |
-| 21.1 | PCB data and registration foundation; depends on 21.0 | Board identity/revision, front/back photos, matching KiCad PCB/Position CSV/netlist, independent calibration and validation points | reproducible photo↔design transform with residuals; image-only and design-assisted inputs explicitly separated |
-| 21.2 | Component, pad, via and copper annotation set; depends on 21.1 | Registered board samples and independent labels | frozen board-group split, annotation guide, inter-review agreement, candidate metrics and error taxonomy |
-| 21.3 | Image-only reconstruction baseline; depends on 21.2 | Training/development labels and sealed board holdout | per-board detection/segmentation scores, uncertainty and false merge/split; holdout scored once by isolated evaluator |
-| 21.4 | Design-assisted reconstruction and ablation; depends on 21.1–21.3 | matching design data and frozen image-only baseline | separately scored design-assisted results and ablation; no silent design metadata in image-only track |
-| 21.5 | Electrical connectivity reconstruction; depends on 21.4 and electrical truth | independently reviewed pin/pad/net correspondence including shorts/opens and via layer links | net/edge and false-short/open metrics by board; candidates stay separate from confirmed circuit nets |
-| 21.6 | Physics-informed diagnosis improvement; depends on supported reconstruction or explicit KiCad inputs and frozen 21.0 protocol | independent circuit families, supported SPICE models, known injected faults and observation conditions | matched rules/Bayesian/SPICE/combined baselines, top-k/calibration/abstention by topology; physical claims only if real outcomes exist |
-| 21.7 | Active measurement policy evaluation; depends on frozen diagnosis task and measurement model | paired case set, probe costs/accessibility, fixed stopping/seed protocol | Random, Rule, existing EIG and optional improved EIG comparison on identical cases; efficiency and accuracy at fixed budgets |
-| 21.8 | Integrated competition demonstrator and release | 21.3–21.7 artifacts have reproducible records; no unresolved provenance bypass | end-to-end demo, clear image-only/design-assisted labels, reproducibility bundle, limitations and presentation-ready results |
+| 21.0 | Technical audit, scope, evaluation rules and initial workbench fixes | Existing repository | 20-area inventory, evidence limits, experiment schema, targeted regression and documented gaps |
+| 21.0.1 | Roadmap alignment, UI verification and final documentation | Phase 21.0 baseline | target product and 21.1–21.10 plan aligned; browser evidence and limitations recorded; docs and CI updated |
+| 21.1 | PCB data and registration foundation | Board identity/revision; front/back photos; matching KiCad PCB, Position CSV and netlist; independent calibration and validation points | reproducible photo↔design transform with residuals; image-only and design-assisted inputs separated |
+| 21.2 | Component, pad, via and copper annotations / dataset | Registered board samples and independent labels | frozen board-group split, annotation guide, inter-review agreement, candidate metrics and error taxonomy |
+| 21.3 | Image-only PCB Vision AI baseline | Development labels and sealed board holdout from 21.2 | per-board detection/segmentation scores, uncertainty and false merge/split; holdout scored once by isolated evaluator |
+| 21.4 | Design-assisted reconstruction and ablation | Matching design data, registered boards and frozen 21.3 baseline | separately scored design-assisted results and ablation; no design metadata in image-only track |
+| 21.5 | Electrical connectivity graph reconstruction | 21.4 plus independently reviewed pin/pad/net correspondence, including shorts/opens and layer links | net/edge and false-short/open metrics by board; visual candidates remain separate from confirmed electrical nets |
+| 21.6 | Physics-informed fault diagnosis | Independent circuit families, supported SPICE models, known faults and observation conditions; explicit KiCad input allowed when visual connectivity is unverified | matched Rules/Bayesian/SPICE/combined baselines, top-k, calibration and abstention by topology; physical claims only with physical outcomes |
+| 21.7 | Active measurement policy evaluation | Paired case set, probe cost/accessibility, fixed stopping and seed protocol | Random, Rule, existing EIG and optional improved EIG on identical cases; efficiency and accuracy at fixed budgets |
+| 21.8 | Natural-language symptoms and secondary-damage diagnosis integration | Validated fault catalog and diagnosis outputs from 21.6; supported electrical graph or explicit design input; measured policy results from 21.7 | structured symptom interpretation and module candidates; distinct root-cause / secondary-impact outputs; bounded compound-fault hypotheses; suggested measurements; no LLM-confirmed failures |
+| 21.9 | Integrated repair workbench and user-centered UI/UX | Stable 21.8 workflow plus usable PCB viewer and provenance states | new diagnosis → summary/detail → PCB viewer → report flow; advanced tools on demand; uncertainty and user measurement update visible |
+| 21.10 | Competition evaluation, demo and release | Reproducible records from 21.3–21.9; independent holdouts; no provenance bypass | independently report three research contributions; integrated demo; runtime/limitations/reproducibility package and final presentation |
+
+PCB reconstruction (21.1–21.5) and diagnosis / measurement work (21.6–21.7) may proceed in parallel on separate data tracks. Phase 21.8 should use verified design connectivity first. If image-derived connectivity is uncertain, the application must request design input or user confirmation, or limit itself to clearly labeled candidates; it must not imply a confirmed net.
+
+For 21.8, evaluate natural-language symptom structuring, fault-candidate accuracy, and secondary-impact candidates separately. For 21.9, evaluate task completion and usability separately from AI accuracy. Keep physical damage observation distinct from simulated rating stress.
 
 ## Immediate Phase 21.1 gate
 
