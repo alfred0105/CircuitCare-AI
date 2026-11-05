@@ -107,4 +107,5 @@ No benchmark or latency claim was made. Selection and overlay changes were exerc
 - Ruff changed Python files: **PASS**
 - `node --check src/circuitcare/schematic/assets/viewer.js`: **PASS**
 - Targeted mypy: **40 existing-scope errors in `ui.py`; no errors in added navigation/theme modules or schematic renderer**
-- GitHub Actions: pending push and run inspection
+- GitHub Actions for `d37ae68` and its tested source tree: **PASS**, all six jobs including Python 3.11/3.12, ngspice integration, OCR inference, stress, and crash injection. [Run 41988485418](https://github.com/alfred0105/CircuitCare-AI/actions/runs/41988485418)
+- An earlier CI attempt caught an AppTest assertion tied to version-specific widget exposure; the assertion was narrowed to stable Workbench/Inspector content, and the subsequent cross-version CI run passed.
