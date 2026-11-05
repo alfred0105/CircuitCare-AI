@@ -4,7 +4,24 @@
 
 CircuitCare AI aims to answer a practical repair question: **if one component has failed, which *other* components might have been affected, why, and what should be checked next?**
 
-> **Status: CircuitCare AI v0.1.0 MVP integrated; Phase 18.1 reliability hotfix implemented and CI verified.** Phase 18 provides a content-addressed workspace, guided workflow, and snapshot JSON/Markdown/HTML/Evidence Bundle exports across 11 analysis areas. Phase 18.1 separates active measurements from What-if preview, preserves explicitly recorded 0 V values, standardizes measurement provenance, validates simulation input/result fingerprints, and blocks invalidated learned-prior rollback. Read the [User Guide](docs/USER_GUIDE.md), [Diagnostic Workflow](docs/DIAGNOSTIC_WORKFLOW.md), [Reporting Guide](docs/REPORTING_GUIDE.md), and [Phase 18.1 Hotfix record](docs/PHASE18_1_RELIABILITY_HOTFIX.md). Physical repair accuracy and actual damage prediction remain `NOT_EVALUATED`; risk levels, model scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+> **Status: integrated local prototype; Phase 21.0 is auditing scope and evaluation readiness.** Existing capabilities include KiCad/netlist analysis, supported SPICE scenarios, stress/risk review, conditional diagnosis and measurement suggestions, schematic and PCB candidate views, and evidence-grounded reports. The three competition research claims are electrical connectivity reconstruction, physics-informed fault reasoning, and active-measurement efficiency. No physical repair accuracy or real-board electrical connectivity performance has been established. Risk levels, detector scores, heuristic matches, and Bayesian weights do **not** establish damage or real-world failure probability.
+
+### Validation at a glance
+
+- Synthetic fault benchmark: 10 cases / 5 topology groups; repeated runs are not independent cases. Rules exact precision .0495 and recall 1.0; LLM exact precision/recall 0; combined methods showed no exact-diagnosis gain over Rules. See [Phase 17 results](docs/PHASE17_EVALUATION.md) and [Phase 17.1 correction](docs/PHASE17_1_EVALUATION_HOTFIX.md).
+- PCB detector: public validation split, 13 images / 196 objects; precision .498, recall .612, mAP@.5 .509. Board split independence and CircuitCare real-board reference matching are not verified. See [PCB evaluation](docs/PCB_AI_EVALUATION.md).
+- PRISM: 12 boards / 24 sides passed through image processing; no image-to-design calibration, valid pixel accuracy metrics, or electrical connectivity validation. See [PRISM benchmark](docs/PHASE20_1_1_PRISM_BENCHMARK.md).
+- Active-measurement policy benefit: `NOT_EVALUATED`; expected-information-gain selection exists, but no matched Random / Rule / EIG efficiency experiment exists.
+
+### Read order
+
+1. [Project overview and setup](README.md)
+2. [System architecture](docs/ARCHITECTURE.md)
+3. [Evaluation methodology](docs/BENCHMARK_METHODOLOGY.md) and [Phase 21 evaluation strategy](docs/PHASE21_EVALUATION_STRATEGY.md)
+4. [Current validation results](docs/PHASE21_0_TECHNICAL_AUDIT.md)
+5. [Phase 21 roadmap](docs/PHASE21_ROADMAP.md)
+
+Phase 21 records: [technical audit](docs/PHASE21_0_TECHNICAL_AUDIT.md), [project scope](docs/PHASE21_0_PROJECT_SCOPE.md), [evaluation strategy](docs/PHASE21_EVALUATION_STRATEGY.md), [roadmap](docs/PHASE21_ROADMAP.md).
 
 ### Phase 18.1.1 stability work
 
@@ -42,9 +59,11 @@ Run the fast suite with `python -m pytest -q -m "not integration and not stress"
 | 17 | Independent benchmark, fair baselines, statistical validation, efficiency | Synthetic benchmark complete; see Phase 17 evaluation and Phase 17.1 metric correction |
 | 17.1 | Metric integrity, off-grid evaluation, SPICE identifiability | Complete; corrected reused-holdout scoring and off-grid parameter evaluation on reused topology templates |
 | 18 | Unified workspace, guided workflow, evidence-grounded reports | Implemented; cached synthetic report flow verified; physical repair validation not evaluated |
-| 18.1 | Diagnostic context and evidence integrity | Implemented; local tests and Python 3.11/3.12 CI passed; see [verification record](docs/PHASE18_1_RELIABILITY_HOTFIX.md) |
+| 18.1 | Diagnostic context and evidence integrity | Implemented; see [verification record](docs/PHASE18_1_RELIABILITY_HOTFIX.md) |
+| 19–20 | Schematic workbench, multi-view PCB pipeline, PRISM adapter and segmentation candidates | Partially implemented; real-board registration and electrical reconstruction remain unverified |
+| 21.0 | Scope, technical/evaluation audit, usability fixes and roadmap | In progress; no AI accuracy improvement claimed |
 
-Full acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
+Historical phase acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md). Current direction and gates: [Phase 21 roadmap](docs/PHASE21_ROADMAP.md).
 
 ## Quick start
 

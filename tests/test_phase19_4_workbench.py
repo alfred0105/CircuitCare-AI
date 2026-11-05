@@ -46,3 +46,29 @@ def test_korean_status_labels_preserve_internal_codes():
 
     assert korean_status("EXCEEDED") == "설정 정격 초과"
     assert korean_status("UNKNOWN") == "미평가"
+    assert korean_status("PROVENANCE_UNVERIFIED") == "출처 확인 필요"
+    assert korean_status("UNRECOGNIZED_INTERNAL_STATE") == "상태 확인 필요"
+
+
+def test_phase21_responsive_layout_and_overlay_symbols_are_present():
+    root = Path(__file__).resolve().parents[1]
+    styles = (root / "src/circuitcare/dashboard/workbench_styles.py").read_text()
+    viewer = (root / "src/circuitcare/schematic/assets/viewer.js").read_text()
+    assert "grid-template-columns:minmax(145px" in styles
+    assert "first-child { display:none!important; }" not in styles
+    assert 'EXCEEDED: "▲"' in viewer
+    assert 'NEAR_LIMIT: "◆"' in viewer
+    assert 'WITHIN_LIMIT: "○"' in viewer
+    assert 'UNKNOWN: "?"' in viewer
+
+
+def test_phase21_readme_document_links_exist_and_schema_is_valid_json():
+    import json
+    import re
+
+    root = Path(__file__).resolve().parents[1]
+    readme = (root / "README.md").read_text()
+    for relative in re.findall(r"\]\((docs/[^)#]+\.md)\)", readme):
+        assert (root / relative).is_file(), relative
+    schema = json.loads((root / "evaluation/experiment_record.schema.json").read_text())
+    assert "experiment_id" in schema["required"]
