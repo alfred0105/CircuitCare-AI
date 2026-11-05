@@ -103,10 +103,17 @@ def main() -> None:
     import streamlit as st
 
     st.set_page_config(page_title="CircuitCare AI", page_icon="🔧", layout="wide")
-    st.title("CircuitCare AI")
-    st.caption("로컬 회로 고장 영향 분석 · 정격 스트레스 평가 · Bayesian 진단 · 근거 기반 수리 지원")
-    st.info("연결 그래프는 후보 경로만 나타냅니다. 시뮬레이션은 손상을 확정하지 않으며, 위험 순위와 Posterior는 실제 고장 확률이 아닙니다.")
+    from circuitcare.dashboard.navigation import WORKSPACE_VIEWS, format_view_option
+    navigation_target = st.session_state.pop("workbench_navigation_target", None)
+    if navigation_target in WORKSPACE_VIEWS:
+        st.session_state["active_analysis_view"] = navigation_target
+    from circuitcare.dashboard.workbench_styles import (
+        apply_workbench_theme,
+        render_workbench_header,
+    )
+    apply_workbench_theme(st)
 
+    st.sidebar.subheader("Project & Circuit")
     case_name = st.sidebar.selectbox("회로 데이터셋", [*CASES, UPLOAD_CHOICE], key="case_name")
     if case_name == UPLOAD_CHOICE:
         uploaded = st.sidebar.file_uploader("KiCad XML 넷리스트", type=["xml"], key="uploaded_netlist")
@@ -129,6 +136,7 @@ def main() -> None:
     netlist_path = ROOT / case["netlist"]
     if case_name != UPLOAD_CHOICE and not case.get("uploaded"):
         circuit = load_netlist(netlist_path)
+    st.sidebar.subheader("Fault Context")
     fault_options = fault_options_for(case_name, case, list(circuit.components))
     selected_fault = st.sidebar.selectbox("고장 부품", fault_options, index=fault_options.index(case["fault"]) if case["fault"] in fault_options else 0)
     fault_type = st.sidebar.selectbox("고장 유형", case["fault_types"], index=case["fault_types"].index(case["fault_type"]), key=f"fault_type_{case_name}")
@@ -264,28 +272,33 @@ def main() -> None:
             "PROVENANCE_UNVERIFIED": "🟠 PROVENANCE_UNVERIFIED · 저장 결과 출처 미검증",
             "NOT_RUN": "⚪ NOT_RUN · 분석 준비 · 미실행",
         }[status])
+    render_workbench_header(
+        st,
+        circuit_name=case_name,
+        fault_ref=selected_fault,
+        fault_type=str(fault_type or case["fault_type"]),
+        fault_value=fault_value if needs_value else None,
+        simulation_status=status,
+        verification_status=analysis_snapshot.integrity,
+    )
+    st.caption("연결 후보는 손상 증거가 아닙니다. 위험 등급은 평가된 정격 스트레스이며 실제 고장 확률이 아닙니다.")
     active_workspace["analysis_records"] = build_analysis_records(
         workspace_context=workspace_context, active_workspace=active_workspace,
         comparison=comparison, risk=risk, status=status, uploaded=bool(case.get("uploaded")),
     )
     st.session_state["circuitcare_workspace"] = active_workspace
     st.sidebar.markdown("🟢 ngspice 사용 가능" if _command_exists("ngspice") else "🟠 ngspice 없음 · 저장 결과 조회 가능")
-    views = ["분석 개요", "회로 및 고장", "SPICE 파형", "2차 손상 위험", "Bayesian 진단", "로컬 LLM 수리 지원", "PCB 사진 인식", "데이터시트 AI", "AI 고장 가설 분석", "수리 이력 및 AI 학습", "AI 성능 평가"]
-    active_view = st.selectbox("분석 영역", views, key="active_analysis_view")
-    client, models = _ollama_models() if active_view in {views[5], views[7], views[8]} else (None, [])
+    views = WORKSPACE_VIEWS
+    st.sidebar.subheader("Workspace & Tools")
+    if not st.session_state.get("phase194_navigation_migrated"):
+        st.session_state["active_analysis_view"] = views[0]
+        st.session_state["phase194_navigation_migrated"] = True
+    active_view = st.sidebar.selectbox("작업 영역", views, key="active_analysis_view",
+                                       format_func=format_view_option)
+    client, models = _ollama_models() if active_view in {"로컬 LLM 수리 지원", "데이터시트 AI", "AI 고장 가설 분석"} else (None, [])
     st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Local LLM은 해당 영역을 열 때 확인합니다")
     what_if_result = None
     if active_view == views[0]:
-        what_if_result = _render_analysis_overview(
-            st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
-            failed_component=selected_fault, fault_type=fault_type, fault_value=fault_value,
-            risk=risk, comparison=comparison, status=status, bayesian_supported=bayesian_supported,
-            workspace=active_workspace,
-            simulation_context={"status": "VERIFIED" if cache_integrity == "VERIFIED" else cache_integrity,
-                                "fingerprint": cache_manifest.get("fingerprint"),
-                                "result_sha256": cache_manifest.get("result_sha256")},
-        )
-    elif active_view == views[1]:
         from circuitcare.dashboard.views.schematic_workspace import (
             render_schematic_workspace,
         )
@@ -300,6 +313,16 @@ def main() -> None:
                                    current_fingerprint=current_simulation_fingerprint,
                                    bayesian_supported=bayesian_supported,
                                    analysis_context_key=context_key)
+    elif active_view == "분석 개요":
+        what_if_result = _render_analysis_overview(
+            st, circuit=circuit, case_name=case_name, case=case, context_key=context_key,
+            failed_component=selected_fault, fault_type=fault_type, fault_value=fault_value,
+            risk=risk, comparison=comparison, status=status, bayesian_supported=bayesian_supported,
+            workspace=active_workspace,
+            simulation_context={"status": "VERIFIED" if cache_integrity == "VERIFIED" else cache_integrity,
+                                "fingerprint": cache_manifest.get("fingerprint"),
+                                "result_sha256": cache_manifest.get("result_sha256")},
+        )
     elif active_view == views[2]:
         from circuitcare.dashboard.views.waveforms import render_waveform_view
         render_waveform_view(st, comparison=comparison, result_dir=result_dir, stress=stress,
