@@ -33,7 +33,7 @@ def test_geometry_fails_closed_for_bad_viewbox_unknown_primitives_or_multi_sheet
     svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="1 0 297 210"/>', encoding="utf-8")
     assert build_symbol_geometry(source, [svg], project_root=tmp_path).status == "UNVERIFIED_GEOMETRY"
     svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 297.0022 210.0072"/>', encoding="utf-8")
-    assert build_symbol_geometry(source, [svg, svg], project_root=tmp_path).status == "PARTIAL"
+    assert build_symbol_geometry(source, [svg, svg], project_root=tmp_path).status == "MULTI_SHEET_MAPPING_PARTIAL"
     contents = source.read_text(encoding="utf-8").replace('(rectangle\n\t\t\t\t(start -1.016 -2.54)', '(arc (start 0 0) (mid 1 1) (end 2 0))\n\t\t\t(rectangle\n\t\t\t\t(start -1.016 -2.54)', 1)
     source.write_text(contents, encoding="utf-8")
     assert build_symbol_geometry(source, [svg], project_root=tmp_path).status == "UNVERIFIED_GEOMETRY"
@@ -44,14 +44,19 @@ def test_selection_event_requires_exact_context_reference_uuid_sheet_and_unit(tm
     geometry = build_symbol_geometry(source, [svg], project_root=tmp_path)
     region = next(item for item in geometry.regions if item.component_ref == "R1")
     event = {"component_ref": region.component_ref, "symbol_uuid": region.symbol_uuid,
-             "sheet_path": region.sheet_path, "unit": region.unit, "context_key": "active"}
+             "sheet_path": region.sheet_path, "unit": region.unit,
+             "context_key": "active", "asset_key": "active-svg", "event_seq": 1}
     refs = {"J1", "R1", "R2"}
-    assert validate_selection_event(event, component_refs=refs, geometry=geometry, context_key="active")[0]
+    assert validate_selection_event(event, component_refs=refs, geometry=geometry,
+                                    context_key="active", asset_key="active-svg")[0]
     assert not validate_selection_event({**event, "component_ref": "Q9"}, component_refs=refs,
-                                       geometry=geometry, context_key="active")[0]
+                                       geometry=geometry, context_key="active", asset_key="active-svg")[0]
     assert not validate_selection_event({**event, "symbol_uuid": "forged"}, component_refs=refs,
-                                       geometry=geometry, context_key="active")[0]
-    assert not validate_selection_event(event, component_refs=refs, geometry=geometry, context_key="other")[0]
+                                       geometry=geometry, context_key="active", asset_key="active-svg")[0]
+    assert not validate_selection_event(event, component_refs=refs, geometry=geometry,
+                                        context_key="other", asset_key="active-svg")[0]
+    assert not validate_selection_event(event, component_refs=refs, geometry=geometry,
+                                        context_key="active", asset_key="old-svg")[0]
 
 
 def test_multi_sheet_project_has_no_click_geometry_even_when_references_are_known(tmp_path):
@@ -61,7 +66,7 @@ def test_multi_sheet_project_has_no_click_geometry_even_when_references_are_know
     contents = source.read_text(encoding="utf-8").replace('(sheet_instances', '(sheet (property "Sheet file" "child.kicad_sch") (uuid "sheet-child"))\n(sheet_instances', 1)
     source.write_text(contents, encoding="utf-8")
     result = build_symbol_geometry(source, [svg], project_root=tmp_path)
-    assert result.status == "PARTIAL"
+    assert result.status == "MULTI_SHEET_MAPPING_PARTIAL"
     identities, missing = read_symbol_identities(source, project_root=tmp_path)
     assert not missing
     assert identities

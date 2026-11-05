@@ -103,6 +103,21 @@ def _library_bounds(library: list[SExpr], unit: int) -> tuple[float, float, floa
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def _symbol_mirror(placed: list[SExpr]) -> tuple[bool, bool]:
+    """Return page X/Y sign flips for KiCad's mirror x/y/xy option."""
+    mirror = _child(placed, "mirror")
+    value = _atom(mirror)
+    if not value:
+        return False, False
+    if value == "x":
+        return True, False
+    if value == "y":
+        return False, True
+    if value == "xy":
+        return True, True
+    raise ValueError(f"Unsupported KiCad mirror mode: {value}")
+
+
 def read_svg_view_box(svg: str | Path) -> tuple[float, float, float, float] | None:
     """Read a validated numeric page viewBox for pan/zoom, independent of hit geometry."""
     try:
@@ -152,6 +167,10 @@ def _load_page(source: Path, svg: Path, project_root: Path, identities: list[Any
         angle = math.radians(_number(at, 3, f"{ref} angle"))
         unit = int(_atom(_child(placed, "unit"), default="1"))
         try:
+            mirror_x, mirror_y = _symbol_mirror(placed)
+        except ValueError as exc:
+            return GeometryResult("UNVERIFIED_GEOMETRY", f"{ref}: {exc}")
+        try:
             x1, y1, x2, y2 = _library_bounds(definition, unit)
         except ValueError as exc:
             return GeometryResult("UNVERIFIED_GEOMETRY", f"{ref}: {exc}")
@@ -159,8 +178,16 @@ def _load_page(source: Path, svg: Path, project_root: Path, identities: list[Any
         # KiCad library y is up; SVG page y is down. The tested page transform is 1 mm to 1 viewBox unit.
         polygon = []
         for x, y in corners:
-            page_x = cx + x * math.cos(angle) - y * math.sin(angle)
-            page_y = cy - (x * math.sin(angle) + y * math.cos(angle))
+            # KiCad rotates local library coordinates, converts to page Y-down,
+            # then reflects across the requested page axis.
+            rotated_x = x * math.cos(angle) - y * math.sin(angle)
+            rotated_y = -(x * math.sin(angle) + y * math.cos(angle))
+            if mirror_y:
+                rotated_x = -rotated_x
+            if mirror_x:
+                rotated_y = -rotated_y
+            page_x = cx + rotated_x
+            page_y = cy + rotated_y
             polygon.append((round(page_x, 4), round(page_y, 4)))
         symbol_uuid = _atom(_child(placed, "uuid"))
         matches = [item for item in identities if item.component_ref == ref and item.symbol_uuid == symbol_uuid
@@ -195,7 +222,7 @@ def build_symbol_geometry(path: str | Path, svg_paths: tuple[Path, ...] | list[P
     if incomplete or identity_incomplete:
         return GeometryResult("INCOMPLETE_PROJECT", "; ".join(incomplete + identity_incomplete))
     if len(files) != 1 or len(svg_paths) != 1:
-        return GeometryResult("PARTIAL", "Multi-sheet SVG-to-sheet identity is not verified; click mapping disabled")
+        return GeometryResult("MULTI_SHEET_MAPPING_PARTIAL", "Multi-sheet SVG-to-sheet identity is not verified; click mapping disabled")
     svg = Path(svg_paths[0]).resolve()
     if svg.stem != source.stem:
         return GeometryResult("UNVERIFIED_GEOMETRY", "SVG page name does not match the schematic source")
