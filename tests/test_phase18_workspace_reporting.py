@@ -433,13 +433,12 @@ def test_streamlit_app_keeps_original_tabs_and_displays_workspace_reports() -> N
     script = Path(__file__).resolve().parents[1] / "src/circuitcare/ui.py"
     app = AppTest.from_file(str(script), default_timeout=30).run()
     assert not app.exception
-    assert any("PROVENANCE_UNVERIFIED" in item.value for item in app.markdown)
-    selector = next(item for item in app.selectbox if item.key == "active_analysis_view")
-    assert any(option.endswith("/  분석 개요") for option in selector.options)
-    assert any(option.endswith("/  AI 성능 평가") for option in selector.options)
-    selector.select("AI 성능 평가").run()
+    assert any("출처 확인 필요" in item.value for item in app.markdown)
+    assert app.session_state["active_analysis_view"] == "회로도 Workbench"
+    next(item for item in app.button if item.label == "AI 성능 평가").click().run()
     assert not app.exception
-    next(item for item in app.selectbox if item.key == "active_analysis_view").select("분석 개요").run()
+    assert app.session_state["active_analysis_view"] == "AI 성능 평가"
+    next(item for item in app.radio if item.key == "main_area").set_value("보고서").run()
     assert any(button.label == "Evidence Bundle ZIP" for button in app.download_button)
     selector = next(item for item in app.selectbox if item.key == "case_name")
     selector.select("KiCad XML 업로드 (연결 그래프 전용)").run()

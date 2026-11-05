@@ -63,6 +63,9 @@ def test_regulator_schematic_is_electrically_equivalent_and_has_verified_measure
     if not find_kicad_cli():
         pytest.skip("NOT_VERIFIED: KiCad CLI unavailable; fixture acceptance requires actual CLI validation")
     schematic = ROOT / "tests/fixtures/regulator.kicad_sch"
+    source_text = schematic.read_text(encoding="utf-8")
+    assert source_text.count("(wire ") >= 19
+    assert source_text.count("(junction ") >= 7
     xml = ROOT / "tests/fixtures/fault_demo_netlist.xml"
     cache_base = ROOT / "data" / f"phase19_3_4_integration_{tmp_path.name}"
     equivalence = verify_schematic_netlist(schematic, xml, project_root=ROOT,

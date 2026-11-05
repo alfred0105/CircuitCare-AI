@@ -10,6 +10,7 @@ _VIEWER = None
 
 
 def render_interactive_viewer(st: Any, *, svg: str, asset_key: str, view_box: tuple[float, float, float, float],
+                              fit_view_box: tuple[float, float, float, float] | None = None,
                               geometry_status: str, regions: list[dict], overlay: dict | None,
                               selected_ref: str,
                               navigation_id: int, context_key: str, event_sequence_seed: int, key: str,
@@ -27,11 +28,12 @@ def render_interactive_viewer(st: Any, *, svg: str, asset_key: str, view_box: tu
         )
     return _VIEWER(
         data={"svg": svg, "asset_key": asset_key, "view_box": list(view_box),
+              "fit_view_box": list(fit_view_box or view_box),
               "geometry_status": geometry_status, "regions": regions,
               "overlay": overlay,
               "selected_ref": selected_ref, "navigation_id": navigation_id,
               "navigation_ref": selected_ref, "context_key": context_key,
               "event_sequence_seed": event_sequence_seed},
         default={"selection": None}, on_selection_change=on_selection_change,
-        key=key, width="stretch", height=690,
+        key=key, width="stretch", height=520,
     )

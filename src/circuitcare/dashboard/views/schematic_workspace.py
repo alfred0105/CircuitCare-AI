@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,42 @@ def _json_object(path: Path) -> dict:
         return {}
 
 
+def _korean_overlay_reason(reason: object) -> str:
+    text = str(reason)
+    if text.startswith("Measurement nodes are logical schematic candidates"):
+        return "측정 Node는 논리 회로도 후보입니다. PCB의 안전하거나 접근 가능한 프로브 지점을 뜻하지 않습니다."
+    if text.startswith("No verified recommendation or inspection markers"):
+        return "현재 Context에 검증된 측정 추천이나 점검 표시가 없습니다."
+    return text
+
+
+def _content_view_box(schematic_path: Path, geometry: GeometryResult) -> tuple[float, float, float, float] | None:
+    """Find real symbol and wire bounds for camera fitting without altering SVG geometry."""
+    if geometry.view_box is None or not geometry.regions:
+        return None
+    points = [point for region in geometry.regions for point in region.polygon]
+    try:
+        source = schematic_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    number = r"-?\d+(?:\.\d+)?"
+    wire_pattern = rf"\(wire\s+\(pts\s+\(xy\s+({number})\s+({number})\)\s+\(xy\s+({number})\s+({number})\)"
+    for match in re.finditer(wire_pattern, source):
+        x1, y1, x2, y2 = (float(value) for value in match.groups())
+        points.extend(((x1, y1), (x2, y2)))
+    for match in re.finditer(rf"\(junction\s+\(at\s+({number})\s+({number})", source):
+        points.append((float(match.group(1)), float(match.group(2))))
+    xs, ys = [point[0] for point in points], [point[1] for point in points]
+    page_x, page_y, page_w, page_h = geometry.view_box
+    padding = 18.0
+    x1, y1 = max(page_x, min(xs) - padding), max(page_y, min(ys) - padding)
+    x2, y2 = min(page_x + page_w, max(xs) + padding), min(page_y + page_h, max(ys) + padding)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    view_box = (x1, y1, x2 - x1, y2 - y1)
+    return view_box
+
+
 def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: dict,
                                selected_fault: str, fault_type: str, fault_value: str | None,
                                root: Path, comparison_path: Path, simulation_status: str,
@@ -116,13 +153,14 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
     if initial_ref not in circuit.components:
         initial_ref = selected_fault if selected_fault in circuit.components else min(circuit.components)
 
-    nav, canvas, inspector = st.columns([0.85, 3.0, 1.4], gap="small")
+    nav, canvas, inspector = st.columns([0.75, 4.8, 1.15], gap="small")
     refs = sorted(circuit.components)
     query = ""
     component_ref = initial_ref
     with nav:
-        st.caption(f"회로 · {case_name}")
-        st.caption(f"분석 Context · {selected_fault} / {fault_type} / {fault_value or '—'}")
+        st.markdown("**회로 탐색기**")
+        from circuitcare.dashboard.navigation import korean_status
+        st.caption(f"고장 가정 · {selected_fault} · {korean_status(fault_type)}")
         query = st.text_input("부품 검색", key=f"schematic_search_{state_key}").strip().casefold()
         filtered = [ref for ref in refs if query in ref.casefold()]
         if not filtered:
@@ -167,17 +205,21 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                                       cache_root=root / "data" / "schematic_svg_cache")
             if result.status == "EXPORTED" and result.svg_paths:
                 svg_paths = result.svg_paths
-                with nav:
-                    page_names = [item.name for item in svg_paths]
-                    page_key = f"schematic_page_{context_token}"
-                    if st.session_state.get(page_key) not in page_names:
-                        st.session_state[page_key] = page_names[0]
-                    page_name = st.selectbox("회로도 페이지", page_names, key=page_key)
+                page_names = [item.name for item in svg_paths]
+                if len(page_names) > 1:
+                    with nav:
+                        page_key = f"schematic_page_{context_token}"
+                        if st.session_state.get(page_key) not in page_names:
+                            st.session_state[page_key] = page_names[0]
+                        page_name = st.selectbox("회로도 페이지", page_names, key=page_key)
+                else:
+                    page_name = page_names[0]
                 svg_path = next(item for item in svg_paths if item.name == page_name)
                 svg = svg_path.read_text(encoding="utf-8")
                 status = "SVG_EXPORTED"
                 geometry = build_symbol_geometry(schematic_path, result.svg_paths, project_root=root)
                 view_box = geometry.view_box or read_svg_view_box(svg_path)
+                fit_view_box = _content_view_box(schematic_path, geometry)
                 allowed_refs = set(refs)
                 regions = [region for region in geometry.regions if region.component_ref in allowed_refs]
                 if len(regions) != len(geometry.regions):
@@ -273,19 +315,18 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                         )
                     if overlay_payload:
                         if overlay_payload.get("status") == "BLOCKED":
-                            st.info(f"이 보기의 Overlay가 비활성화되었습니다. {overlay_payload.get('reason')}")
+                            st.info(f"이 보기의 Overlay가 비활성화되었습니다. {_korean_overlay_reason(overlay_payload.get('reason', ''))}")
                         elif overlay_payload.get("status") == "UNVERIFIED_MEASUREMENT_LOCATION":
-                            st.info(f"측정 추천은 정보 패널에서만 확인할 수 있습니다. 위치 검증 결과: {overlay_payload.get('reason')}")
+                            st.info(f"측정 추천은 정보 패널에서만 확인할 수 있습니다. 위치 검증: {_korean_overlay_reason(overlay_payload.get('reason', ''))}")
                         elif overlay_payload.get("reason"):
-                            st.caption(str(overlay_payload["reason"]))
+                            st.caption(_korean_overlay_reason(overlay_payload["reason"]))
                         if overlay_mode == "연결 후보" and overlay_payload.get("status") == "READY":
                             path_status = overlay_payload.get("path_search", {}).get("status", "UNKNOWN")
                             st.caption(f"보라: 사용자 고장 가정 · 파랑: 연결 후보 (손상 증거 아님) · 배선은 표시하지 않음 · 경로 검색: {path_status}")
                         elif overlay_mode == "전기적 위험" and overlay_payload.get("status") == "READY":
-                            st.caption("정격 비교 결과입니다. EXCEEDED/NEAR_LIMIT는 실제 손상 확정이 아니며, WITHIN_LIMIT는 평가된 Metric에만 적용됩니다.")
+                            st.caption("정격 초과·근접 결과는 실제 손상 확정이 아닙니다. 정격 이내 판정은 평가된 항목에만 적용됩니다.")
                         elif overlay_mode == "측정·점검" and overlay_payload.get("status") == "READY":
                             st.caption("측정 핀은 논리적 회로도 후보이며 PCB에서 안전하거나 접근 가능한 프로브 위치를 보증하지 않습니다. 점검 점수는 손상 확률이 아닙니다.")
-                    st.caption(f"KiCad CLI SVG · {schematic_path.relative_to(root)} · {svg_path.name}")
                     viewer_key = f"schematic_viewer_{context_token}_{hashlib.sha256(svg_path.name.encode()).hexdigest()[:8]}"
                     viewer_result = None
                     if view_box is not None:
@@ -311,6 +352,7 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
 
                         viewer_result = render_interactive_viewer(
                             st, svg=svg, asset_key=asset_key, view_box=view_box,
+                            fit_view_box=fit_view_box,
                             geometry_status=interaction_geometry.status,
                             overlay=overlay_payload,
                             regions=[{"component_ref": item.component_ref, "symbol_uuid": item.symbol_uuid,
@@ -330,10 +372,8 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                         selection_error = st.session_state.pop(f"selection_error_{viewer_key}", None)
                         if selection_error:
                             st.warning(f"회로도 선택 이벤트를 거부했습니다: {selection_error}")
-                        eq_status = equivalence.status if equivalence else "NOT_VERIFIED"
-                        st.caption(f"Electrical equivalence · {eq_status} · "
-                                   f"{equivalence.message if equivalence else 'Schematic unavailable'}")
-                        st.caption(f"Symbol Geometry · {geometry.status} · {geometry.message}")
+                        if equivalence is None or equivalence.status != "VERIFIED_EQUIVALENT":
+                            st.warning("회로도와 넷리스트의 전기적 정합성을 확인하지 못했습니다. 선택 및 Overlay가 제한됩니다.")
             else:
                 with canvas:
                     st.warning(f"회로도 Export를 사용할 수 없습니다 ({result.status}). {result.message}")
@@ -400,86 +440,53 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         item = circuit.components[component_ref]
         candidates = direct_candidates(circuit, component_ref)
         path_search = find_paths_result(circuit, component_ref, max_hops=2)
-        st.markdown("#### Inspector")
-        st.markdown(f"**{item.ref}** · {item.value or '값 없음'}")
-        st.caption(item.library_id or "Library ID 없음")
-        st.caption(f"FAULT SOURCE · {selected_fault}    INSPECTED · {component_ref}")
+        from circuitcare.dashboard.navigation import korean_status
+        st.markdown("#### 부품 상세")
+        st.markdown(f"### {item.ref}")
+        st.caption(item.value or "값 없음")
+        st.caption(f"선택 부품 · {component_ref}  /  고장 가정 부품 · {selected_fault}")
+        st.markdown("**연결**")
+        component_connections = [conn for conn in circuit.connections if conn.ref == component_ref]
+        if component_connections:
+            for conn in component_connections:
+                st.caption(f"{conn.pin}번 핀 → {conn.net}")
+        else:
+            st.caption("연결 Net 정보 없음")
         st.divider()
-        st.caption("SUMMARY · 현재 회로의 연결 및 회로도 매칭")
-        st.write("**연결 Net**")
-        for conn in circuit.connections:
-            if conn.ref == component_ref:
-                st.caption(f"{conn.pin} → {conn.net}")
-        identity = mapping.get(component_ref, {"status": "UNVERIFIED_MAPPING"})
-        if equivalence is not None:
-            st.caption(f"회로도/넷리스트 정합성 · {equivalence.status} · {equivalence.message}")
-        st.caption(f"점검 선택 · {component_ref} · 고장 원인 {selected_fault} (별도 상태)")
-        st.caption(f"회로도 매칭 · {identity.get('status', 'UNVERIFIED_MAPPING')}")
-        for instance in identity.get("symbol_instances", []):
-            st.caption(f"UUID · {instance['symbol_uuid']} · unit {instance['unit']} · {instance['sheet_path']}")
-        st.write("**연결 분석 후보**")
-        for candidate in candidates:
-            st.caption(f"{candidate.target_ref} · {', '.join(candidate.shared_nets)}")
-        st.caption(f"경로 검색 · {path_search.status} · {len(path_search.paths)}개 후보 경로")
+        st.markdown("**진단 상태**")
         marker = next((row for row in (overlay_payload or {}).get("markers", [])
                        if row.get("component_ref") == component_ref), None)
-        if overlay_mode == "연결 후보":
-            st.write("**연결 후보 Overlay 근거**")
-            if marker:
-                st.caption(f"종류 · {marker.get('label')} · evidence {marker.get('evidence_level')}")
-                if marker.get("hop_count") is not None:
-                    st.caption(f"Hop · {marker['hop_count']} · 공유 Net · {', '.join(marker.get('shared_nets', [])) or '없음'}")
-                for path in marker.get("paths", []):
-                    st.caption(f"경로 · {' → '.join(path.get('path', []))} · {', '.join(path.get('nets', []))}")
-            else:
-                st.caption("현재 부품의 연결 후보 Overlay가 없습니다.")
+        if marker and marker.get("kind") == "RISK":
+            st.metric("정격 스트레스", korean_status(marker.get("risk_level", "UNKNOWN")))
+            st.caption(f"우선순위 {marker.get('priority_rank', '—')} · {marker.get('dominant_metric') or '근거 미확인'}")
+            st.caption("정격 스트레스 평가이며 실제 손상 확률이나 손상 확정이 아닙니다.")
         elif overlay_mode == "전기적 위험":
-            st.write("**현재 Simulation Risk 근거**")
-            if marker and marker.get("kind") == "RISK":
-                st.caption(f"Risk · {marker.get('risk_level')} · 순위 {marker.get('priority_rank', '—')} · 점검 지수 {marker.get('priority_score', '—')} (확률 아님)")
-                st.caption(f"주요 Metric · {marker.get('dominant_metric') or '미확인'} · 근거 · {marker.get('evidence_level')}")
-                for metric_name, metric in marker.get("metrics", {}).items():
-                    st.caption(f"{metric_name} · 상태 {metric.get('status', 'unknown')} · 스트레스 {metric.get('measured_stress', '—')} {metric.get('unit', '')} · 기준 {metric.get('rated_limit', '—')} · 사용률 {metric.get('utilization_ratio', '—')}")
-                    source = metric.get("rating_source") or {}
-                    if source:
-                        st.caption(f"정격 출처 · {source.get('type', 'unknown')} · {source.get('note', '')}")
-                if risk_assessment.get("reassessment_source"):
-                    st.caption(f"현재 정격 재평가 출처 · {risk_assessment['reassessment_source']}")
-            elif overlay_payload and overlay_payload.get("status") == "BLOCKED":
-                st.caption(f"Risk 사용 차단 · {overlay_payload.get('reason')}")
-            else:
-                st.caption("현재 부품에 검증된 Risk 행이 없습니다.")
-        elif overlay_mode == "측정·점검":
-            st.write("**측정·점검 근거**")
-            if measurement_recommendation:
-                st.caption(f"추천 Node · {measurement_recommendation.get('node')} · 유형 {measurement_recommendation.get('measurement_type')} ({measurement_recommendation.get('unit')})")
-                st.caption(f"출처 · {measurement_source} · 정보 이득 {measurement_recommendation.get('expected_information_gain_nats', '—')} nats · 불확실도 출처 {measurement_recommendation.get('uncertainty_source', 'unknown')}")
-                if measurement_anchors and measurement_anchors.anchors:
-                    st.caption("논리적 핀 후보 · " + ", ".join(
-                        f"{row['component_ref']}.{row['pin']}" for row in measurement_anchors.anchors))
-                elif measurement_anchors:
-                    st.caption(f"위치 상태 · {measurement_anchors.status} · {measurement_anchors.message}")
-            elif not bayesian_supported:
-                st.caption("현재 회로/고장 조건에 지원되는 Bayesian 측정 모델이 없습니다.")
-            else:
-                st.caption("현재 Context에 사용할 수 있는 측정 추천이 없습니다.")
-            if svg is None:
-                st.caption("회로도 Geometry가 검증되지 않아 화면상의 측정 핀 후보는 없습니다.")
-            if diagnosis.get("model_mismatch"):
-                st.warning("Model mismatch: 순위와 추천 위치가 차단되었습니다.")
-            rank_rows = (inspection_ranking.get("prior_weighted_inspection_order", [])
-                         if measurement_source == "prior_only" else
-                         inspection_ranking.get("posterior_weighted_inspection_order", []))
-            rank_row = next((row for row in rank_rows if row.get("component_ref") == component_ref), None)
-            if rank_row:
-                score = rank_row.get("posterior_weighted_priority_score",
-                                     rank_row.get("prior_weighted_priority_score"))
-                st.caption(f"점검 순위 {rank_row.get('priority_rank', '—')} · 점수 {score if score is not None else '—'} (가설 집합 조건부, 손상 확률 아님) · 근거 범위 {rank_row.get('posterior_evidence_coverage', '—')}")
-        st.write("**Simulation**")
-        st.caption(f"상태 · {simulation_status}")
-        st.caption(f"SPICE 검증 · {spice_verification_label(simulation_status, simulation_integrity)}")
-        st.caption(f"SVG Export 상태 · {status}")
-        st.caption("연결 후보는 손상이나 전기적 위험의 증거가 아닙니다.")
+            st.caption("위험 상태 · 검증된 평가 없음")
+        else:
+            st.caption("위험 상태 · 미평가")
+        if measurement_recommendation:
+            st.markdown("**다음 측정 후보**")
+            st.write(f"{measurement_recommendation.get('node', '—')} · {measurement_recommendation.get('measurement_type', '측정')}")
+            if measurement_anchors and measurement_anchors.anchors:
+                st.caption("논리적 핀 · " + ", ".join(
+                    f"{row['component_ref']}.{row['pin']}" for row in measurement_anchors.anchors))
+        else:
+            st.caption("다음 측정 · 추천 자료 없음")
+        if candidates:
+            st.markdown("**연결 후보**")
+            st.caption(" · ".join(f"{candidate.target_ref} ({', '.join(candidate.shared_nets)})" for candidate in candidates[:4]))
+        identity = mapping.get(component_ref, {"status": "UNVERIFIED_MAPPING"})
+        with st.expander("근거 및 검증 정보", expanded=False):
+            st.caption(f"시뮬레이션 · {korean_status(simulation_status)} · {spice_verification_label(simulation_status, simulation_integrity)}")
+            st.caption(f"회로도 Export · {korean_status(status)}")
+            st.caption(f"전기적 정합성 · {equivalence.status if equivalence else 'NOT_VERIFIED'} · {equivalence.message if equivalence else '회로도 없음'}")
+            st.caption(f"부품 매칭 · {identity.get('status', 'UNVERIFIED_MAPPING')}")
+            st.caption(f"경로 검색 · {path_search.status} · {len(path_search.paths)}개 후보 경로")
+            for instance in identity.get("symbol_instances", []):
+                st.caption(f"UUID · {instance['symbol_uuid']} · Unit {instance['unit']} · {instance['sheet_path']}")
+            st.caption("연결 후보는 손상 또는 전기적 위험의 증거가 아닙니다.")
+        if overlay_mode == "측정·점검" and diagnosis.get("model_mismatch"):
+            st.warning("모델 불일치로 점검 순위와 위치 표시가 제한됩니다.")
         action_col, report_col = st.columns(2, gap="small")
         if action_col.button("파형 상세", key=f"workbench_waveform_{context_token}", use_container_width=True):
             st.session_state["workbench_navigation_target"] = "SPICE 파형"

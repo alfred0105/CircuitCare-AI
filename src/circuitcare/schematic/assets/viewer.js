@@ -52,13 +52,28 @@ export default function(component) {
     camera.setAttribute("transform", `translate(${state.x} ${state.y}) scale(${state.scale})`);
     zoomLabel.textContent = `${Math.round(state.scale * 100)}%`;
   };
-  const fit = () => { state.scale = 1; state.x = 0; state.y = 0; renderCamera(); };
+  const fit = () => {
+    const vb = data.view_box;
+    const bounds = data.fit_view_box || vb;
+    const baseScale = Math.min(viewport.clientWidth / vb[2], viewport.clientHeight / vb[3]);
+    const fullPage = bounds[0] === vb[0] && bounds[1] === vb[1] &&
+      bounds[2] === vb[2] && bounds[3] === vb[3];
+    const contentScale = fullPage ? 1 : Math.min(
+      viewport.clientWidth / (baseScale * bounds[2]),
+      viewport.clientHeight / (baseScale * bounds[3]),
+    ) * 0.9;
+    state.scale = Math.min(8, Math.max(0.25, contentScale));
+    state.x = vb[0] + vb[2] / 2 - (bounds[0] + bounds[2] / 2) * state.scale;
+    state.y = vb[1] + vb[3] / 2 - (bounds[1] + bounds[3] / 2) * state.scale;
+    state.userAdjusted = false;
+    renderCamera();
+  };
   const zoomAt = (factor, point) => {
     const scale = Math.min(8, Math.max(0.25, state.scale * factor));
     const ratio = scale / state.scale;
     state.x = point.x - (point.x - state.x) * ratio;
     state.y = point.y - (point.y - state.y) * ratio;
-    state.scale = scale; renderCamera();
+    state.scale = scale; state.userAdjusted = true; renderCamera();
   };
   const centerOn = (ref) => {
     const region = (data.regions || []).find((r) => r.component_ref === ref);
@@ -111,15 +126,16 @@ export default function(component) {
       const group = make("g", { class: "cc-overlay-marker" });
       if (marker.kind === "FAULT_SOURCE") {
         group.appendChild(make("polygon", { points: points.map((point) => point.join(",")).join(" "), class: "cc-overlay-fault" }));
-        addText(group, cx, Math.min(...ys) - 1.2, "FAULT ASSUMPTION", "cc-overlay-label");
+        addText(group, cx, Math.min(...ys) - 1.2, "고장 가정", "cc-overlay-label");
       } else if (marker.kind === "DIRECT_CANDIDATE" || marker.kind === "INDIRECT_CANDIDATE") {
         const candidateClass = marker.kind === "DIRECT_CANDIDATE" ? "cc-overlay-direct" : "cc-overlay-indirect";
         group.appendChild(make("polygon", { points: points.map((point) => point.join(",")).join(" "), class: candidateClass }));
-        addText(group, cx, Math.min(...ys) - 1.2, `${marker.kind === "DIRECT_CANDIDATE" ? "DIRECT" : "INDIRECT"} · ${marker.hop_count} hop`, "cc-overlay-label");
+        addText(group, cx, Math.min(...ys) - 1.2, `${marker.kind === "DIRECT_CANDIDATE" ? "직접" : "간접"} · ${marker.hop_count}단계`, "cc-overlay-label");
       } else if (marker.kind === "RISK") {
         const levelClass = { EXCEEDED: "exceeded", NEAR_LIMIT: "near", WITHIN_LIMIT: "within", UNKNOWN: "unknown" }[marker.risk_level] || "unknown";
         group.appendChild(make("circle", { cx: Math.max(...xs), cy: Math.min(...ys), r: 2.1, class: `cc-overlay-risk cc-overlay-risk-${levelClass}` }));
-        addText(group, cx, Math.min(...ys) - 1.6, marker.risk_level, "cc-overlay-label");
+        const riskLabel = { EXCEEDED: "정격 초과", NEAR_LIMIT: "정격 근접", WITHIN_LIMIT: "정격 이내", UNKNOWN: "미평가" }[marker.risk_level] || "미평가";
+        addText(group, cx, Math.min(...ys) - 1.6, riskLabel, "cc-overlay-label");
       } else if (marker.kind === "INSPECTION_PRIORITY") {
         group.appendChild(make("circle", { cx: Math.max(...xs), cy: Math.max(...ys), r: 2, class: "cc-overlay-inspection" }));
         addText(group, Math.max(...xs), Math.max(...ys) + 0.8, marker.priority_rank ?? "?", "cc-overlay-rank");
@@ -165,6 +181,7 @@ export default function(component) {
     const point = svgPoint(event.clientX, event.clientY);
     state.x = state.drag.tx + point.x - state.drag.x;
     state.y = state.drag.ty + point.y - state.drag.y;
+    state.userAdjusted = true;
     renderCamera();
   };
   const endDrag = (event) => {
@@ -203,7 +220,7 @@ export default function(component) {
         zoomAt(action === "zoom-in" ? 1.25 : 0.8, svgPoint(rect.left + rect.width / 2, rect.top + rect.height / 2));
       }
     });
-    state.observer = new ResizeObserver(() => { if (state.scale === 1 && state.x === 0 && state.y === 0) fit(); });
+    state.observer = new ResizeObserver(() => { if (!state.userAdjusted) fit(); });
     state.observer.observe(viewport);
   }
   if (state.pageKey !== data.asset_key) setAsset(); else setAsset();

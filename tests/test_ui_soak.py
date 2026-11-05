@@ -14,7 +14,7 @@ def test_direct_vision_view_switch_keeps_app_live():
 
     root = Path(__file__).resolve().parents[1]
     app = AppTest.from_file(str(root / "src/circuitcare/ui.py"), default_timeout=30).run()
-    next(widget for widget in app.selectbox if widget.key == "active_analysis_view").select("PCB 사진 인식").run()
+    next(widget for widget in app.button if widget.label == "PCB 사진 인식").click().run()
     assert not app.exception
 
 
@@ -32,7 +32,7 @@ def test_streamlit_twenty_circuit_switches_keep_app_live():
         chosen = choices[index % 3]
         next(widget for widget in app.selectbox if widget.key == "case_name").select(chosen).run()
         assert not app.exception
-        assert any(widget.key == "active_analysis_view" for widget in app.selectbox)
+        assert app.session_state["active_analysis_view"] == "회로도 Workbench"
         if index + 1 in {5, 10, 20}:
             samples[str(index + 1)] = _rss_mb()
     print("ui_switch_rss_samples_mb=" + json.dumps(samples, sort_keys=True))

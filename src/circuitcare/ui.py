@@ -103,18 +103,34 @@ def main() -> None:
     import streamlit as st
 
     st.set_page_config(page_title="CircuitCare AI", page_icon="🔧", layout="wide")
-    from circuitcare.dashboard.navigation import WORKSPACE_VIEWS, format_view_option
+    from circuitcare.dashboard.navigation import (
+        ADVANCED_VIEWS, ANALYSIS_VIEWS, AREAS, CASE_LABELS, WORKBENCH_VIEW,
+        WORKSPACE_VIEWS, korean_status,
+    )
     navigation_target = st.session_state.pop("workbench_navigation_target", None)
     if navigation_target in WORKSPACE_VIEWS:
         st.session_state["active_analysis_view"] = navigation_target
+        target_area = (
+            "회로도" if navigation_target == WORKBENCH_VIEW else
+            "분석" if navigation_target in ANALYSIS_VIEWS else
+            "측정·진단" if navigation_target == "Bayesian 진단" else None
+        )
+        if target_area is not None:
+            st.session_state["main_area"] = target_area
+            st.session_state["workbench_area"] = target_area
+            if navigation_target in ANALYSIS_VIEWS:
+                st.session_state["analysis_view_choice"] = navigation_target
+        else:
+            st.session_state["workbench_area"] = "고급 도구"
     from circuitcare.dashboard.workbench_styles import (
         apply_workbench_theme,
         render_workbench_header,
     )
     apply_workbench_theme(st)
 
-    st.sidebar.subheader("Project & Circuit")
-    case_name = st.sidebar.selectbox("회로 데이터셋", [*CASES, UPLOAD_CHOICE], key="case_name")
+    st.sidebar.subheader("프로젝트")
+    case_name = st.sidebar.selectbox("회로 데이터셋", [*CASES, UPLOAD_CHOICE], key="case_name",
+                                     format_func=lambda name: CASE_LABELS.get(name, name))
     if case_name == UPLOAD_CHOICE:
         uploaded = st.sidebar.file_uploader("KiCad XML 넷리스트", type=["xml"], key="uploaded_netlist")
         if uploaded is None:
@@ -136,10 +152,12 @@ def main() -> None:
     netlist_path = ROOT / case["netlist"]
     if case_name != UPLOAD_CHOICE and not case.get("uploaded"):
         circuit = load_netlist(netlist_path)
-    st.sidebar.subheader("Fault Context")
+    st.sidebar.subheader("고장 조건")
     fault_options = fault_options_for(case_name, case, list(circuit.components))
     selected_fault = st.sidebar.selectbox("고장 부품", fault_options, index=fault_options.index(case["fault"]) if case["fault"] in fault_options else 0)
-    fault_type = st.sidebar.selectbox("고장 유형", case["fault_types"], index=case["fault_types"].index(case["fault_type"]), key=f"fault_type_{case_name}")
+    fault_type = st.sidebar.selectbox(
+        "고장 유형", case["fault_types"], index=case["fault_types"].index(case["fault_type"]),
+        key=f"fault_type_{case_name}", format_func=korean_status)
     needs_value = fault_type in {"resistance_drift", "regulator_output_rise", "regulator_output_drop"}
     fault_value = st.sidebar.text_input("고장 파라미터 (SPICE 숫자 표기)", value=case["value"] if fault_type == case["fault_type"] else ("10k" if fault_type == "resistance_drift" else "8"), disabled=not needs_value, key=f"fault_value_{case_name}_{fault_type}")
     context_key = _analysis_context_key(case_name, case, selected_fault, fault_type, fault_value if needs_value else None)
@@ -159,8 +177,8 @@ def main() -> None:
     bayesian_supported = _supports_bayesian_demo(case_name, selected_fault, fault_type, fault_value if needs_value else None)
     reconcile_analysis_context(st.session_state, context_key)
     active_workspace = reconcile_session_workspace(st.session_state, workspace_context)
-    st.sidebar.caption(f"선택한 고장 모델: {fault_type} · 파라미터: {fault_value if needs_value else '해당 없음'}")
-    st.sidebar.caption("시연 데이터는 저장된 결과이며, 새 시뮬레이션은 버튼을 눌렀을 때만 실행합니다.")
+    st.sidebar.caption(f"고장 모델 · {korean_status(fault_type)} · 값 {fault_value if needs_value else '해당 없음'}")
+    st.sidebar.caption("저장 결과는 현재 회로 조건과 검증된 경우에만 사용합니다. 새 계산은 실행 버튼을 눌렀을 때 시작됩니다.")
 
     run_col, state_col = st.sidebar.columns(2)
     state_display = state_col.empty()
@@ -265,12 +283,12 @@ def main() -> None:
     if status != "RUNNING":
         st.session_state.simulation_status = status
         state_display.markdown({
-            "SUCCESS": "🟢 SUCCESS · Live Simulation",
-            "FAILED": "🔴 FAILED" + (" · 이전 저장 결과는 출처 미검증으로 사용하지 않음" if is_cached_selection else ""),
-            "CACHED_SIMULATION": "🔵 CACHED_SIMULATION · 입력 지문 확인됨",
-            "STALE": "🟠 STALE · 입력 지문 불일치 · 결과 사용 차단",
-            "PROVENANCE_UNVERIFIED": "🟠 PROVENANCE_UNVERIFIED · 저장 결과 출처 미검증",
-            "NOT_RUN": "⚪ NOT_RUN · 분석 준비 · 미실행",
+            "SUCCESS": "🟢 완료 · 새 시뮬레이션",
+            "FAILED": "🔴 실패" + (" · 저장 결과 출처 미검증, 사용 차단" if is_cached_selection else ""),
+            "CACHED_SIMULATION": "🔵 저장 결과 · 입력 지문 검증됨",
+            "STALE": "🟠 입력 변경 · 결과 사용 차단",
+            "PROVENANCE_UNVERIFIED": "🟠 결과 출처 미검증",
+            "NOT_RUN": "⚪ 미실행 · 분석 준비",
         }[status])
     render_workbench_header(
         st,
@@ -289,14 +307,41 @@ def main() -> None:
     st.session_state["circuitcare_workspace"] = active_workspace
     st.sidebar.markdown("🟢 ngspice 사용 가능" if _command_exists("ngspice") else "🟠 ngspice 없음 · 저장 결과 조회 가능")
     views = WORKSPACE_VIEWS
-    st.sidebar.subheader("Workspace & Tools")
     if not st.session_state.get("phase194_navigation_migrated"):
         st.session_state["active_analysis_view"] = views[0]
         st.session_state["phase194_navigation_migrated"] = True
-    active_view = st.sidebar.selectbox("작업 영역", views, key="active_analysis_view",
-                                       format_func=format_view_option)
+    if st.session_state.get("main_area") not in AREAS:
+        st.session_state["main_area"] = "회로도"
+    area_col, tool_col = st.columns([5, 1])
+    area = area_col.radio("작업 영역", AREAS, horizontal=True, key="main_area",
+                          label_visibility="collapsed")
+    active_view = WORKBENCH_VIEW
+    if area == "분석":
+        active_view = st.radio("분석 화면", ANALYSIS_VIEWS, horizontal=True,
+                               key="analysis_view_choice", label_visibility="collapsed")
+    elif area == "측정·진단":
+        active_view = "Bayesian 진단"
+    elif area == "보고서":
+        active_view = "분석 개요"
+    with tool_col:
+        with st.popover("고급 도구", use_container_width=True):
+            st.caption("추가 분석 기능")
+            for tool_view in ADVANCED_VIEWS:
+                st.button(
+                    tool_view, key=f"advanced_{tool_view}", use_container_width=True,
+                    on_click=lambda view=tool_view: st.session_state.update(
+                        active_analysis_view=view, workbench_area="고급 도구"),
+                )
+    if st.session_state.get("workbench_area") == "고급 도구" and area == st.session_state.get("last_main_area", "회로도"):
+        active_view = st.session_state.get("active_analysis_view")
+        if active_view not in ADVANCED_VIEWS:
+            active_view = ADVANCED_VIEWS[0]
+    elif area != st.session_state.get("last_main_area"):
+        st.session_state["workbench_area"] = area
+    st.session_state["last_main_area"] = area
+    st.session_state["active_analysis_view"] = active_view
     client, models = _ollama_models() if active_view in {"로컬 LLM 수리 지원", "데이터시트 AI", "AI 고장 가설 분석"} else (None, [])
-    st.sidebar.markdown("🟢 Local LLM" if client else "🟡 Local LLM은 해당 영역을 열 때 확인합니다")
+    st.sidebar.markdown("🟢 로컬 AI 연결됨" if client else "🟡 로컬 AI는 고급 기능을 열 때 확인합니다")
     what_if_result = None
     if active_view == views[0]:
         from circuitcare.dashboard.views.schematic_workspace import (
