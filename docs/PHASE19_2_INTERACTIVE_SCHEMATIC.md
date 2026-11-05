@@ -30,11 +30,11 @@ Viewer의 SVG 이미지와 투명 Hit Region은 같은 SVG viewBox·camera trans
 
 ## 8. 성능
 
-소형 Divider fixture에서 wheel zoom으로 배율이 100%에서 112%로 바뀌는 것을 브라우저에서 확인했다. Zoom/drag는 JS 내 local state만 갱신하고 Streamlit component state를 건드리지 않는다. KiCad export cache는 기존 방식으로 재사용한다. FPS/지연 시간은 측정하지 않았다. ResizeObserver 1개와 viewer의 고정 event listeners를 mount 단위로 등록하고 cleanup에서 제거하도록 구현했다.
+소형 Divider fixture에서 wheel zoom으로 배율이 100%에서 112%로 바뀌고 drag pan이 동작하는 것을 브라우저에서 확인했다. Zoom/drag는 JS 내 local state만 갱신하고 Streamlit component state를 건드리지 않는다. KiCad export cache는 기존 방식으로 재사용한다. FPS/지연 시간은 측정하지 않았다. ResizeObserver 1개와 viewer의 고정 event listeners를 mount 단위로 등록하고 cleanup에서 제거하도록 구현했다.
 
 ## 9. 브라우저 E2E
 
-실제 로컬 Streamlit 브라우저에서 Divider SVG 표시, Geometry VERIFIED 표시, Fit/Zoom toolbar, wheel zoom, J1 canvas selection → Inspector J1, 부품 검색 R2 → Inspector R2, fault R1 불변, RC 전환 후 이전 선택 격리 및 connectivity fallback을 확인했다. Console error/warning은 없었다. Drag와 실제 물리 마우스 좌표 선택은 별도로 검증하지 않았다. Canvas symbol 선택은 접근성 Hit Region button action으로 브라우저 이벤트 전달과 Inspector 동기화까지 확인했다.
+실제 로컬 Streamlit 브라우저에서 Divider SVG 표시, Geometry VERIFIED 표시, Fit/Reset toolbar, wheel zoom, drag pan, J1 canvas selection → Inspector J1, 부품 검색 R2 → Inspector R2, fault R1 불변, RC 전환 후 이전 선택 격리 및 connectivity fallback을 확인했다. Pan/Zoom, Fit, Reset 후 Streamlit 전체 rerun이 발생하지 않았다. Console error/warning은 없었다. 심벌 선택은 노출된 Hit Region 접근성 버튼을 통해 브라우저 이벤트 전달과 Inspector 동기화까지 확인했다. OS 포인터의 좌표 기반 클릭은 별도로 검증하지 않았다.
 
 ## 10. 검증 결과
 
