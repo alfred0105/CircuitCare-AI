@@ -15,6 +15,7 @@ data/ui_runs/
 data/vision_results/
 data/visualizations/
 data/schematic_svg_cache/
+data/schematic_equivalence_cache/
 models/*.pt
 models/*.onnx
 reports/
