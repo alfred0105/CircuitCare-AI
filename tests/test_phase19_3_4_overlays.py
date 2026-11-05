@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -30,6 +31,11 @@ def test_divider_phase19_3_4_simulation_manifest_is_verified_and_tamper_is_stale
     case = DEMO_CASES["Independent resistor divider (evaluation circuit A)"]
     result = ROOT / case["cached"]
     fingerprint = _current_simulation_fingerprint(case, "R1", "resistance_drift", "10k")
+    manifest = json.loads((result / "simulation_context.json").read_text(encoding="utf-8"))
+    expected_engine = manifest["fingerprint"]["simulation_settings"].get("ngspice_version")
+    current_engine = fingerprint["simulation_settings"].get("ngspice_version")
+    if current_engine != expected_engine:
+        pytest.skip("NOT_VERIFIED: cached simulation is pinned to a different ngspice version")
     snapshot = load_analysis_snapshot(result_dir=result, current_fingerprint=fingerprint,
                                      live_used=False, live_error=None, cached_selection=True)
     assert snapshot.status == "CACHED_SIMULATION"
