@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
 from circuitcare.graph import direct_candidates, find_paths_result
 from circuitcare.schematic.exporter import export_schematic
-from circuitcare.schematic.identity import map_component_refs, read_symbol_identities
+from circuitcare.schematic.geometry import (
+    GeometryResult,
+    build_symbol_geometry,
+    read_svg_view_box,
+)
+from circuitcare.schematic.identity import (
+    discover_schematic_files,
+    map_component_refs,
+    read_symbol_identities,
+)
+from circuitcare.schematic.interaction import validate_selection_event
+from circuitcare.schematic.viewer import render_interactive_viewer
 
 
 def spice_verification_label(status: str, integrity: str) -> str:
@@ -39,9 +51,16 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
                                root: Path, comparison_path: Path, simulation_status: str,
                                simulation_integrity: str) -> None:
     st.subheader("회로도 작업공간")
-    context_token = hashlib.sha256(case_name.encode()).hexdigest()[:12]
-    uploaded = st.file_uploader("KiCad 회로도 (.kicad_sch)", type=["kicad_sch"], key=f"schematic_source_{context_token}")
+    fingerprint = {
+        "case": case_name,
+        "components": [(ref, item.value, item.library_id) for ref, item in sorted(circuit.components.items())],
+        "connections": sorted((conn.ref, conn.pin, conn.net) for conn in circuit.connections),
+    }
+    digest = hashlib.sha256(json.dumps(fingerprint, sort_keys=True).encode())
     schematic_path = None
+    upload_token = hashlib.sha256(case_name.encode()).hexdigest()[:12]
+    uploaded = st.file_uploader("KiCad 회로도 (.kicad_sch)", type=["kicad_sch"], key=f"schematic_source_{upload_token}")
+    # Include the actual schematic bytes in the selection scope, including child sheets.
     if uploaded is not None:
         try:
             schematic_path = _store_schematic(uploaded.getvalue(), root)
@@ -52,26 +71,49 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
         if candidate.is_relative_to(root.resolve()) and candidate.is_file():
             schematic_path = candidate
 
+    if schematic_path is not None:
+        try:
+            source_files, _ = discover_schematic_files(schematic_path, project_root=root)
+            for source_file in source_files:
+                digest.update(source_file.relative_to(root.resolve()).as_posix().encode())
+                digest.update(source_file.read_bytes())
+        except (OSError, ValueError):
+            digest.update(schematic_path.name.encode())
+    else:
+        digest.update(b"no-kicad-schematic")
+    context_key = digest.hexdigest()
+    context_token = context_key[:16]
+    state_key = f"schematic_inspected_{context_token}"
+    navigation_key = f"schematic_navigation_{context_token}"
+    initial_ref = st.session_state.get(state_key)
+    if initial_ref not in circuit.components:
+        initial_ref = selected_fault if selected_fault in circuit.components else min(circuit.components)
+
     nav, canvas, inspector = st.columns([1, 3, 1.2], gap="small")
     refs = sorted(circuit.components)
-    state_key = f"schematic_selected_{context_token}"
-    if st.session_state.get("schematic_case") != case_name:
-        st.session_state["schematic_case"] = case_name
-        st.session_state.pop(state_key, None)
+    query = ""
+    component_ref = initial_ref
     with nav:
         st.caption(f"회로 · {case_name}")
         st.caption(f"분석 Context · {selected_fault} / {fault_type} / {fault_value or '—'}")
         query = st.text_input("부품 검색", key=f"schematic_search_{state_key}").strip().casefold()
         filtered = [ref for ref in refs if query in ref.casefold()]
-        current = st.session_state.get(state_key, selected_fault)
-        options = filtered or refs
-        index = options.index(current) if current in options else 0
-        component_ref = st.selectbox("부품", options, index=index, key=f"schematic_component_{state_key}")
-        st.session_state[state_key] = component_ref
-        st.caption("시트 · / (상위 시트는 파일 선택 후 표시)")
+        if not filtered:
+            st.info("검색한 Reference가 현재 회로에 없습니다.")
+        else:
+            widget_key = f"schematic_component_{context_token}"
+            if widget_key not in st.session_state or st.session_state.get(widget_key) not in filtered:
+                st.session_state[widget_key] = initial_ref if initial_ref in filtered else filtered[0]
+            component_ref = st.selectbox("부품 검색 결과", filtered, key=widget_key)
+            if component_ref != st.session_state.get(state_key):
+                st.session_state[state_key] = component_ref
+                st.session_state[navigation_key] = int(st.session_state.get(navigation_key, 0)) + 1
 
     status = "NOT_EVALUATED"
     svg = None
+    svg_path = None
+    view_box = None
+    geometry = GeometryResult("UNVERIFIED_GEOMETRY", "회로도 geometry를 사용할 수 없습니다.")
     mapping: dict[str, dict] = {}
     if schematic_path is not None:
         try:
@@ -85,12 +127,61 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
             if result.status == "EXPORTED" and result.svg_paths:
                 svg_paths = result.svg_paths
                 with nav:
-                    page = st.selectbox("시트 페이지", range(1, len(svg_paths) + 1), key=f"schematic_page_{result.cache_key}")
-                svg = svg_paths[page - 1]
+                    page_names = [item.name for item in svg_paths]
+                    page_key = f"schematic_page_{context_token}"
+                    if st.session_state.get(page_key) not in page_names:
+                        st.session_state[page_key] = page_names[0]
+                    page_name = st.selectbox("회로도 페이지", page_names, key=page_key)
+                svg_path = next(item for item in svg_paths if item.name == page_name)
+                svg = svg_path.read_text(encoding="utf-8")
                 status = "SVG_EXPORTED"
+                geometry = build_symbol_geometry(schematic_path, result.svg_paths, project_root=root)
+                view_box = geometry.view_box or read_svg_view_box(svg_path)
+                allowed_refs = set(refs)
+                regions = [region for region in geometry.regions if region.component_ref in allowed_refs]
+                if len(regions) != len(geometry.regions):
+                    geometry = GeometryResult("UNVERIFIED_GEOMETRY", "Schematic Reference does not match the current netlist", view_box)
+                    regions = []
+                asset_key = f"{result.cache_key}:{svg_path.name}"
                 with canvas:
-                    st.caption(f"시트 {page} · KiCad CLI SVG · {schematic_path.relative_to(root)}")
-                    st.image(str(svg), output_format="SVG", use_container_width=True)
+                    st.caption(f"KiCad CLI SVG · {schematic_path.relative_to(root)} · {svg_path.name}")
+                    viewer_key = f"schematic_viewer_{context_token}_{hashlib.sha256(svg_path.name.encode()).hexdigest()[:8]}"
+                    viewer_result = None
+                    if view_box is not None:
+                        def handle_viewer_selection() -> None:
+                            current = st.session_state.get(viewer_key)
+                            event = getattr(current, "selection", None)
+                            if not isinstance(event, dict) or event.get("event_id") == st.session_state.get(f"last_event_{viewer_key}"):
+                                return
+                            valid, reason = validate_selection_event(event, component_refs=set(refs),
+                                                                    geometry=geometry, context_key=context_key)
+                            st.session_state[f"last_event_{viewer_key}"] = event.get("event_id")
+                            if not valid:
+                                st.session_state[f"selection_error_{viewer_key}"] = reason
+                                return
+                            st.session_state[state_key] = event["component_ref"]
+                            st.session_state[f"schematic_component_{context_token}"] = event["component_ref"]
+                            st.session_state[navigation_key] = int(st.session_state.get(navigation_key, 0)) + 1
+
+                        viewer_result = render_interactive_viewer(
+                            st, svg=svg, asset_key=asset_key, view_box=view_box,
+                            geometry_status=geometry.status,
+                            regions=[{"component_ref": item.component_ref, "symbol_uuid": item.symbol_uuid,
+                                      "sheet_path": item.sheet_path, "unit": item.unit,
+                                      "polygon": [list(point) for point in item.polygon]} for item in regions],
+                            selected_ref=component_ref,
+                            navigation_id=int(st.session_state.get(navigation_key, 0)),
+                            context_key=context_key, key=viewer_key,
+                            on_selection_change=handle_viewer_selection,
+                        )
+                    if viewer_result is None:
+                        st.image(str(svg_path), output_format="SVG", use_container_width=True)
+                        st.caption("Pan/Zoom Viewer를 사용할 수 없어 SVG 정적 보기로 표시합니다.")
+                    else:
+                        selection_error = st.session_state.pop(f"selection_error_{viewer_key}", None)
+                        if selection_error:
+                            st.warning(f"회로도 선택 이벤트를 거부했습니다: {selection_error}")
+                        st.caption(f"Symbol Geometry · {geometry.status} · {geometry.message}")
             else:
                 with canvas:
                     st.warning(f"회로도 Export를 사용할 수 없습니다 ({result.status}). {result.message}")
@@ -121,6 +212,7 @@ def render_schematic_workspace(st: Any, *, circuit: Any, case_name: str, case: d
             if conn.ref == component_ref:
                 st.caption(f"{conn.pin} → {conn.net}")
         identity = mapping.get(component_ref, {"status": "UNVERIFIED_MAPPING"})
+        st.caption(f"점검 선택 · {component_ref} · 고장 원인 {selected_fault} (별도 상태)")
         st.caption(f"회로도 매칭 · {identity.get('status', 'UNVERIFIED_MAPPING')}")
         for instance in identity.get("symbol_instances", []):
             st.caption(f"UUID · {instance['symbol_uuid']} · unit {instance['unit']} · {instance['sheet_path']}")

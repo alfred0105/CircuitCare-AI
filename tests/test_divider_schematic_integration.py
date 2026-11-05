@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from circuitcare.schematic.exporter import export_schematic, find_kicad_cli
+from circuitcare.schematic.geometry import build_symbol_geometry
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -68,6 +69,23 @@ def test_divider_schematic_matches_xml_netlist(tmp_path):
         assert exported.status == "EXPORTED", exported.message
         assert len(exported.svg_paths) == 1
         assert exported.svg_paths[0].is_file()
+        geometry = build_symbol_geometry(source, exported.svg_paths, project_root=ROOT)
+        assert geometry.status == "VERIFIED_GEOMETRY", geometry.message
+        assert geometry.view_box == (0.0, 0.0, 297.0022, 210.0072)
+        region_refs = {region.component_ref for region in geometry.regions}
+        assert region_refs == {"J1", "R1", "R2"}
+        svg_root = ET.parse(exported.svg_paths[0]).getroot()
+        svg_rects = [element.attrib for element in svg_root.iter()
+                     if element.tag.rsplit("}", 1)[-1] == "rect"]
+        assert {("98.984000", "71.270000", "2.032000", "5.080000"),
+                ("118.984000", "78.890000", "2.032000", "5.080000")} <= {
+                    (rect.get("x"), rect.get("y"), rect.get("width"), rect.get("height"))
+                    for rect in svg_rects
+                }
+        svg_paths = [element.get("d", "") for element in svg_root.iter()
+                     if element.tag.rsplit("}", 1)[-1] == "path"]
+        assert any("M100.0000 71.2700 L100.0000 70.0000" in path for path in svg_paths)
+        assert any("M120.0000 78.8900 L120.0000 77.6200" in path for path in svg_paths)
     finally:
         if cache_root.exists():
             shutil.rmtree(cache_root)
