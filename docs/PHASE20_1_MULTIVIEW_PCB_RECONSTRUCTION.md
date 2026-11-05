@@ -51,7 +51,7 @@ Hough 원 후보와 동박 후보의 원형·사각형 윤곽으로 `PAD_OR_VIA_
 
 ## 6. 사용자 화면 및 기존 기능
 
-`다중 사진 PCB 복원`을 고급 도구에 추가했습니다. 다중 업로드, 사진별 면·촬영 유형, 외곽 후보 선택, 품질 안내, 원본 보기, 배선 후보, Pad/Via 후보, 접촉 후보 보기, 투명도 조절을 제공합니다. 부품 마킹 OCR은 사용자가 사진별로 요청할 때만 로컬에서 실행합니다.
+`다중 사진 PCB 복원`을 고급 도구에 추가했습니다. 다중 업로드, 사진별 면·촬영 유형, 외곽 후보 선택, 품질 안내, 원본 보기, 배선 후보, Pad/Via 후보, 접촉 후보 보기, 투명도 조절, 캔버스 맞춤·휠 확대·버튼 확대축소·드래그 이동을 제공합니다. 부품 마킹 OCR은 사용자가 사진별로 요청할 때만 로컬에서 실행합니다.
 
 기존 `PCB 사진 인식`, KiCad 회로도, SPICE, 위험 평가, Bayesian, 보고서 기능은 기존 경로에서 유지됩니다. 새 다중 사진 파이프라인은 현재 해당 분석 결과를 자동으로 사진 위에 얹거나 수리 추천과 결합하지 않습니다.
 
@@ -75,8 +75,9 @@ Streamlit 화면에서 두 PNG를 동시에 업로드하고 앞면·뒷면을 �
 - [다중 사진 및 면 지정 화면](assets/phase20_1_multiview_synthetic_browser.png)
 - [앞면·뒷면 방향 검토 화면](assets/phase20_1_registration_review_browser.png)
 - [배선 후보 중첩 화면](assets/phase20_1_copper_candidates_browser.png)
+- [확대·이동 가능한 PCB 캔버스](assets/phase20_1_zoom_pan_viewer_browser.png)
 
-로컬 Python 3.12 회귀 테스트는 **328 passed**이며 `tests/test_vision_reconstruction.py`, 기존 `tests/test_vision.py`, 전체 CircuitCare 회귀 및 Streamlit AppTest 내비게이션을 포함합니다. Python compileall, JavaScript syntax check, `git diff --check`도 통과했습니다. 세션 상태 및 내부 상태 코드는 유지됩니다.
+실제 브라우저 E2E에서는 확대 버튼으로 125%가 표시되는 것과 캔버스를 드래그했을 때 카메라 변환이 바뀌는 것을 확인했습니다. 페이지 JavaScript 오류는 없었습니다. 로컬 Python 3.12 회귀 테스트는 **328 passed**이며 `tests/test_vision_reconstruction.py`, 기존 `tests/test_vision.py`, 전체 CircuitCare 회귀 및 Streamlit AppTest 내비게이션을 포함합니다. Python compileall, JavaScript syntax check, `git diff --check`도 통과했습니다. 세션 상태 및 내부 상태 코드는 유지됩니다.
 
 GitHub Actions [Tests run 42017609929](https://github.com/alfred0105/CircuitCare-AI/actions/runs/42017609929)도 성공했습니다. Python 3.11·3.12, ngspice 통합, OCR 통합, bounded stress 및 isolated crash-injection 작업이 모두 통과했습니다.
 

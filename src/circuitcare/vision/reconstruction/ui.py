@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import io
 from typing import Any
 
 import cv2
@@ -253,12 +255,55 @@ def render_multiview_reconstruction(st: Any) -> None:
         column = overlay_cols[index % len(overlay_cols)]
         with column:
             coordinate_note = "원본 픽셀 좌표" if view_mode == "원본 사진" else item["frame_status"]
-            st.image(Image.fromarray(display),
-                     caption=f"{_SIDE_LABELS[record.side]} · {view_mode} · 좌표계: {coordinate_note}",
-                     use_container_width=True)
+            _render_zoomable_canvas(
+                st, Image.fromarray(display),
+                caption=f"{_SIDE_LABELS[record.side]} · {view_mode} · 좌표계: {coordinate_note}")
             st.write({"관측 상태": segmented.status, "사진 좌표계": item["frame_status"],
                       "배선 영역": len(traces), "패드/비아 후보": len(pads),
                       "같은 면 접촉 후보": len(graph.edges),
                       "연결 그래프": graph.status,
                       "미관측 영역": "솔더마스크/가림 아래 배선은 NOT_OBSERVABLE"})
             st.caption("접촉 후보는 전기적 Net이나 연속성 확인이 아닙니다. 사진이 바뀌면 후보와 근거도 새로 계산됩니다.")
+
+
+def _render_zoomable_canvas(st: Any, image: Image.Image, *, caption: str) -> None:
+    """Render the current photo layer with browser-local wheel zoom and drag pan."""
+    image.thumbnail((2000, 2000), Image.Resampling.LANCZOS)
+    stream = io.BytesIO()
+    image.save(stream, format="JPEG", quality=88, optimize=True)
+    encoded = base64.b64encode(stream.getvalue()).decode("ascii")
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><style>
+      *{{box-sizing:border-box}} body{{margin:0;background:#0e141b;color:#d8e2ec;font:13px sans-serif}}
+      .toolbar{{height:40px;display:flex;align-items:center;gap:6px;padding:4px 8px;background:#141e29;border:1px solid #344354;border-bottom:0}}
+      button{{height:28px;min-width:34px;border:1px solid #415266;border-radius:4px;background:#202d3a;color:#edf3f8;cursor:pointer}}
+      button:hover{{background:#2b3d4e}} #zoom{{min-width:48px;text-align:center;color:#aebdca}}
+      #caption{{margin-left:auto;color:#aebdca;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+      #viewport{{height:460px;width:100%;overflow:hidden;position:relative;background:#f7f6f2;border:1px solid #344354;touch-action:none;cursor:grab}}
+      #viewport.dragging{{cursor:grabbing}} #stage{{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}}
+      #photo{{display:block;max-width:none;max-height:none;user-select:none;-webkit-user-drag:none;pointer-events:none}}
+    </style></head><body>
+      <div class="toolbar" role="toolbar" aria-label="사진 캔버스 조작">
+        <button id="fit" aria-label="화면 맞춤" title="화면 맞춤">맞춤</button>
+        <button id="minus" aria-label="축소" title="축소">−</button>
+        <span id="zoom" aria-live="polite">100%</span>
+        <button id="plus" aria-label="확대" title="확대">＋</button>
+        <span id="caption">{caption}</span>
+      </div>
+      <div id="viewport" aria-label="이동 및 확대 가능한 PCB 사진">
+        <div id="stage"><img id="photo" alt="PCB 사진과 선택한 후보 레이어" src="data:image/jpeg;base64,{encoded}"></div>
+      </div>
+      <script>
+        const viewport=document.getElementById('viewport'),stage=document.getElementById('stage'),img=document.getElementById('photo'),zoomLabel=document.getElementById('zoom');
+        let scale=1,x=0,y=0,fitScale=1,drag=null;
+        function apply(){{stage.style.transform=`translate(${{x}}px,${{y}}px) scale(${{scale}})`;zoomLabel.textContent=`${{Math.round(scale/fitScale*100)}}%`;}}
+        function fit(){{const r=viewport.getBoundingClientRect();fitScale=Math.min(r.width/img.naturalWidth,r.height/img.naturalHeight);scale=fitScale;x=(r.width-img.naturalWidth*scale)/2;y=(r.height-img.naturalHeight*scale)/2;apply();}}
+        function around(point,nextScale){{const rect=viewport.getBoundingClientRect(),px=point.clientX-rect.left,py=point.clientY-rect.top,ratio=nextScale/scale;x=px-(px-x)*ratio;y=py-(py-y)*ratio;scale=nextScale;apply();}}
+        if(img.complete)fit();else img.addEventListener('load',fit);window.addEventListener('resize',fit);document.getElementById('fit').onclick=fit;
+        document.getElementById('plus').onclick=()=>around({{clientX:viewport.clientWidth/2+viewport.getBoundingClientRect().left,clientY:viewport.clientHeight/2+viewport.getBoundingClientRect().top}},Math.min(scale*1.25,fitScale*8));
+        document.getElementById('minus').onclick=()=>around({{clientX:viewport.clientWidth/2+viewport.getBoundingClientRect().left,clientY:viewport.clientHeight/2+viewport.getBoundingClientRect().top}},Math.max(scale/1.25,fitScale*.2));
+        viewport.addEventListener('wheel',event=>{{event.preventDefault();around(event,Math.max(fitScale*.2,Math.min(scale*(event.deltaY<0?1.12:.89),fitScale*8)));}},{{passive:false}});
+        viewport.addEventListener('pointerdown',event=>{{drag={{x:event.clientX,y:event.clientY,originX:x,originY:y}};viewport.classList.add('dragging');viewport.setPointerCapture(event.pointerId);}});
+        viewport.addEventListener('pointermove',event=>{{if(!drag)return;x=drag.originX+event.clientX-drag.x;y=drag.originY+event.clientY-drag.y;apply();}});
+        function stop(){{drag=null;viewport.classList.remove('dragging');}}viewport.addEventListener('pointerup',stop);viewport.addEventListener('pointercancel',stop);
+      </script></body></html>"""
+    st.components.v1.html(html, height=510, scrolling=False)
