@@ -99,7 +99,10 @@ def main():
             "No sealed independent test split is available."]}
     args.output.write_text(json.dumps(report, indent=2))
     print(json.dumps({"output": str(args.output.resolve()), "positive_image_count": positive["dataset"]["image_count"],
-                      "negative_counts": {k: v["image_count"] for k, v in negatives.items()}}, indent=2))
+                      "negative_counts": {k: {"reviewed": v["reviewed_image_count"],
+                                          "evaluated": v["evaluated_image_count"],
+                                          "failed": v["inference_failure_count"]}
+                                          for k, v in negatives.items()}}, indent=2))
     return 0
 
 
