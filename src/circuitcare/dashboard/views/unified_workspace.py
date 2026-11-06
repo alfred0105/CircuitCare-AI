@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import base64
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 from typing import Any
@@ -13,6 +14,9 @@ from circuitcare.frontend.component_overlay_adapter import (
     adapt_component_map_components, adapt_original_photo_components,
 )
 from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
+from circuitcare.frontend.diagnosis_adapter import DiagnosisContext, adapt_fault_overlay
+from circuitcare.frontend.measurement_models import measurement_set_sha256
+from circuitcare.frontend.measurement_state import diagnosis_state, get_measurements
 from circuitcare.frontend.component_map_adapter import (
     COMPONENT_MAP_STATE_KEY, LOGGER, REGISTRATION_LABELS, available_photo_sides,
     clear_component_map_state,
@@ -265,6 +269,40 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
                 )
     if overlay_result and overlay_result.status == "INVALID_DATA":
         st.warning("일부 부품 좌표를 검증할 수 없어 표시하지 않았습니다.")
+    if mode == "통합 이미지" and component_map and side_enum and canonical and decoded_canonical:
+        scoped_diagnosis = diagnosis_state(
+            st.session_state, project_id=project.project_id, board_id=project.board_id or "",
+        )
+        stored_diagnosis = scoped_diagnosis.get("result")
+        diagnosis_context = scoped_diagnosis.get("context")
+        board_measurements = get_measurements(
+            st.session_state, project_id=project.project_id, board_id=project.board_id or "",
+        )
+        current_measurement_set = measurement_set_sha256(
+            board_measurements, project_id=project.project_id, board_id=project.board_id or "",
+        )
+        if (scoped_diagnosis.get("status") in {"DIAGNOSIS_COMPLETE", "MODEL_MISMATCH"}
+                and scoped_diagnosis.get("measurement_set_sha256") == current_measurement_set
+                and isinstance(diagnosis_context, DiagnosisContext) and isinstance(stored_diagnosis, dict)):
+            overlay_rows, overlay_error = adapt_fault_overlay(
+                {
+                    "diagnosis": stored_diagnosis,
+                    "fault_overlay": stored_diagnosis.get("fault_overlay"),
+                    "canonical_frame_id": stored_diagnosis.get("canonical_frame_id"),
+                    "component_map_version": stored_diagnosis.get("component_map_version"),
+                    "confirmed_component_ids": stored_diagnosis.get("confirmed_component_ids", []),
+                },
+                context=diagnosis_context,
+                measurement_set_sha256=current_measurement_set,
+                board_side=side_enum, canonical_frame_id=decoded_canonical.frame_id,
+                component_ids={item.component_id for item in component_models},
+            )
+            if overlay_error:
+                st.caption("진단 위치가 현재 이미지에 확인되지 않아 고장 Overlay를 표시하지 않았습니다.")
+            elif overlay_rows:
+                component_models = tuple(replace(
+                    item, fault_candidate_status=overlay_rows[item.component_id]["fault_candidate_status"],
+                ) if item.component_id in overlay_rows else item for item in component_models)
     st.session_state["circuitcare_v4_current_components"] = tuple(component_models)
     st.session_state["circuitcare_v4_detection_status"] = detection_status
     current_selection = st.session_state.get(SELECTION_KEY)

@@ -26,6 +26,7 @@ class ComponentOverlayViewModel:
     possible_part_number: str | None
     evidence: tuple[str, ...]
     overlay_status: str
+    fault_candidate_status: str | None = None
 
 
 @dataclass(frozen=True)

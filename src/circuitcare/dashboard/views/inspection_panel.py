@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel, display_identity_status
+from circuitcare.frontend.measurement_state import get_measurements
 from circuitcare.frontend.models import ProjectContext
+from circuitcare.dashboard.views.diagnosis_panel import render_diagnosis_panel
+from circuitcare.dashboard.views.measurement_panel import render_measurement_panel
+
+MAP_VERSION_KEY = "circuitcare_v4_selection_map_key"
 
 
 def _component_label(value: str) -> str:
@@ -69,6 +74,18 @@ def render_inspection_panel(
             if selected_component.evidence:
                 with st.expander("검출 근거"):
                     st.write(" · ".join(selected_component.evidence))
-        st.markdown("**고장 진단** · 미실행")
-        st.markdown("**측정값** · 없음")
+        measurements = get_measurements(
+            st.session_state, project_id=project.project_id, board_id=project.board_id or "",
+        )
+        map_version = st.session_state.get(MAP_VERSION_KEY)
+        render_measurement_panel(
+            st, project, selected_component=selected_component, preview=preview,
+            component_map_version=map_version,
+        )
+        selection = st.session_state.get("circuitcare_v2_selection")
+        render_diagnosis_panel(
+            st, project, measurements=measurements,
+            analysis_context_id=getattr(selection, "analysis_context_id", None),
+            component_map_version=map_version,
+        )
         st.markdown("**다음 점검** · 분석 데이터 없음")

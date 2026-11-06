@@ -88,6 +88,9 @@ export default function(component) {
       rows.push(`검출 신뢰도 ${(item.detection_confidence * 100).toFixed(0)}%`);
     rows.push(`식별 ${item.display_status || "미확인"}`);
     if (item.ocr_marking) rows.push(`표기 ${item.ocr_marking}`);
+    const faultLabels = { SUSPECTED_FAULT:"고장 의심 후보", RELATED_COMPONENT:"관련 점검 후보",
+      CONFIRMED_FAULT:"검사 근거 확인" };
+    if (faultLabels[item.fault_candidate_status]) rows.push(faultLabels[item.fault_candidate_status]);
     rows.push("고장 진단 미실행");
     tooltip.textContent = rows.join("\n"); tooltip.hidden = false;
     const rect = viewport.getBoundingClientRect();
@@ -100,7 +103,7 @@ export default function(component) {
     for (const item of data.components || []) {
       const [x1,y1,x2,y2] = item.bbox_xyxy;
       const shape = svgElement("rect", { x:x1, y:y1, width:x2-x1, height:y2-y1,
-        class:`cc-pcb-component${item.component_id === data.selected_component_id ? " cc-selected" : ""}`,
+        class:`cc-pcb-component${item.component_id === data.selected_component_id ? " cc-selected" : ""}${item.fault_candidate_status === "SUSPECTED_FAULT" ? " cc-fault-suspected" : item.fault_candidate_status === "RELATED_COMPONENT" ? " cc-fault-related" : item.fault_candidate_status === "CONFIRMED_FAULT" ? " cc-fault-confirmed" : ""}`,
         "data-component-id":item.component_id, tabindex:"0", role:"button",
         "aria-label":`${item.display_label || item.component_type} 부품 선택` });
       fragment.appendChild(shape);

@@ -160,6 +160,7 @@ def render_component_viewer(
         "identity_match_status": item.identity_match_status,
         "ocr_marking": item.ocr_marking,
         "possible_part_number": item.possible_part_number,
+        "fault_candidate_status": item.fault_candidate_status,
     } for item in components]
     result = render_pcb_viewer(
         st, image_png_base64=image_b64, image_size_px=image_size_px, components=payload,
