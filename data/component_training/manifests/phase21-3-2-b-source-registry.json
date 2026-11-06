@@ -1,0 +1,78 @@
+{
+  "phase": "21.3.2-B",
+  "generated_at": "2026-11-06",
+  "policy": {
+    "default_training_domains": ["POPULATED_PCB", "PARTIALLY_POPULATED_PCB", "PCB_COMPONENT_CLOSEUP"],
+    "unknown_or_unreviewed_included": false,
+    "empty_annotation_means_negative": false,
+    "raw_sources_deleted": false
+  },
+  "sources": [
+    {
+      "id": "pcb-component-detection-kaggle-datasetninja",
+      "source_url": "https://www.kaggle.com/datasets/animeshkumar/printed-board-circuit-pcb-component-detection",
+      "license": "CC0-1.0 (source dataset metadata)",
+      "download": "data/component_training/raw/external/pcb-component-detection/pcb-component-detection-DatasetNinja.tar",
+      "sha256": "97432b6c45786cebd386b2fb0e132d1d3a52f89973595159751c0daee47b607b",
+      "downloaded_bytes": 188600320,
+      "archive_members": 2823,
+      "expanded_bytes": 183479313,
+      "images": 1410,
+      "source_boxes": 11119,
+      "empty_annotation_images": 114,
+      "filename_stem_groups": 433,
+      "stem_groups_crossing_source_splits": 37,
+      "physical_unique_boards": "UNVERIFIED",
+      "status": "DOWNLOADED_NOT_TRAINING_READY",
+      "reason": ["BOARD_ID_UNRESOLVED", "SOURCE_SPLIT_LEAKAGE", "CANONICAL_10_CLASS_MAPPING_INCOMPLETE"],
+      "image_manifest": "data/component_training/manifests/pcb-component-detection-acquisition-manifest.json"
+    },
+    {
+      "id": "pcb-wacv-2019",
+      "source_url": "https://ripl.cc.gatech.edu/data/pcb_wacv_2019.zip",
+      "license": "UNSPECIFIED_LICENSE_REVIEW_REQUIRED",
+      "download": "data/component_training/raw/external/pcb-wacv-2019/pcb_wacv_2019.zip",
+      "sha256": "d24cf0e3688a5c7a4d827b2363a2a5d6e3c88c189203876a9e9ef3ab6f45b01a",
+      "downloaded_bytes": 298093226,
+      "images": 47,
+      "source_objects": 18201,
+      "status": "DOWNLOADED_NOT_TRAINING_READY",
+      "reason": ["LICENSE_REVIEW_REQUIRED", "PARTIAL_CLASS_COVERAGE", "BOARD_GROUP_UNRESOLVED"],
+      "image_manifest": "data/component_training/manifests/pcb-wacv-2019-acquisition-manifest.json"
+    },
+    {
+      "id": "fpic-physicaldb",
+      "source_url": "https://physicaldb.ece.ufl.edu/pcb-dataset/",
+      "license": "UNSPECIFIED_LICENSE_REVIEW_REQUIRED",
+      "downloaded_annotation_archives": [
+        {"name": "smd_annotation.zip", "sha256": "01624144c27684d9a9b16a69c1d8d0d2fd6e8e6d93fac90fab1653ec65a4dc33", "bytes": 8235561, "rows": 52582, "csv_files": 228},
+        {"name": "ocr_annotation.zip", "sha256": "46d9c0f15e6aef4e466292deeb4e84c40dc0f5c0058666ae87905795c42f47a6", "bytes": 657972, "rows": 23218, "csv_files": 92},
+        {"name": "vtp_annotation.zip", "sha256": "3b14a03e7123ed9b00526a76dbe4edf4ae9940926a11834a4b338bda568af1a7", "bytes": 439755, "rows": 3954, "csv_files": 9},
+        {"name": "metadata.zip", "sha256": "d5ed5f42f525c5a73e91394cccc0046aca92e61f53a1c5ec1cbe11c06809d258", "bytes": 3298, "rows": 138, "csv_files": 2}
+      ],
+      "image_archive_bytes_not_downloaded": 7196349363,
+      "status": "ANNOTATIONS_ONLY_NOT_TRAINING_READY",
+      "reason": ["LICENSE_REVIEW_REQUIRED", "SMD_HAS_NO_CLASS_FIELD", "OCR_AND_VTP_ARE_DIFFERENT_ANNOTATION_TASKS"]
+    },
+    {
+      "id": "fics-pcb",
+      "source_url": "https://trust-hub.org/data",
+      "license": "ACCESS_AND_LICENSE_UNRESOLVED",
+      "status": "ACCESS_NOT_VERIFIED",
+      "reason": ["ANONYMOUS_DATA_DOWNLOAD_NOT_VERIFIED"]
+    },
+    {
+      "id": "pcb-dslr",
+      "source_url": "https://zenodo.org/records/13298212",
+      "license": "CONFLICTING_TERMS_REVIEW_REQUIRED",
+      "status": "NOT_DOWNLOADED",
+      "advertised_images": 748,
+      "advertised_boards": 165,
+      "class_scope": "IC_ONLY",
+      "advertised_archive_bytes": 6200000000,
+      "reason": ["RECORD_METADATA_CC_BY_4_LICENSE_TEXT_NONCOMMERCIAL_CONFLICT", "IC_ONLY_SCOPE", "LARGE_DOWNLOAD_HELD"]
+    }
+  ],
+  "canonical_model_training_addition": {"images": 0, "verified_unique_boards": 0, "status": "NO_NEW_SOURCE_IS_TRAINING_READY"},
+  "existing_phase_a_dataset": {"images": 130, "boxes": 3300, "treatment": "PRESERVED_UNCHANGED_NOT_COUNTED_AS_NEW_ACQUISITION"}
+}

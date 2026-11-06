@@ -23,23 +23,44 @@ def evaluate_negatives(model: Path, review_manifest: Path, *, confidence: float,
         if not row.get("hard_negative_eligible"):
             continue
         image_path = ROOT / "data" / "component_training" / row["image_path"]
-        start = time.perf_counter()
-        result = detect_components(Image.open(image_path).convert("RGB"), str(model),
-                                   confidence_threshold=confidence, iou_threshold=nms_iou)
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        detections = result.get("detections", [])
-        grouped[row["image_type"]].append({"image_id": row["image_id"],
-            "board_group_id": row.get("board_group_id"), "false_positive_count": len(detections),
-            "has_false_positive": bool(detections), "inference_latency_ms": elapsed_ms})
+        started = time.perf_counter()
+        record = {"image_id": row["image_id"], "board_group_id": row.get("board_group_id"),
+                  "image_path": str(image_path)}
+        try:
+            if not image_path.is_file():
+                raise FileNotFoundError(f"image not found: {image_path}")
+            with Image.open(image_path) as source_image:
+                result = detect_components(source_image.convert("RGB"), str(model),
+                    confidence_threshold=confidence, iou_threshold=nms_iou)
+            if not isinstance(result, dict) or result.get("status") != "INFERENCE_COMPLETE":
+                raise RuntimeError(f"detector did not complete: {result.get('status') if isinstance(result, dict) else type(result).__name__}")
+            model_info = result.get("model")
+            if not isinstance(model_info, dict) or model_info.get("status") != "READY":
+                raise RuntimeError("detector did not report a ready model")
+            detections = result.get("detections")
+            if not isinstance(detections, list):
+                raise RuntimeError("detector returned no valid detections list")
+            record.update({"status": "INFERENCE_COMPLETE", "false_positive_count": len(detections),
+                           "has_false_positive": bool(detections)})
+        except Exception as exc:  # Failed inference must never be scored as zero false positives.
+            record.update({"status": "INFERENCE_FAILED", "failure_type": type(exc).__name__,
+                           "failure_reason": str(exc)})
+        record["inference_latency_ms"] = (time.perf_counter() - started) * 1000
+        grouped[row["image_type"]].append(record)
     metrics = {}
     for domain in ("BARE_PCB", "BREADBOARD"):
         rows = grouped[domain]
-        n = len(rows)
-        metrics[domain] = {"image_count": n,
-            "image_level_false_positive_rate": sum(row["has_false_positive"] for row in rows) / n if n else None,
-            "mean_false_positives_per_image": sum(row["false_positive_count"] for row in rows) / n if n else None,
-            "total_false_positives": sum(row["false_positive_count"] for row in rows),
-            "status": "MEASURED_REVIEWED_EMPTY_IMAGES" if n else "NO_REVIEWED_IMAGES",
+        successful = [row for row in rows if row["status"] == "INFERENCE_COMPLETE"]
+        failures = [row for row in rows if row["status"] != "INFERENCE_COMPLETE"]
+        n = len(successful)
+        metrics[domain] = {"reviewed_image_count": len(rows), "evaluated_image_count": n,
+            "inference_failure_count": len(failures),
+            "image_level_false_positive_rate": sum(row["has_false_positive"] for row in successful) / n if n else None,
+            "mean_false_positives_per_image": sum(row["false_positive_count"] for row in successful) / n if n else None,
+            "total_false_positives": sum(row["false_positive_count"] for row in successful),
+            "status": ("NO_REVIEWED_IMAGES" if not rows else
+                       "NO_SUCCESSFUL_INFERENCES" if not n else
+                       "PARTIAL_INFERENCE_FAILURE" if failures else "MEASURED_REVIEWED_EMPTY_IMAGES"),
             "per_image": rows}
     return metrics
 
