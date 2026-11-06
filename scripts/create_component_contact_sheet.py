@@ -22,7 +22,7 @@ def create(manifest_path: Path, output_dir: Path, *, page_size: int = 100) -> di
         raise ValueError("manifest must have an images array")
     output_dir.mkdir(parents=True, exist_ok=True)
     font = ImageFont.load_default()
-    tile_w, tile_h, thumb_w, thumb_h = 220, 190, 210, 140
+    tile_w, tile_h, thumb_w, thumb_h = 260, 220, 250, 165
     columns = 5
     index_rows = []
     for start in range(0, len(rows), page_size):
@@ -31,9 +31,12 @@ def create(manifest_path: Path, output_dir: Path, *, page_size: int = 100) -> di
         sheet = Image.new("RGB", (columns * tile_w, math.ceil(len(chunk) / columns) * tile_h), "white")
         draw = ImageDraw.Draw(sheet)
         for offset, row in enumerate(chunk):
-            image_path = Path(row["image_path"])
+            image_path = Path(row.get("image_path") or row.get("image", ""))
             if not image_path.is_absolute():
-                image_path = ROOT / image_path
+                candidate = ROOT / image_path
+                if not candidate.is_file():
+                    candidate = ROOT / "data/component_training/raw/external" / image_path
+                image_path = candidate
             with Image.open(image_path) as source:
                 image = source.convert("RGB")
                 source_width, source_height = image.size
@@ -54,16 +57,22 @@ def create(manifest_path: Path, output_dir: Path, *, page_size: int = 100) -> di
             domain = str(row.get("image_type", "UNKNOWN"))
             count = row.get("annotation_count", "?")
             review = str(row.get("review_status", "UNREVIEWED"))
+            split = str(row.get("source_split", "UNKNOWN"))
+            stem = str(row.get("source_stem_group", "UNKNOWN"))
+            confidence = str(row.get("classification_confidence", "UNKNOWN"))
             draw.text((x + 4, y + thumb_h + 2), identifier[:32], fill="black", font=font)
-            draw.text((x + 4, y + thumb_h + 18), f"{domain} | boxes={count}", fill="black", font=font)
-            draw.text((x + 4, y + thumb_h + 34), review[:35], fill="black", font=font)
+            draw.text((x + 4, y + thumb_h + 18), f"{domain} | boxes={count} | {split}", fill="black", font=font)
+            draw.text((x + 4, y + thumb_h + 34), f"{confidence} | {review}"[:45], fill="black", font=font)
+            draw.text((x + 4, y + thumb_h + 50), f"stem={stem}"[:45], fill="black", font=font)
             index_rows.append({"page": page, "tile": offset + 1, "image_id": identifier,
                 "image_path": str(image_path), "image_type": domain,
-                "annotation_count": count, "review_status": review})
+                "annotation_count": count, "source_split": split, "source_stem_group": stem,
+                "classification_confidence": confidence, "review_status": review})
         sheet.save(output_dir / f"contact-sheet-{page:03}.jpg", quality=88)
     with (output_dir / "review-index.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(index_rows[0]) if index_rows else
-            ["page", "tile", "image_id", "image_path", "image_type", "annotation_count", "review_status"])
+            ["page", "tile", "image_id", "image_path", "image_type", "annotation_count",
+             "source_split", "source_stem_group", "classification_confidence", "review_status"])
         writer.writeheader()
         writer.writerows(index_rows)
     return {"image_count": len(rows), "page_count": math.ceil(len(rows) / page_size),

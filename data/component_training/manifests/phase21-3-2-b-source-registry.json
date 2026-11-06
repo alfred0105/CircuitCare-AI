@@ -271,5 +271,55 @@
     "raw_external_directory_approx_bytes": 2473000000,
     "free_space_after_acquisition_approx_bytes": 142000000000,
     "raw_data_committed_to_git": false
+  },
+  "phase_21_3_2_c_kaggle_curation": {
+    "manifest": "data/component_training/manifests/pcb-component-detection-curation-manifest.json",
+    "image_count": 1410,
+    "domain_reviewed_images": 0,
+    "populated_pcb_images": 1410,
+    "domain_excluded_images": 0,
+    "source_annotations": 11119,
+    "valid_boxes": 11119,
+    "invalid_boxes": 0,
+    "class_annotation_counts": {
+      "Cap1": 1295,
+      "Cap2": 1264,
+      "Cap3": 1199,
+      "Cap4": 1074,
+      "MOSFET": 1295,
+      "Mov": 1291,
+      "Resestor": 3,
+      "Resistor": 1151,
+      "Transformer": 2547
+    },
+    "annotation_completeness": {
+      "annotation_status_unknown": 1296,
+      "empty_unreviewed": 114,
+      "annotation_complete": 0,
+      "reviewed_empty": 0
+    },
+    "groups": {
+      "source_stem_groups": 433,
+      "source_stem_groups_crossing_source_splits": 37,
+      "phash_near_duplicate_pairs_le_6": 228,
+      "phash_near_duplicate_cross_split_pairs": 71,
+      "visual_board_group_candidates": 1,
+      "human_confirmed_board_groups": 0,
+      "source_verified_physical_board_ids": 0,
+      "board_group_candidate_crosses_source_splits": true
+    },
+    "training_readiness": {
+      "source_only_training_candidates": 0,
+      "canonical_10_class_training_candidates": 0,
+      "train_split_images": 0,
+      "validation_split_images": 0,
+      "status": "BLOCKED_NO_VERIFIED_TRAINING_DATA"
+    },
+    "domain_review_method": "AI visual audit of 57 contact sheets; requires human adjudication",
+    "raw_images_changed": false,
+    "raw_data_committed_to_git": false,
+    "ai_domain_candidates": 1410,
+    "human_domain_review_pending": 1410,
+    "review_queue": "data/component_training/manifests/kaggle-component-review-queue/review-queue.csv"
   }
 }

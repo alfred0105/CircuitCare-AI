@@ -1,0 +1,2365 @@
+{
+  "exact_duplicate_groups": [],
+  "phash_distance_threshold": 6,
+  "phash_near_duplicate_groups": [
+    [
+      "pcb-component-detection/extracted/train/img/VID20210601144135-60_jpg.rf.b386fef1f1b770ce925bf19389426744.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-384_jpg.rf.5230485c779a294c2eb506e1bf15e104.jpg",
+      "pcb-component-detection/extracted/test/img/VID20210601144135-60_jpg.rf.b12333c10d89f56d72e505c9c742b403.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID20210601144202-30_jpg.rf.f15cfb2129c9cc29c22409cb7f05bb9e.jpg",
+      "pcb-component-detection/extracted/test/img/VID20210601144207-18_jpg.rf.900f8eb9de5f4348e60e7768d977af1e.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID20210601144207-18_jpg.rf.8582f3946c6ff5d609e6d10fbf8d7db7.jpg",
+      "pcb-component-detection/extracted/test/img/VID20210601144202-30_jpg.rf.569fdf2a19367044bf777c2194086d9a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID20210601144220-135_jpg.rf.61f099c6adb764aa7a6680dbb0788fad.jpg",
+      "pcb-component-detection/extracted/test/img/VID20210601144220-120_jpg.rf.62e0be60a9f65d7037f8d0cd13c831ae.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID20210601144238-58_jpg.rf.b250ea529b843c5d4de768a7dcd2c020.jpg",
+      "pcb-component-detection/extracted/test/img/VID20210601144238-58_jpg.rf.f3eec9468477112bece7fe9a2b1e1c7a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID20210601144411-45_jpg.rf.3239531aa965105b16d8d3a099c62951.jpg",
+      "pcb-component-detection/extracted/train/img/VID20210601144553-30_jpg.rf.6473d6578d14b93b4d8209518cac11aa.jpg",
+      "pcb-component-detection/extracted/test/img/VID20210601144553-240_jpg.rf.736b20a6433878a9f6533b5d0e29d555.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-0_jpg.rf.8b7f3d17ce7185fe5be8c11050a5b874.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-72_jpg.rf.a24e1c7e75313d3bd94bb2d083833df0.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-12_jpg.rf.df068fa1f353eef4ce20b0fee4bedddc.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-30_jpg.rf.a1a9618468a014e6fbe8630e0e26747c.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-204_jpg.rf.c4eb4ef097944c0ff0b6d8b1bd50f942.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-240_jpg.rf.79ac30ee05985279c6f80acf01d14f14.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-24_jpg.rf.c1ebf4346df28ce1f3250159f53ca109.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-72_jpg.rf.52bb48c2b1e9503036e0803b0dd574e8.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-360_jpg.rf.371a97c1722ee820a82981e43440cd11.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-366_jpg.rf.a4305dc7762844a90db9e704bb4863f4.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-42_jpg.rf.4f1ee9acd25aec8bfc081d2ebe07adf8.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-42_jpg.rf.def4079ccb828a57f9a810642a694d33.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071435211-66_jpg.rf.c9f13fa9297fca12bf74e283de864e0f.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071435211-6_jpg.rf.14229b0a85cec3d544c9814d28827b5f.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-12_jpg.rf.d9f7d62bd39fb9bc675020121e368043.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436231-54_jpg.rf.9c279ee70a4ddb317a321814e52a9a39.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-156_jpg.rf.392ed409fad1b8b6eba18eb5985e0c06.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436231-162_jpg.rf.4bb898b6414af084651b37e6d1428c3c.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-198_jpg.rf.cefb9bbb4dcf9e0a7be0f19e52e1bc7d.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436511-114_jpg.rf.c342337fbf9c4d90f0e0b05adbadb2d7.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071437151-102_jpg.rf.44547da00dec4e8fa48b608d3df80ded.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-138_jpg.rf.24f38c59114f05540d02e38b31225810.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.aa0ec20748bf064ea6b8854217c45b76.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-84_jpg.rf.9d17069e2d5e0bf898fb8b967adc8053.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-150_jpg.rf.ab0bb534503a2e12a85681c20a8dcf2c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.fd39d2d6055bcfcaa6f52b8b3fa7d6f4.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.8e510f14d455aed603a37eb1b84ca9d2.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-12_jpg.rf.c8d3da0920c89fd32ce35cfd7d2ba9b6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-24_jpg.rf.1ec5c509e5b1d571560ec4f381f000c0.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436231-84_jpg.rf.21b95cd4552f6361cee2e0afbc2db7f3.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-270_jpg.rf.6fa3c03924822f4dd93e3b2d023e1ac4.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-0_jpg.rf.764201556db5ff3a7c31cbe5c04f6c27.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-36_jpg.rf.57aeca236522b2e99fcfe0e924ba19bf.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.08d569bd9735123e5577ec15f3020bd5.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-42_jpg.rf.e6e5f30fe9f07d260fd5ec041e81f5e2.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436511-108_jpg.rf.076a26e5a07ce47075ca471bc8474b3e.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071437151-0_jpg.rf.7b344ad70e897b53c85477bd1ac89a4f.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.1e78d285929057fa3f2e88c5356046bd.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-144_jpg.rf.03e5ac45058e53a7f0dedafdf92882fd.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.4ec3aacf219b36e5c422fb4973682d31.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-48_jpg.rf.cd0be870086173ebb78889cf58014011.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-132_jpg.rf.61f6bf4a48d13a2ee2037ff81aff5ca6.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-138_jpg.rf.e35c057cd7e022fd2d3f06e94b959708.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-144_jpg.rf.2302fe61f93f2812a9e254282c6d341c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.b1bce447aca2b723b325289dea9930c3.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436231-60_jpg.rf.5261bc01155fb719a6d45931180d3810.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439301-24_jpg.rf.7998893d026c42416153b231028289ef.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-54_jpg.rf.901bf6a7ab5fbb005e9ee0148b33345b.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-132_jpg.rf.9f34436631452ec8d0e0b62d4930c54f.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.186be05fbf1ba7549cf8f8bb1f339f7d.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-138_jpg.rf.3d210c2a3e4242977caa8970788fe1fd.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436511-54_jpg.rf.a01dc723d8499da6b4ca1942df0417a6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-138_jpg.rf.4af21faf7f564835ad7bc4f46d683667.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-24_jpg.rf.b226ea1b65cb07b6ddf6cd0e69bcf7e2.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-36_jpg.rf.71fe5838a47214b7c72f3375649f623c.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-18_jpg.rf.dcc311d48d6965c6e47766b51def1e95.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436511-24_jpg.rf.3687a4338c1e0b8eda4e0b6df89c0c59.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071436511-30_jpg.rf.6c2f8b4fdbdff97a870db547419cd152.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-30_jpg.rf.ea438b5c9bbbec50992f7cb4857ed1b6.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438351-120_jpg.rf.574e69d33739c01256fb3e1ba418171f.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-36_jpg.rf.3d5c303bee2a8d57e343e096618ef352.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-6_jpg.rf.a80ff875e67f39e8742fdddd9c05dbbb.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-24_jpg.rf.3f3c0c7c8e2bace79bb61534d4638621.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-36_jpg.rf.23527af3a0566995cc686b1fbaa53a79.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.6ad9f6843fbc33f82d3aadd38f1a94fc.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.0e4446a52d0c63d8a90dad4c341ddab9.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.049bd9f806b8c5b515457b0e939e3769.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-78_jpg.rf.dbad2d9f316af00d669594e14480396a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-42_jpg.rf.e22259dad911f22ea926dcf3550376c9.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439301-42_jpg.rf.05460987a3ac98466cfdef865421df67.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-42_jpg.rf.e26fbd874a5f67f6cd3034fd4b7f5544.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-48_jpg.rf.35c2d58d653dc125e283c226312c55a5.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-66_jpg.rf.f438c48035134bb955d455a2da45f9a0.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439301-66_jpg.rf.754e0d212299616f4daef249b250a4fc.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-6_jpg.rf.f1d45e19aac00335a2295cb2c0fca547.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438351-6_jpg.rf.5646a4ef1983372ca17401df35a8b50e.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438551-60_jpg.rf.299ff0a6408c47ce25ab39c6e4d0d91b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.6568ec75c1f745b64ba811937bf07157.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439301-48_jpg.rf.01723b7199e6a1e02855933ae5f7af7b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.639896139af53b7110ac20dcbfca463b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-96_jpg.rf.ad3584b70cbd2a809d0e3b189f05bb55.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-72_jpg.rf.fd2c7cbfd7824badcfa9ef62d3058d8c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-24_jpg.rf.71f8ee99a85f761cc92a474d1d452f3a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-78_jpg.rf.b831b7fa9b37ae6b95b211efef25df5b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438551-24_jpg.rf.480ff176970de4534804ef35b8d3d30e.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438551-30_jpg.rf.5c54f97e87a6ba9d6ba50f019339fdcf.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071436511-84_jpg.rf.dd8419925fff5038588650cc393a7352.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071437151-102_jpg.rf.120febfab0f036b2645dd0b6cc0517b4.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071437151-36_jpg.rf.13462d9f1642112b20e827b8e159a984.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071437151-42_jpg.rf.9b76593309fb0fc0f4c2ed743d9f1c4a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071438351-108_jpg.rf.5371fcd0e2f048c61bc0c05842c5c241.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438351-108_jpg.rf.d8ac1c2566213cc4d941e798948387ae.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071438351-126_jpg.rf.6b26dc4dafa9ac0db0ecb2d6bb51ab0c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438351-12_jpg.rf.48b9e41a15f6db4ccfdfe0ede3b79f5b.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071438351-30_jpg.rf.abdffd7a97410e61465741fab158d5bc.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441261-12_jpg.rf.1c313c409a45d5ae9f5112dd762cffab.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071438351-54_jpg.rf.075d8f65ced18d759c5fd7a80969844b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438351-54_jpg.rf.604f15d05c45e3f2ca7655ee5e9e4d44.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071438551-66_jpg.rf.f0958cff044f89c3b79de49faf9a04be.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071438551-72_jpg.rf.3dc245ba53e97e28daaea38e02b00be6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.775fd002e7709ceacaa2176c64f842a2.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-78_jpg.rf.f6b51ae006e9a13db9a4ab5695d2bd0f.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.68e0c068cb44833add619d4561f942c9.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-60_jpg.rf.1c2380d5ec0d09e8b7d13f04eca246a3.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-36_jpg.rf.d5cda7f72a488963768df57c0226cdc8.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.c55390e416c606f6e2852738891ace34.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-54_jpg.rf.a30bf7be8cb8589b25bf9c043c671b2e.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-90_jpg.rf.35a5ae1a4d69bb47204e491c4aa31416.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-54_jpg.rf.ec7b84beef5086191d4abb0adfb643f7.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.16a931a5c6013816c116277a68b13746.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-30_jpg.rf.48f90374e9b14a3ff3f86d97dc378d1c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-30_jpg.rf.39424eff15481673de004c73a6cebba4.jpg",
+      "pcb-component-detection/extracted/test/img/VID202106071442011-60_jpg.rf.2bbf7bb0a09a02976608a9031d5b72a2.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.c6ddc09e4fc40fe28bc4cfb763fe9b13.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-12_jpg.rf.fd4eacbfecf8af8a4d303e51320daff8.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.4bea033ffb70a74e4a180347543e9a05.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.d69f82135e01242066a6840abd644f0c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.5c9ed81f5f87fb5241ac4bcac8a492d3.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-12_jpg.rf.162554a8d1444622310f9c495a58a3f7.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.a39eb8bf1e4c10be310747a37a6c0703.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-18_jpg.rf.161bf9e1ba1a6e19b34e8a10b12ac6a9.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-36_jpg.rf.6a40ffc3856160c3b27e8702bda77ffd.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-0_jpg.rf.60f356cc1e9a259aafa5775355ba8907.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-24_jpg.rf.459fdf917d764f06ed4cef12676b1e77.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-48_jpg.rf.15c943c3f536226f3fd513d7edb48c79.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.891f5b2fb0a782fe7e6db409bc0eac7a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-42_jpg.rf.9f7344eb64fbf2be2586a85b66135160.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-48_jpg.rf.7dd612e8b55bd4a6281db274442361d0.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-48_jpg.rf.0f648b999e50f75fb19fd0c359ed194a.jpg",
+      "pcb-component-detection/extracted/test/img/VID202106071444271-42_jpg.rf.9755432dba2178c0bccc1dea7fbd086e.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-48_jpg.rf.5eeb17dd64dd072f9c331b9e5a69b15b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-72_jpg.rf.dba3c433d278a905fe7a508fbe55d996.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439081-78_jpg.rf.fe3ee855c053deb60cb9b38a9aa66680.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-66_jpg.rf.54f2cf725faa3f2900d36b718a78a2de.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.dfbe35ef0019600dc30316af49301646.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.65d7fcdb0a0dc1defbc2b39c5dc71b14.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-84_jpg.rf.46465b4ec054c9d9770c96be92b2779c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-18_jpg.rf.e486378d674fdc71245aebc0dcdd760f.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-48_jpg.rf.f740bcd8d3fc4fbfca52a65dc6902489.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439081-6_jpg.rf.bd26856521dd055597b1d872b5360661.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.8ec44c2a40fc05505cddea15431a289e.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439301-156_jpg.rf.edeb9d77225a49f297f00fec60d03c65.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439301-162_jpg.rf.9c703cc2b7936cbbb542e0ef6dcf5514.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439301-18_jpg.rf.ad51d4e684ab50bf343c5222d0122dba.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439301-30_jpg.rf.b5fcd4b2c8aa893b32a8a9976f1a4c36.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-66_jpg.rf.bc1285dcb458f4f51535db332fc53726.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439301-30_jpg.rf.dff890a5c46a2e1bafbe821f8f27e317.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-36_jpg.rf.e73c226afa8720be326455f0d39f2f33.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439301-36_jpg.rf.e9e24635b8cb2ad05c39b1348d11403d.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.331ab4ed8e6ec9c8fbc67ef3af59d4a9.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439391-18_jpg.rf.7a3cebeda80778811c9970875374c467.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.5113986cdfd4fa4b01de89812ef3bba7.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-144_jpg.rf.eccc2be1abeeefeccb901ce338b8fc0c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-6_jpg.rf.a6eb7db07addd05d0391d3499c6fc5d6.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.17c3138b5082fc5f675ed500097af4b6.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-90_jpg.rf.b6a7ae2ae69ae7167594a4c1ffb3c87f.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-90_jpg.rf.d36096f5c370c825c9a59671521a867c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-144_jpg.rf.c152910bc46f66af41698e4f653d080d.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.3cda139a462b904c1fa290e61eb9b957.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-96_jpg.rf.89312edf6be7181027e619077b3507c0.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439391-54_jpg.rf.16605544b939f096d642179a6cdbb7f3.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-6_jpg.rf.f34fe7150bb297434d87cdef414a2b28.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439391-66_jpg.rf.edbc94d76c306177b8aaa3dafb2a18b4.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-6_jpg.rf.b460ef4258fc31834d3b94c8351c0ef9.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.d7de7a393db2a3b1951339bf166dc7f8.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439391-78_jpg.rf.7a60eaaafb951728076953d76337eb1b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-90_jpg.rf.c91fbd35f16ca5033cf4bd2a3ff51f63.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071439391-90_jpg.rf.17ce3221ec7f32b5e92ad2a5238036b2.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071439391-96_jpg.rf.4e06cc4767be2ce3a5de374c2ee8c6d5.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441201-30_jpg.rf.103fc4249310aa34310643792c017b7f.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.3ebbc6dac758ef91a5e21866c26971d7.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-96_jpg.rf.8f2ef7b0b950fea42cbe0368680bec46.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-150_jpg.rf.6c8ae5e7d3a87b5edd62475b1655d5b9.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-156_jpg.rf.abc0892010c397a33d0959a01b36e0a6.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071443181-6_jpg.rf.4668a2a85a2174e80f8866c504988ffd.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-24_jpg.rf.a4d3bb6e402690a593c8b0da100c1509.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-42_jpg.rf.af9ff4df8f72966e5d0cf563f3e51c5c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-54_jpg.rf.6820fbf7ce5c47704d230f7e841420e6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441201-30_jpg.rf.668723dc7888eb6f82ab5c21bd51b17b.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.9820d580f6a119ff340e2f4633497099.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.1a37b22f368c8a5683f9dac434252a32.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-18_jpg.rf.ecaa228ad80fa56d81b417becc81c1de.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-12_jpg.rf.2e7746416c3d947729d84f121ea831c1.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.485febcb12627cd5cd859ae0ead05748.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-6_jpg.rf.85632c6c4ccf99c1a07c375e9f24264e.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441201-60_jpg.rf.6c6add90cf85af105d3323e207201687.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-42_jpg.rf.31244ad0c92d5c9ee55dc5669b841aaa.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441261-12_jpg.rf.0bcef574914733c5ef4358ae1883ea51.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441411-42_jpg.rf.d0b3678c6478acda55ab64a9b49942ae.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-30_jpg.rf.b065a9164fd86eb04a6cf7b0098c4480.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-36_jpg.rf.48fdf3171f6547f8e6b29a6a231b7fa1.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-42_jpg.rf.7b1749e8a640919082e13c787ff4845f.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441411-18_jpg.rf.5041dda0fbc6ab0515f9c55ed4062de8.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-24_jpg.rf.197feeb164f08bbd9f30d95a9c965e1e.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441411-24_jpg.rf.c4e682f67c0478b79708f9da7f0c7a67.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-66_jpg.rf.70e2a82540a15194b6c65cd4ddf54593.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441411-54_jpg.rf.200eea606ae554dce7034cbb3b832b8e.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-84_jpg.rf.8e1945a2c9293a422a66e70f164d14bb.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441411-66_jpg.rf.246e1540a722a4cff957bbc031e60b3c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071441411-6_jpg.rf.fc22ba4a801ece1f3b1a9937e6f20ee1.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441411-66_jpg.rf.4cc1aa4a9631b0fdf442265ff52ac5a7.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-96_jpg.rf.7e568b0fa0398add0b837b86319d8672.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-78_jpg.rf.e3f00f2d9085d226402881ff91942783.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071441411-78_jpg.rf.32a3cbaa56f086d2d309dd9ca7062e88.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-132_jpg.rf.3b61744c2b1dfd9b034c7fb7d6d6c89c.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-0_jpg.rf.a0ab6fd55c96ffc76c1af76bca336060.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-36_jpg.rf.1396096b36ecfb6fafc4d1f5a1f278db.jpg",
+      "pcb-component-detection/extracted/test/img/VID202106071442011-60_jpg.rf.1e1306d338177471b0cc29496baf105b.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-0_jpg.rf.fb93e6cab510fc0b788c413cd89a5ffa.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-54_jpg.rf.c4b4c8be89cc00fe77f95f98c7b4d2a6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-150_jpg.rf.69001e6a42a7bc2a8d0088f366ff53ca.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-60_jpg.rf.e13e95b997fcb0a9e99674cbffba1075.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-150_jpg.rf.e0d021ca6e15b8c4b00a706fa0ae7695.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-30_jpg.rf.fccf300c8e4442c0c8554c31bb7b8f47.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-30_jpg.rf.06554cf82420ea6b50c45620bd2cc7c5.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-30_jpg.rf.a2b8c729067f0a2814f663593e6577ce.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-36_jpg.rf.860b39d53dd3ba7f429c1cac98d8c2e6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-60_jpg.rf.6e953aa555a5e3cf8112bdb266adff9c.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-72_jpg.rf.3770f6c91a9b1a2e16ffe050c9a3a6bb.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.75eee3be8d3ae1b1ac06746133e77bce.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442011-72_jpg.rf.94ef034fd37fe6a54e7298c019749921.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442191-0_jpg.rf.dd87e938a8bc8ebcee1247f100fd83e6.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-18_jpg.rf.afe343672b9e6db08f94ce0ce426a652.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-36_jpg.rf.ced97df8ad03cd4f722173f9a2b43844.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442191-12_jpg.rf.2ffba4087f62b5c0f5226d167843cf49.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-36_jpg.rf.db9e272efb66e78996eac0b0f2d98b0d.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442191-6_jpg.rf.5dc5e77c6461f3787849c9bec2665df4.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-6_jpg.rf.ff3b2d8c78834ff13782d3dd421e5189.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442191-84_jpg.rf.d63e726fcc492608050328ac15cdddbf.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442191-90_jpg.rf.ce0392a082afdf5fc223a34ee801068c.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.c4291505c493d428386e109d4d8e8e75.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-144_jpg.rf.d5fa4614c79a29b538fa809ba909b3c9.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-0_jpg.rf.7c8e1b17db6fccbd7fcbf503f41ed9d8.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-108_jpg.rf.e752d17462d9ab1234f254ce817de89d.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-42_jpg.rf.fc67f3a3c84fc7df18a3dcb411d7dfb1.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-48_jpg.rf.09569e099db3c9bab92bbf6749eedf36.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.cce67a2d7f4b6387d6be8d80696426f6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-126_jpg.rf.43e35f2e3ca811a94b95ed2124dcbd17.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-6_jpg.rf.332e09c68550b64260af98a7461f899f.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-156_jpg.rf.1945c28f2766de2bbab7581d8bef070f.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-156_jpg.rf.7e112a682aa91195792b5aea7ba4b0e8.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.9e7d3d79a3794c3d5a38924911f91f8f.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-60_jpg.rf.4b134aa35b50dbccf5d5db937858fd86.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.dcecd464b5eaa3bd9f445e8fcb530e70.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-42_jpg.rf.bd8371841933bb341ef336aba25b876e.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-84_jpg.rf.b9ab99936a399a439d80d726c36fb404.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-54_jpg.rf.5e938593dc5b185514b5438d9162a4ac.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.3e5ae06e14f744353e2184cc2f07d802.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.cf790e5e6f037a7890d5394b70b2714d.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-54_jpg.rf.a3bd32035999de52e5862c04e9a118c3.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442531-6_jpg.rf.83e3d85c7d8ebdc996f443ec827ef460.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.2d7b0efd0ab99cc0a46663d303654459.jpg",
+      "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.820e1826159e6dabe3f7785dfee1213a.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-60_jpg.rf.85023f82e48526edbc32f4a4c4750d9e.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-72_jpg.rf.67ba13b6f0595c14f0b9a5f8b2404f34.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-96_jpg.rf.84b52280ed170a55d2f1bff5ed4faf57.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-72_jpg.rf.de8fae9e5ce9c7bb42d426c9545d43f1.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-24_jpg.rf.70e4222a2330f16895d82034d67c9a3d.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442321-96_jpg.rf.44152903b2fecdffb9ee693d10846881.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.3fd8fb766799d097aa86c7e10585da80.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071442531-156_jpg.rf.00d183adec15d46645138f6ab181885b.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-144_jpg.rf.26c2591914db48b2cc6804ee0a0822fb.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/train/img/VID202106071443181-6_jpg.rf.69a081f793e21dd77f06acfac7be3d71.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.8e9667a765cc39f4e0e1825fb51ee1c1.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-108_jpg.rf.65a6c91efb1629918b69ba5eb6da66f3.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-120_jpg.rf.d30fac75e8d2a29448c05e42c75d386a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-114_jpg.rf.1ec5109e07df2ab34f02cf8dbc39494c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-108_jpg.rf.1ded833a628d0e97143d27aed07ff558.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-144_jpg.rf.8825a2de8e8a5ff5d9bae4f8530e51b9.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-138_jpg.rf.aefd2db48316375a9cace3e316c1e443.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-42_jpg.rf.d2574a926270418154931a8e8cd3bc66.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443181-66_jpg.rf.57d8de8f660d09aeca6b893149b44f2b.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-12_jpg.rf.de09216f6ea8810a24d4cbe325419b4c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-0_jpg.rf.da0aae2f37fad29495dc284fe67e4875.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.299f959bd711f4ac18e85b7586e2b07c.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-12_jpg.rf.22298ea3ad4059d814b631e78eb338b6.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-78_jpg.rf.d9284ebb2a956f9b8a7fafc1eb1b9bd3.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071443431-78_jpg.rf.dfffb7861e386b52beb5b01ce82436c3.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-66_jpg.rf.fb0bf4b566be8381b06e153a54617528.jpg",
+      "pcb-component-detection/extracted/test/img/VID202106071444271-60_jpg.rf.69d51f8b107b294f457137899bc4f45b.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-0_jpg.rf.1197fa54d5b1cca62e81cc903477004d.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-0_jpg.rf.db63f119b7f921a908bcc1b090e96b0f.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-102_jpg.rf.b7ce4d69190468de4336d1f7951bf912.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-96_jpg.rf.7050ae838ef5bebe612d73e7d7c7c0c5.jpg",
+      "pcb-component-detection/extracted/test/img/VID202106071444271-42_jpg.rf.200b1e4d1d4dac7ee843cb20ecff0b1a.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-66_jpg.rf.40a35ffc1ece0b0a29a7f256c1b29302.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-72_jpg.rf.54bb4486f95a8a9cadc4dddf8bd5cfd4.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-84_jpg.rf.6835334f4d7990f8d5fafadb649dcda6.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-54_jpg.rf.d3102166fadd72fae1b5913e19d807ed.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444071-90_jpg.rf.143d15a47927ba7b6aefc839bf449a8a.jpg",
+      "pcb-component-detection/extracted/test/img/VID202106071444071-78_jpg.rf.77f9e0ff31361cea6384ebeee824ecd0.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-12_jpg.rf.6fe8f43569cf2fb9580020d39c0b2b95.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-12_jpg.rf.efad566b4034a9647bfb28ec6d96db31.jpg"
+    ],
+    [
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-30_jpg.rf.f65d9808919fc8ec05f68db299a622b5.jpg",
+      "pcb-component-detection/extracted/validation/img/VID202106071444271-54_jpg.rf.0a3ef36d39f72f85b771de649d497680.jpg"
+    ]
+  ],
+  "phash_near_duplicate_pairs": [
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144135-60_jpg.rf.b386fef1f1b770ce925bf19389426744.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-384_jpg.rf.5230485c779a294c2eb506e1bf15e104.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144135-60_jpg.rf.b386fef1f1b770ce925bf19389426744.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID20210601144135-60_jpg.rf.b12333c10d89f56d72e505c9c742b403.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": true,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144202-30_jpg.rf.f15cfb2129c9cc29c22409cb7f05bb9e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID20210601144207-18_jpg.rf.900f8eb9de5f4348e60e7768d977af1e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144207-18_jpg.rf.8582f3946c6ff5d609e6d10fbf8d7db7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID20210601144202-30_jpg.rf.569fdf2a19367044bf777c2194086d9a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144220-135_jpg.rf.61f099c6adb764aa7a6680dbb0788fad.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID20210601144220-120_jpg.rf.62e0be60a9f65d7037f8d0cd13c831ae.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144238-58_jpg.rf.b250ea529b843c5d4de768a7dcd2c020.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID20210601144238-58_jpg.rf.f3eec9468477112bece7fe9a2b1e1c7a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": true,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144411-45_jpg.rf.3239531aa965105b16d8d3a099c62951.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID20210601144553-30_jpg.rf.6473d6578d14b93b4d8209518cac11aa.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID20210601144411-45_jpg.rf.3239531aa965105b16d8d3a099c62951.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID20210601144553-240_jpg.rf.736b20a6433878a9f6533b5d0e29d555.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-0_jpg.rf.8b7f3d17ce7185fe5be8c11050a5b874.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-72_jpg.rf.a24e1c7e75313d3bd94bb2d083833df0.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-12_jpg.rf.df068fa1f353eef4ce20b0fee4bedddc.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-30_jpg.rf.a1a9618468a014e6fbe8630e0e26747c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-204_jpg.rf.c4eb4ef097944c0ff0b6d8b1bd50f942.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-240_jpg.rf.79ac30ee05985279c6f80acf01d14f14.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-24_jpg.rf.c1ebf4346df28ce1f3250159f53ca109.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-72_jpg.rf.52bb48c2b1e9503036e0803b0dd574e8.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-360_jpg.rf.371a97c1722ee820a82981e43440cd11.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-366_jpg.rf.a4305dc7762844a90db9e704bb4863f4.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-42_jpg.rf.4f1ee9acd25aec8bfc081d2ebe07adf8.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-42_jpg.rf.def4079ccb828a57f9a810642a694d33.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-66_jpg.rf.c9f13fa9297fca12bf74e283de864e0f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071435211-6_jpg.rf.14229b0a85cec3d544c9814d28827b5f.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-12_jpg.rf.d9f7d62bd39fb9bc675020121e368043.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-54_jpg.rf.9c279ee70a4ddb317a321814e52a9a39.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-156_jpg.rf.392ed409fad1b8b6eba18eb5985e0c06.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-162_jpg.rf.4bb898b6414af084651b37e6d1428c3c.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-198_jpg.rf.cefb9bbb4dcf9e0a7be0f19e52e1bc7d.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-12_jpg.rf.c8d3da0920c89fd32ce35cfd7d2ba9b6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-24_jpg.rf.1ec5c509e5b1d571560ec4f381f000c0.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-84_jpg.rf.21b95cd4552f6361cee2e0afbc2db7f3.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-270_jpg.rf.6fa3c03924822f4dd93e3b2d023e1ac4.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-0_jpg.rf.764201556db5ff3a7c31cbe5c04f6c27.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-36_jpg.rf.57aeca236522b2e99fcfe0e924ba19bf.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.08d569bd9735123e5577ec15f3020bd5.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-42_jpg.rf.e6e5f30fe9f07d260fd5ec041e81f5e2.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071437151-0_jpg.rf.7b344ad70e897b53c85477bd1ac89a4f.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-42_jpg.rf.e6e5f30fe9f07d260fd5ec041e81f5e2.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.1e78d285929057fa3f2e88c5356046bd.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-42_jpg.rf.e6e5f30fe9f07d260fd5ec041e81f5e2.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.4ec3aacf219b36e5c422fb4973682d31.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-48_jpg.rf.cd0be870086173ebb78889cf58014011.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.b1bce447aca2b723b325289dea9930c3.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436231-60_jpg.rf.5261bc01155fb719a6d45931180d3810.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-24_jpg.rf.7998893d026c42416153b231028289ef.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-108_jpg.rf.076a26e5a07ce47075ca471bc8474b3e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.4ec3aacf219b36e5c422fb4973682d31.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-114_jpg.rf.c342337fbf9c4d90f0e0b05adbadb2d7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-138_jpg.rf.24f38c59114f05540d02e38b31225810.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-132_jpg.rf.9f34436631452ec8d0e0b62d4930c54f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.186be05fbf1ba7549cf8f8bb1f339f7d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-138_jpg.rf.3d210c2a3e4242977caa8970788fe1fd.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-54_jpg.rf.a01dc723d8499da6b4ca1942df0417a6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-138_jpg.rf.4af21faf7f564835ad7bc4f46d683667.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-36_jpg.rf.71fe5838a47214b7c72f3375649f623c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-18_jpg.rf.dcc311d48d6965c6e47766b51def1e95.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-24_jpg.rf.3687a4338c1e0b8eda4e0b6df89c0c59.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-18_jpg.rf.dcc311d48d6965c6e47766b51def1e95.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-30_jpg.rf.6c2f8b4fdbdff97a870db547419cd152.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-30_jpg.rf.ea438b5c9bbbec50992f7cb4857ed1b6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-120_jpg.rf.574e69d33739c01256fb3e1ba418171f.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-36_jpg.rf.3d5c303bee2a8d57e343e096618ef352.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.6ad9f6843fbc33f82d3aadd38f1a94fc.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-42_jpg.rf.e22259dad911f22ea926dcf3550376c9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-42_jpg.rf.05460987a3ac98466cfdef865421df67.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-42_jpg.rf.e26fbd874a5f67f6cd3034fd4b7f5544.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-48_jpg.rf.35c2d58d653dc125e283c226312c55a5.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-66_jpg.rf.f438c48035134bb955d455a2da45f9a0.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-66_jpg.rf.754e0d212299616f4daef249b250a4fc.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-6_jpg.rf.f1d45e19aac00335a2295cb2c0fca547.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-6_jpg.rf.f1d45e19aac00335a2295cb2c0fca547.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-60_jpg.rf.299ff0a6408c47ce25ab39c6e4d0d91b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-78_jpg.rf.b831b7fa9b37ae6b95b211efef25df5b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-24_jpg.rf.480ff176970de4534804ef35b8d3d30e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071436511-84_jpg.rf.dd8419925fff5038588650cc393a7352.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071437151-102_jpg.rf.120febfab0f036b2645dd0b6cc0517b4.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071437151-102_jpg.rf.44547da00dec4e8fa48b608d3df80ded.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-150_jpg.rf.ab0bb534503a2e12a85681c20a8dcf2c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071437151-36_jpg.rf.13462d9f1642112b20e827b8e159a984.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071437151-42_jpg.rf.9b76593309fb0fc0f4c2ed743d9f1c4a.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-108_jpg.rf.5371fcd0e2f048c61bc0c05842c5c241.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-108_jpg.rf.d8ac1c2566213cc4d941e798948387ae.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-126_jpg.rf.6b26dc4dafa9ac0db0ecb2d6bb51ab0c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-12_jpg.rf.48b9e41a15f6db4ccfdfe0ede3b79f5b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-30_jpg.rf.abdffd7a97410e61465741fab158d5bc.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441261-12_jpg.rf.1c313c409a45d5ae9f5112dd762cffab.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-54_jpg.rf.075d8f65ced18d759c5fd7a80969844b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-54_jpg.rf.604f15d05c45e3f2ca7655ee5e9e4d44.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-6_jpg.rf.5646a4ef1983372ca17401df35a8b50e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-6_jpg.rf.5646a4ef1983372ca17401df35a8b50e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-60_jpg.rf.299ff0a6408c47ce25ab39c6e4d0d91b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-6_jpg.rf.5646a4ef1983372ca17401df35a8b50e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.6568ec75c1f745b64ba811937bf07157.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-6_jpg.rf.5646a4ef1983372ca17401df35a8b50e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-48_jpg.rf.01723b7199e6a1e02855933ae5f7af7b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438351-6_jpg.rf.5646a4ef1983372ca17401df35a8b50e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.639896139af53b7110ac20dcbfca463b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-60_jpg.rf.299ff0a6408c47ce25ab39c6e4d0d91b.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.6568ec75c1f745b64ba811937bf07157.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-48_jpg.rf.01723b7199e6a1e02855933ae5f7af7b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-12_jpg.rf.fe0c5ad2083446a0ea3e75f2c28b1fda.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.639896139af53b7110ac20dcbfca463b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-24_jpg.rf.480ff176970de4534804ef35b8d3d30e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-30_jpg.rf.5c54f97e87a6ba9d6ba50f019339fdcf.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-60_jpg.rf.299ff0a6408c47ce25ab39c6e4d0d91b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.6568ec75c1f745b64ba811937bf07157.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-60_jpg.rf.299ff0a6408c47ce25ab39c6e4d0d91b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-24_jpg.rf.71f8ee99a85f761cc92a474d1d452f3a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-66_jpg.rf.f0958cff044f89c3b79de49faf9a04be.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071438551-72_jpg.rf.3dc245ba53e97e28daaea38e02b00be6.jpg",
+      "phash_hamming_distance": 0,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.6568ec75c1f745b64ba811937bf07157.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.639896139af53b7110ac20dcbfca463b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-0_jpg.rf.775fd002e7709ceacaa2176c64f842a2.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-78_jpg.rf.f6b51ae006e9a13db9a4ab5695d2bd0f.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.68e0c068cb44833add619d4561f942c9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-60_jpg.rf.1c2380d5ec0d09e8b7d13f04eca246a3.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.68e0c068cb44833add619d4561f942c9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-36_jpg.rf.d5cda7f72a488963768df57c0226cdc8.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.c55390e416c606f6e2852738891ace34.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-30_jpg.rf.39424eff15481673de004c73a6cebba4.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.c55390e416c606f6e2852738891ace34.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071442011-60_jpg.rf.2bbf7bb0a09a02976608a9031d5b72a2.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.c6ddc09e4fc40fe28bc4cfb763fe9b13.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-12_jpg.rf.fd4eacbfecf8af8a4d303e51320daff8.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-12_jpg.rf.c6ddc09e4fc40fe28bc4cfb763fe9b13.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.a39eb8bf1e4c10be310747a37a6c0703.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-18_jpg.rf.161bf9e1ba1a6e19b34e8a10b12ac6a9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-0_jpg.rf.60f356cc1e9a259aafa5775355ba8907.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-24_jpg.rf.459fdf917d764f06ed4cef12676b1e77.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.891f5b2fb0a782fe7e6db409bc0eac7a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-24_jpg.rf.b226ea1b65cb07b6ddf6cd0e69bcf7e2.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-36_jpg.rf.71fe5838a47214b7c72f3375649f623c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-36_jpg.rf.6a40ffc3856160c3b27e8702bda77ffd.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-0_jpg.rf.60f356cc1e9a259aafa5775355ba8907.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-42_jpg.rf.9f7344eb64fbf2be2586a85b66135160.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-48_jpg.rf.7dd612e8b55bd4a6281db274442361d0.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-48_jpg.rf.0f648b999e50f75fb19fd0c359ed194a.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071444271-42_jpg.rf.9755432dba2178c0bccc1dea7fbd086e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-48_jpg.rf.5eeb17dd64dd072f9c331b9e5a69b15b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-72_jpg.rf.dba3c433d278a905fe7a508fbe55d996.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-48_jpg.rf.5eeb17dd64dd072f9c331b9e5a69b15b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-78_jpg.rf.fe3ee855c053deb60cb9b38a9aa66680.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-54_jpg.rf.a30bf7be8cb8589b25bf9c043c671b2e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.16a931a5c6013816c116277a68b13746.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-6_jpg.rf.a80ff875e67f39e8742fdddd9c05dbbb.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-36_jpg.rf.23527af3a0566995cc686b1fbaa53a79.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-6_jpg.rf.a80ff875e67f39e8742fdddd9c05dbbb.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.049bd9f806b8c5b515457b0e939e3769.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-6_jpg.rf.a80ff875e67f39e8742fdddd9c05dbbb.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-78_jpg.rf.dbad2d9f316af00d669594e14480396a.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-6_jpg.rf.bd26856521dd055597b1d872b5360661.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.8ec44c2a40fc05505cddea15431a289e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-72_jpg.rf.dba3c433d278a905fe7a508fbe55d996.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-78_jpg.rf.fe3ee855c053deb60cb9b38a9aa66680.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-72_jpg.rf.dba3c433d278a905fe7a508fbe55d996.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.65d7fcdb0a0dc1defbc2b39c5dc71b14.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439081-78_jpg.rf.fe3ee855c053deb60cb9b38a9aa66680.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.65d7fcdb0a0dc1defbc2b39c5dc71b14.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-156_jpg.rf.edeb9d77225a49f297f00fec60d03c65.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-162_jpg.rf.9c703cc2b7936cbbb542e0ef6dcf5514.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-18_jpg.rf.ad51d4e684ab50bf343c5222d0122dba.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-30_jpg.rf.b5fcd4b2c8aa893b32a8a9976f1a4c36.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-18_jpg.rf.ad51d4e684ab50bf343c5222d0122dba.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-66_jpg.rf.bc1285dcb458f4f51535db332fc53726.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-24_jpg.rf.7998893d026c42416153b231028289ef.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-54_jpg.rf.901bf6a7ab5fbb005e9ee0148b33345b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-30_jpg.rf.dff890a5c46a2e1bafbe821f8f27e317.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-36_jpg.rf.e73c226afa8720be326455f0d39f2f33.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439301-36_jpg.rf.e9e24635b8cb2ad05c39b1348d11403d.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.331ab4ed8e6ec9c8fbc67ef3af59d4a9.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-18_jpg.rf.7a3cebeda80778811c9970875374c467.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.5113986cdfd4fa4b01de89812ef3bba7.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-24_jpg.rf.3f3c0c7c8e2bace79bb61534d4638621.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.6ad9f6843fbc33f82d3aadd38f1a94fc.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-24_jpg.rf.3f3c0c7c8e2bace79bb61534d4638621.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.0e4446a52d0c63d8a90dad4c341ddab9.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-36_jpg.rf.23527af3a0566995cc686b1fbaa53a79.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.0e4446a52d0c63d8a90dad4c341ddab9.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-36_jpg.rf.23527af3a0566995cc686b1fbaa53a79.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-78_jpg.rf.dbad2d9f316af00d669594e14480396a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.3cda139a462b904c1fa290e61eb9b957.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-96_jpg.rf.89312edf6be7181027e619077b3507c0.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.5113986cdfd4fa4b01de89812ef3bba7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-6_jpg.rf.a6eb7db07addd05d0391d3499c6fc5d6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-42_jpg.rf.5113986cdfd4fa4b01de89812ef3bba7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-90_jpg.rf.b6a7ae2ae69ae7167594a4c1ffb3c87f.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-54_jpg.rf.16605544b939f096d642179a6cdbb7f3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-6_jpg.rf.f34fe7150bb297434d87cdef414a2b28.jpg",
+      "phash_hamming_distance": 0,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.639896139af53b7110ac20dcbfca463b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-96_jpg.rf.ad3584b70cbd2a809d0e3b189f05bb55.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-60_jpg.rf.6ad9f6843fbc33f82d3aadd38f1a94fc.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.0e4446a52d0c63d8a90dad4c341ddab9.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-66_jpg.rf.54f2cf725faa3f2900d36b718a78a2de.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.dfbe35ef0019600dc30316af49301646.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-66_jpg.rf.54f2cf725faa3f2900d36b718a78a2de.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-84_jpg.rf.46465b4ec054c9d9770c96be92b2779c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-66_jpg.rf.edbc94d76c306177b8aaa3dafb2a18b4.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-6_jpg.rf.b460ef4258fc31834d3b94c8351c0ef9.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-6_jpg.rf.b460ef4258fc31834d3b94c8351c0ef9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.d7de7a393db2a3b1951339bf166dc7f8.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.dfbe35ef0019600dc30316af49301646.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.65d7fcdb0a0dc1defbc2b39c5dc71b14.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-72_jpg.rf.dfbe35ef0019600dc30316af49301646.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-84_jpg.rf.46465b4ec054c9d9770c96be92b2779c.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-78_jpg.rf.7a60eaaafb951728076953d76337eb1b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-90_jpg.rf.c91fbd35f16ca5033cf4bd2a3ff51f63.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-90_jpg.rf.17ce3221ec7f32b5e92ad2a5238036b2.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071439391-96_jpg.rf.4e06cc4767be2ce3a5de374c2ee8c6d5.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-30_jpg.rf.103fc4249310aa34310643792c017b7f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071443181-6_jpg.rf.4668a2a85a2174e80f8866c504988ffd.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-30_jpg.rf.103fc4249310aa34310643792c017b7f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-24_jpg.rf.a4d3bb6e402690a593c8b0da100c1509.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-30_jpg.rf.668723dc7888eb6f82ab5c21bd51b17b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.9820d580f6a119ff340e2f4633497099.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.1a37b22f368c8a5683f9dac434252a32.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-18_jpg.rf.ecaa228ad80fa56d81b417becc81c1de.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.1a37b22f368c8a5683f9dac434252a32.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-12_jpg.rf.2e7746416c3d947729d84f121ea831c1.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-42_jpg.rf.485febcb12627cd5cd859ae0ead05748.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-6_jpg.rf.85632c6c4ccf99c1a07c375e9f24264e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-60_jpg.rf.6c6add90cf85af105d3323e207201687.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-42_jpg.rf.31244ad0c92d5c9ee55dc5669b841aaa.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-6_jpg.rf.65d7fcdb0a0dc1defbc2b39c5dc71b14.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-84_jpg.rf.46465b4ec054c9d9770c96be92b2779c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-84_jpg.rf.46465b4ec054c9d9770c96be92b2779c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-48_jpg.rf.f740bcd8d3fc4fbfca52a65dc6902489.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-90_jpg.rf.35a5ae1a4d69bb47204e491c4aa31416.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.16a931a5c6013816c116277a68b13746.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441201-96_jpg.rf.ad3584b70cbd2a809d0e3b189f05bb55.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-72_jpg.rf.fd2c7cbfd7824badcfa9ef62d3058d8c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441261-12_jpg.rf.0bcef574914733c5ef4358ae1883ea51.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-42_jpg.rf.d0b3678c6478acda55ab64a9b49942ae.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441261-12_jpg.rf.0bcef574914733c5ef4358ae1883ea51.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-30_jpg.rf.b065a9164fd86eb04a6cf7b0098c4480.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-18_jpg.rf.5041dda0fbc6ab0515f9c55ed4062de8.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-24_jpg.rf.197feeb164f08bbd9f30d95a9c965e1e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-24_jpg.rf.c4e682f67c0478b79708f9da7f0c7a67.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-66_jpg.rf.70e2a82540a15194b6c65cd4ddf54593.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-42_jpg.rf.d0b3678c6478acda55ab64a9b49942ae.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-36_jpg.rf.48fdf3171f6547f8e6b29a6a231b7fa1.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-54_jpg.rf.200eea606ae554dce7034cbb3b832b8e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-84_jpg.rf.8e1945a2c9293a422a66e70f164d14bb.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-66_jpg.rf.246e1540a722a4cff957bbc031e60b3c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-6_jpg.rf.fc22ba4a801ece1f3b1a9937e6f20ee1.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-66_jpg.rf.4cc1aa4a9631b0fdf442265ff52ac5a7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-96_jpg.rf.7e568b0fa0398add0b837b86319d8672.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-66_jpg.rf.4cc1aa4a9631b0fdf442265ff52ac5a7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-78_jpg.rf.e3f00f2d9085d226402881ff91942783.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071441411-78_jpg.rf.32a3cbaa56f086d2d309dd9ca7062e88.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-132_jpg.rf.3b61744c2b1dfd9b034c7fb7d6d6c89c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-0_jpg.rf.a0ab6fd55c96ffc76c1af76bca336060.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-36_jpg.rf.1396096b36ecfb6fafc4d1f5a1f278db.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-0_jpg.rf.a0ab6fd55c96ffc76c1af76bca336060.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071442011-60_jpg.rf.1e1306d338177471b0cc29496baf105b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-0_jpg.rf.fb93e6cab510fc0b788c413cd89a5ffa.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-54_jpg.rf.c4b4c8be89cc00fe77f95f98c7b4d2a6.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-144_jpg.rf.eccc2be1abeeefeccb901ce338b8fc0c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-144_jpg.rf.c152910bc46f66af41698e4f653d080d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-150_jpg.rf.69001e6a42a7bc2a8d0088f366ff53ca.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-60_jpg.rf.e13e95b997fcb0a9e99674cbffba1075.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-150_jpg.rf.e0d021ca6e15b8c4b00a706fa0ae7695.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-30_jpg.rf.fccf300c8e4442c0c8554c31bb7b8f47.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-18_jpg.rf.e486378d674fdc71245aebc0dcdd760f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-48_jpg.rf.f740bcd8d3fc4fbfca52a65dc6902489.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-30_jpg.rf.06554cf82420ea6b50c45620bd2cc7c5.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-30_jpg.rf.a2b8c729067f0a2814f663593e6577ce.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-30_jpg.rf.06554cf82420ea6b50c45620bd2cc7c5.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-36_jpg.rf.860b39d53dd3ba7f429c1cac98d8c2e6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-30_jpg.rf.a2b8c729067f0a2814f663593e6577ce.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-36_jpg.rf.860b39d53dd3ba7f429c1cac98d8c2e6.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-54_jpg.rf.ec7b84beef5086191d4abb0adfb643f7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.16a931a5c6013816c116277a68b13746.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-60_jpg.rf.6e953aa555a5e3cf8112bdb266adff9c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-72_jpg.rf.3770f6c91a9b1a2e16ffe050c9a3a6bb.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.16a931a5c6013816c116277a68b13746.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071442011-60_jpg.rf.2bbf7bb0a09a02976608a9031d5b72a2.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-66_jpg.rf.75eee3be8d3ae1b1ac06746133e77bce.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-72_jpg.rf.94ef034fd37fe6a54e7298c019749921.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-6_jpg.rf.a6eb7db07addd05d0391d3499c6fc5d6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-90_jpg.rf.b6a7ae2ae69ae7167594a4c1ffb3c87f.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-6_jpg.rf.a6eb7db07addd05d0391d3499c6fc5d6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-90_jpg.rf.d36096f5c370c825c9a59671521a867c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442011-6_jpg.rf.a6eb7db07addd05d0391d3499c6fc5d6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-144_jpg.rf.c152910bc46f66af41698e4f653d080d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-0_jpg.rf.dd87e938a8bc8ebcee1247f100fd83e6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-18_jpg.rf.afe343672b9e6db08f94ce0ce426a652.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-0_jpg.rf.dd87e938a8bc8ebcee1247f100fd83e6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-36_jpg.rf.ced97df8ad03cd4f722173f9a2b43844.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-12_jpg.rf.2ffba4087f62b5c0f5226d167843cf49.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-36_jpg.rf.db9e272efb66e78996eac0b0f2d98b0d.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-12_jpg.rf.fd4eacbfecf8af8a4d303e51320daff8.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.a39eb8bf1e4c10be310747a37a6c0703.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-6_jpg.rf.5dc5e77c6461f3787849c9bec2665df4.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-6_jpg.rf.ff3b2d8c78834ff13782d3dd421e5189.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-84_jpg.rf.d63e726fcc492608050328ac15cdddbf.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442191-90_jpg.rf.ce0392a082afdf5fc223a34ee801068c.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.4bea033ffb70a74e4a180347543e9a05.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.d69f82135e01242066a6840abd644f0c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.4bea033ffb70a74e4a180347543e9a05.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.5c9ed81f5f87fb5241ac4bcac8a492d3.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.4bea033ffb70a74e4a180347543e9a05.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-12_jpg.rf.162554a8d1444622310f9c495a58a3f7.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.c4291505c493d428386e109d4d8e8e75.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-144_jpg.rf.d5fa4614c79a29b538fa809ba909b3c9.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-102_jpg.rf.c4291505c493d428386e109d4d8e8e75.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-0_jpg.rf.7c8e1b17db6fccbd7fcbf503f41ed9d8.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-108_jpg.rf.e752d17462d9ab1234f254ce817de89d.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-42_jpg.rf.fc67f3a3c84fc7df18a3dcb411d7dfb1.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-108_jpg.rf.e752d17462d9ab1234f254ce817de89d.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.cce67a2d7f4b6387d6be8d80696426f6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-126_jpg.rf.43e35f2e3ca811a94b95ed2124dcbd17.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-6_jpg.rf.332e09c68550b64260af98a7461f899f.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-132_jpg.rf.61f6bf4a48d13a2ee2037ff81aff5ca6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-138_jpg.rf.e35c057cd7e022fd2d3f06e94b959708.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-132_jpg.rf.61f6bf4a48d13a2ee2037ff81aff5ca6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-144_jpg.rf.2302fe61f93f2812a9e254282c6d341c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-132_jpg.rf.61f6bf4a48d13a2ee2037ff81aff5ca6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.b1bce447aca2b723b325289dea9930c3.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-138_jpg.rf.24f38c59114f05540d02e38b31225810.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-84_jpg.rf.9d17069e2d5e0bf898fb8b967adc8053.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-138_jpg.rf.24f38c59114f05540d02e38b31225810.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.8e510f14d455aed603a37eb1b84ca9d2.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-156_jpg.rf.1945c28f2766de2bbab7581d8bef070f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-156_jpg.rf.7e112a682aa91195792b5aea7ba4b0e8.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.3ebbc6dac758ef91a5e21866c26971d7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-156_jpg.rf.abc0892010c397a33d0959a01b36e0a6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-18_jpg.rf.d69f82135e01242066a6840abd644f0c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.5c9ed81f5f87fb5241ac4bcac8a492d3.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-30_jpg.rf.48f90374e9b14a3ff3f86d97dc378d1c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-30_jpg.rf.39424eff15481673de004c73a6cebba4.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.9e7d3d79a3794c3d5a38924911f91f8f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-60_jpg.rf.4b134aa35b50dbccf5d5db937858fd86.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.aa0ec20748bf064ea6b8854217c45b76.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-84_jpg.rf.9d17069e2d5e0bf898fb8b967adc8053.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-36_jpg.rf.aa0ec20748bf064ea6b8854217c45b76.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-12_jpg.rf.c8d3da0920c89fd32ce35cfd7d2ba9b6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-42_jpg.rf.bd8371841933bb341ef336aba25b876e.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-84_jpg.rf.b9ab99936a399a439d80d726c36fb404.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-42_jpg.rf.fc67f3a3c84fc7df18a3dcb411d7dfb1.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.cce67a2d7f4b6387d6be8d80696426f6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-48_jpg.rf.09569e099db3c9bab92bbf6749eedf36.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.cce67a2d7f4b6387d6be8d80696426f6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-48_jpg.rf.15c943c3f536226f3fd513d7edb48c79.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.891f5b2fb0a782fe7e6db409bc0eac7a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-54_jpg.rf.5e938593dc5b185514b5438d9162a4ac.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.cf790e5e6f037a7890d5394b70b2714d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-54_jpg.rf.a3bd32035999de52e5862c04e9a118c3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-6_jpg.rf.83e3d85c7d8ebdc996f443ec827ef460.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.2d7b0efd0ab99cc0a46663d303654459.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.820e1826159e6dabe3f7785dfee1213a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.5c9ed81f5f87fb5241ac4bcac8a492d3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-12_jpg.rf.162554a8d1444622310f9c495a58a3f7.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-60_jpg.rf.5c9ed81f5f87fb5241ac4bcac8a492d3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.a39eb8bf1e4c10be310747a37a6c0703.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.17c3138b5082fc5f675ed500097af4b6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-90_jpg.rf.b6a7ae2ae69ae7167594a4c1ffb3c87f.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.17c3138b5082fc5f675ed500097af4b6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-90_jpg.rf.d36096f5c370c825c9a59671521a867c.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.17c3138b5082fc5f675ed500097af4b6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-144_jpg.rf.c152910bc46f66af41698e4f653d080d.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-6_jpg.rf.820e1826159e6dabe3f7785dfee1213a.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-60_jpg.rf.85023f82e48526edbc32f4a4c4750d9e.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-72_jpg.rf.67ba13b6f0595c14f0b9a5f8b2404f34.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-96_jpg.rf.84b52280ed170a55d2f1bff5ed4faf57.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-72_jpg.rf.de8fae9e5ce9c7bb42d426c9545d43f1.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-24_jpg.rf.70e4222a2330f16895d82034d67c9a3d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-90_jpg.rf.b6a7ae2ae69ae7167594a4c1ffb3c87f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-90_jpg.rf.d36096f5c370c825c9a59671521a867c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-90_jpg.rf.b6a7ae2ae69ae7167594a4c1ffb3c87f.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-144_jpg.rf.c152910bc46f66af41698e4f653d080d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-96_jpg.rf.44152903b2fecdffb9ee693d10846881.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.3fd8fb766799d097aa86c7e10585da80.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-96_jpg.rf.8f2ef7b0b950fea42cbe0368680bec46.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-156_jpg.rf.abc0892010c397a33d0959a01b36e0a6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442321-96_jpg.rf.8f2ef7b0b950fea42cbe0368680bec46.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-54_jpg.rf.6820fbf7ce5c47704d230f7e841420e6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-12_jpg.rf.162554a8d1444622310f9c495a58a3f7.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-24_jpg.rf.a39eb8bf1e4c10be310747a37a6c0703.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-150_jpg.rf.6c8ae5e7d3a87b5edd62475b1655d5b9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-156_jpg.rf.abc0892010c397a33d0959a01b36e0a6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071442531-156_jpg.rf.00d183adec15d46645138f6ab181885b.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-144_jpg.rf.26c2591914db48b2cc6804ee0a0822fb.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071443181-6_jpg.rf.4668a2a85a2174e80f8866c504988ffd.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-24_jpg.rf.a4d3bb6e402690a593c8b0da100c1509.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071443181-6_jpg.rf.4668a2a85a2174e80f8866c504988ffd.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-42_jpg.rf.af9ff4df8f72966e5d0cf563f3e51c5c.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/train/img/VID202106071443181-6_jpg.rf.69a081f793e21dd77f06acfac7be3d71.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.8e9667a765cc39f4e0e1825fb51ee1c1.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-108_jpg.rf.65a6c91efb1629918b69ba5eb6da66f3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-120_jpg.rf.d30fac75e8d2a29448c05e42c75d386a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-114_jpg.rf.1ec5109e07df2ab34f02cf8dbc39494c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-108_jpg.rf.1ded833a628d0e97143d27aed07ff558.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-144_jpg.rf.03e5ac45058e53a7f0dedafdf92882fd.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.4ec3aacf219b36e5c422fb4973682d31.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-144_jpg.rf.8825a2de8e8a5ff5d9bae4f8530e51b9.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-138_jpg.rf.aefd2db48316375a9cace3e316c1e443.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-150_jpg.rf.ab0bb534503a2e12a85681c20a8dcf2c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.fd39d2d6055bcfcaa6f52b8b3fa7d6f4.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-24_jpg.rf.a4d3bb6e402690a593c8b0da100c1509.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-42_jpg.rf.af9ff4df8f72966e5d0cf563f3e51c5c.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-42_jpg.rf.af9ff4df8f72966e5d0cf563f3e51c5c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-54_jpg.rf.6820fbf7ce5c47704d230f7e841420e6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-42_jpg.rf.d2574a926270418154931a8e8cd3bc66.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-66_jpg.rf.57d8de8f660d09aeca6b893149b44f2b.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-60_jpg.rf.4b134aa35b50dbccf5d5db937858fd86.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.dcecd464b5eaa3bd9f445e8fcb530e70.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.3e5ae06e14f744353e2184cc2f07d802.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-18_jpg.rf.cf790e5e6f037a7890d5394b70b2714d.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-78_jpg.rf.fd39d2d6055bcfcaa6f52b8b3fa7d6f4.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-84_jpg.rf.8e510f14d455aed603a37eb1b84ca9d2.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443181-90_jpg.rf.d36096f5c370c825c9a59671521a867c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-144_jpg.rf.c152910bc46f66af41698e4f653d080d.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-12_jpg.rf.de09216f6ea8810a24d4cbe325419b4c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-0_jpg.rf.da0aae2f37fad29495dc284fe67e4875.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-150_jpg.rf.299f959bd711f4ac18e85b7586e2b07c.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-12_jpg.rf.22298ea3ad4059d814b631e78eb338b6.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-36_jpg.rf.1396096b36ecfb6fafc4d1f5a1f278db.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071442011-60_jpg.rf.1e1306d338177471b0cc29496baf105b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-78_jpg.rf.d9284ebb2a956f9b8a7fafc1eb1b9bd3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-78_jpg.rf.dfffb7861e386b52beb5b01ce82436c3.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071443431-78_jpg.rf.d9284ebb2a956f9b8a7fafc1eb1b9bd3.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071444271-60_jpg.rf.69d51f8b107b294f457137899bc4f45b.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-0_jpg.rf.1197fa54d5b1cca62e81cc903477004d.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-0_jpg.rf.db63f119b7f921a908bcc1b090e96b0f.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-102_jpg.rf.b7ce4d69190468de4336d1f7951bf912.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-96_jpg.rf.7050ae838ef5bebe612d73e7d7c7c0c5.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-102_jpg.rf.b7ce4d69190468de4336d1f7951bf912.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071444271-42_jpg.rf.200b1e4d1d4dac7ee843cb20ecff0b1a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-66_jpg.rf.40a35ffc1ece0b0a29a7f256c1b29302.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-72_jpg.rf.54bb4486f95a8a9cadc4dddf8bd5cfd4.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-84_jpg.rf.6835334f4d7990f8d5fafadb649dcda6.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-54_jpg.rf.d3102166fadd72fae1b5913e19d807ed.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-90_jpg.rf.143d15a47927ba7b6aefc839bf449a8a.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071444071-78_jpg.rf.77f9e0ff31361cea6384ebeee824ecd0.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444071-96_jpg.rf.7050ae838ef5bebe612d73e7d7c7c0c5.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071444271-42_jpg.rf.200b1e4d1d4dac7ee843cb20ecff0b1a.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-12_jpg.rf.6fe8f43569cf2fb9580020d39c0b2b95.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-12_jpg.rf.efad566b4034a9647bfb28ec6d96db31.jpg",
+      "phash_hamming_distance": 6,
+      "same_stem_group": true,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-30_jpg.rf.b065a9164fd86eb04a6cf7b0098c4480.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-42_jpg.rf.7b1749e8a640919082e13c787ff4845f.jpg",
+      "phash_hamming_distance": 2,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-30_jpg.rf.f65d9808919fc8ec05f68db299a622b5.jpg",
+      "second_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-54_jpg.rf.0a3ef36d39f72f85b771de649d497680.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": false,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    },
+    {
+      "first_image_id": "pcb-component-detection/extracted/validation/img/VID202106071444271-66_jpg.rf.fb0bf4b566be8381b06e153a54617528.jpg",
+      "second_image_id": "pcb-component-detection/extracted/test/img/VID202106071444271-60_jpg.rf.69d51f8b107b294f457137899bc4f45b.jpg",
+      "phash_hamming_distance": 4,
+      "same_stem_group": false,
+      "crosses_source_split": true,
+      "status": "NEAR_DUPLICATE_CANDIDATE_REQUIRES_ADJUDICATION"
+    }
+  ],
+  "interpretation": "pHash pairs are review candidates; they do not define or verify a physical board ID"
+}

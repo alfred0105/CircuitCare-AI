@@ -1,0 +1,15 @@
+# BLOCKED: no training-ready images. Do not pass to Ultralytics.
+status: BLOCKED_NO_VERIFIED_TRAINING_DATA
+source: Kaggle PCB Component Detection / DatasetNinja
+train: []
+val: []
+names:
+  0: Cap1
+  1: Cap2
+  2: Cap3
+  3: Cap4
+  4: MOSFET
+  5: Mov
+  6: Resestor
+  7: Resistor
+  8: Transformer

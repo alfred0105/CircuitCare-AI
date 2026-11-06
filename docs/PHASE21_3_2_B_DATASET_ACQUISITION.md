@@ -1,5 +1,7 @@
 # Phase 21.3.2-B — 데이터 수집 감사
 
+후속 Kaggle PCB 1,410장 정제 결과는 [Phase 21.3.2-C Kaggle Curation](PHASE21_3_2_C_KAGGLE_CURATION.md), [클래스 매핑](PHASE21_3_2_C_CLASS_MAPPING.md), [보드 누수](PHASE21_3_2_C_BOARD_LEAKAGE.md), [학습 준비 상태](PHASE21_3_2_C_TRAINING_READINESS.md)에 기록했습니다.
+
 ## 결과
 
 실제 원본 이미지 1,463장을 새로 확보했습니다: Kaggle/DatasetNinja 1,410장과 PCB-WACV 53장. PCB-WACV 중 47장만 XML annotation과 짝이 있고, 나머지 6장은 같은 stem의 PNG/JPEG alternate encoding으로 확인됐습니다. 각 파일은 원본 영역에 보존했으며 Git에는 올리지 않습니다.

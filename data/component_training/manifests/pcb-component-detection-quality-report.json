@@ -1,0 +1,51 @@
+{
+  "image_count": 1410,
+  "domain_candidate_image_count": 1410,
+  "human_confirmed_domain_image_count": 0,
+  "domain_excluded_image_count": 0,
+  "domain_review_pending_image_count": 1410,
+  "training_ready_image_count": 0,
+  "training_hold_image_count": 1410,
+  "annotation_count": 11119,
+  "class_annotation_counts": {
+    "Cap1": 1295,
+    "Cap2": 1264,
+    "Cap3": 1199,
+    "Cap4": 1074,
+    "MOSFET": 1295,
+    "Mov": 1291,
+    "Resestor": 3,
+    "Resistor": 1151,
+    "Transformer": 2547
+  },
+  "valid_bounding_box_count": 11119,
+  "invalid_bounding_box_count": 0,
+  "source_split_image_counts": {
+    "test": 111,
+    "train": 1099,
+    "validation": 200
+  },
+  "source_stem_group_count": 433,
+  "source_stem_groups_crossing_splits": 37,
+  "source_stem_cross_split_image_count": 219,
+  "exact_duplicate_group_count": 0,
+  "exact_duplicate_extra_image_count": 0,
+  "phash_near_duplicate_pair_count": 228,
+  "phash_near_duplicate_group_count": 111,
+  "phash_near_duplicate_cross_split_pair_count": 71,
+  "augmentation_family_count": 433,
+  "augmentation_family_cross_split_count": 37,
+  "visual_board_group_candidate_count": 1,
+  "human_confirmed_board_group_count": 0,
+  "source_verified_physical_board_id_count": 0,
+  "visual_board_group_candidate_crosses_source_splits": 1,
+  "train_split_image_count": 0,
+  "validation_split_image_count": 0,
+  "source_only_training_candidate_count": 0,
+  "canonical_10_class_training_candidate_count": 0,
+  "annotation_state_counts": {
+    "ANNOTATION_STATUS_UNKNOWN": 1296,
+    "EMPTY_UNREVIEWED": 114
+  },
+  "status": "BLOCKED_NO_VERIFIED_TRAINING_DATA"
+}

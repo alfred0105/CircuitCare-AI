@@ -1,0 +1,12 @@
+{
+  "state_counts": {
+    "ANNOTATION_STATUS_UNKNOWN": 1296,
+    "EMPTY_UNREVIEWED": 114
+  },
+  "empty_source_label_image_count": 114,
+  "empty_labels_are_negative_samples": false,
+  "nonempty_source_label_image_count": 1296,
+  "completeness_reviewed_image_count": 0,
+  "training_eligible_image_count": 0,
+  "reason": "No per-image full object coverage adjudication was performed."
+}

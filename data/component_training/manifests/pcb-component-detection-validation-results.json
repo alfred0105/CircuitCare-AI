@@ -1,0 +1,86 @@
+{
+  "phase": "21.3.2-C",
+  "validated_on": "2026-11-06",
+  "status": "AI_AUDIT_COMPLETE_HUMAN_REVIEW_REQUIRED_TRAINING_BLOCKED",
+  "dataset": {
+    "images": 1410,
+    "annotations": 11119,
+    "valid_boxes": 11119,
+    "invalid_boxes": 0,
+    "domain_type_counts": {
+      "AUTO_CLASSIFIED_POPULATED_PCB_CANDIDATE": 1410
+    },
+    "annotation_status_counts": {
+      "ANNOTATION_STATUS_UNKNOWN": 1296,
+      "EMPTY_UNREVIEWED": 114
+    },
+    "training_ready_images": 0,
+    "human_confirmed_domain_images": 0,
+    "human_review_pending_images": 1410
+  },
+  "duplicates": {
+    "sha256_duplicate_groups": 0,
+    "phash_distance_le_6_pairs": 228,
+    "phash_cross_source_split_pairs": 71,
+    "source_stem_groups": 433,
+    "source_stem_cross_split_groups": 37,
+    "visual_board_groups": 1,
+    "source_verified_physical_board_ids": 0,
+    "human_confirmed_board_groups": 0,
+    "visual_board_group_candidates": 1
+  },
+  "splits": {
+    "training_images": 0,
+    "validation_images": 0,
+    "independent_test_images": 0,
+    "status": "NOT_CREATED_NO_HUMAN_VERIFIED_BOARD_GROUP"
+  },
+  "mps_doctor": {
+    "machine": "arm64 macOS",
+    "python": "3.12.14",
+    "torch": "2.15.0",
+    "mps_available": true,
+    "mps_probe_ok": true,
+    "selected_device": "mps",
+    "memory_total_gib": 24.0,
+    "memory_available_gib_at_probe": 5.89
+  },
+  "loader_smoke": {
+    "dataset": "local ignored candidate export based on original source train split, not Phase C approved output",
+    "train_images": 1099,
+    "batch_size": 2,
+    "image_tensor_shape": [
+      2,
+      3,
+      320,
+      320
+    ],
+    "first_batch_box_count": 28,
+    "mps_tensor_move": "mps:0",
+    "status": "MECHANICS_ONLY_SOURCE_SPLIT_NOT_VALID_FOR_TRAINING_OR_EVALUATION"
+  },
+  "training_run": {
+    "started": false,
+    "reason": "no verified training-ready examples; labels and split fail curation gates"
+  },
+  "pytest": {
+    "command": "python -m pytest -q -m 'not integration and not stress and not crash_injection'",
+    "passed": 390,
+    "skipped": 1,
+    "deselected": 48,
+    "warnings": 1,
+    "status": "PASS"
+  },
+  "limitations": [
+    "Domain assignment is AI visual classification only; all 1,410 images still require a human reviewer.",
+    "Source class meanings remain unverified.",
+    "Source annotations are not coverage-adjudicated; 114 empty labels remain EMPTY_UNREVIEWED.",
+    "Physical board IDs and human-confirmed board groups are unavailable.",
+    "No independent holdout can be created from the currently identified one visual group candidate."
+  ],
+  "human_review_queue": {
+    "images": 1410,
+    "reviewed": 0,
+    "path": "data/component_training/manifests/kaggle-component-review-queue/review-queue.csv"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "status": "CURATION_AUDIT_ONLY_NOT_TRAINING_READY",
+  "source": null,
+  "source_license": "CC0-1.0 (source metadata; unchanged from acquisition record)",
+  "image_count": 1410,
+  "reviewed_image_count": 0,
+  "unreviewed_image_count": 1410,
+  "source_split_counts": {
+    "train": 1099,
+    "validation": 200,
+    "test": 111
+  },
+  "source_stem_group_count": 433,
+  "source_stem_cross_split_group_count": 37,
+  "source_stem_cross_split_groups": [
+    "VID20210601143927-96_jpg",
+    "VID20210601144014-45_jpg",
+    "VID20210601144014-60_jpg",
+    "VID20210601144029-63_jpg",
+    "VID20210601144029-84_jpg",
+    "VID20210601144102-60_jpg",
+    "VID20210601144102-75_jpg",
+    "VID20210601144119-15_jpg",
+    "VID20210601144119-60_jpg",
+    "VID20210601144119-75_jpg",
+    "VID20210601144135-60_jpg",
+    "VID20210601144149-60_jpg",
+    "VID20210601144202-30_jpg",
+    "VID20210601144207-0_jpg",
+    "VID20210601144207-18_jpg",
+    "VID20210601144220-105_jpg",
+    "VID20210601144220-120_jpg",
+    "VID20210601144220-135_jpg",
+    "VID20210601144220-165_jpg",
+    "VID20210601144220-90_jpg",
+    "VID20210601144238-58_jpg",
+    "VID20210601144401-45_jpg",
+    "VID20210601144411-45_jpg",
+    "VID20210601144512-12_jpg",
+    "VID20210601144512-66_jpg",
+    "VID20210601144553-180_jpg",
+    "VID20210601144553-240_jpg",
+    "VID20210601144553-30_jpg",
+    "VID202106071442011-60_jpg",
+    "VID202106071442531-108_jpg",
+    "VID202106071442531-96_jpg",
+    "VID202106071443181-24_jpg",
+    "VID202106071443431-48_jpg",
+    "VID202106071443431-60_jpg",
+    "VID202106071444071-78_jpg",
+    "VID202106071444271-42_jpg",
+    "VID202106071444271-60_jpg"
+  ],
+  "exact_sha_cross_split_count": 0,
+  "exact_sha_cross_split_hashes": [],
+  "confirmed_board_group_count": 0,
+  "confirmed_board_cross_split_count": 0,
+  "confirmed_board_cross_split_ids": [],
+  "human_confirmed_domains": {
+    "UNKNOWN": 1410
+  },
+  "human_annotation_completeness": {
+    "ANNOTATION_STATUS_UNKNOWN": 1410
+  },
+  "blocker_image_counts": {
+    "DOMAIN_NOT_CONFIRMED_FOR_TRAINING": 1410,
+    "ANNOTATION_COMPLETENESS_NOT_CONFIRMED": 1410,
+    "BOARD_ID_UNRESOLVED": 1410,
+    "EMPTY_LABEL_NOT_VERIFIED": 114
+  },
+  "canonical_10_class_training_ready_images": 0,
+  "source_only_training_ready_images": 0,
+  "reason": [
+    "Source class meanings and annotation completeness need human adjudication.",
+    "The source splits overlap by augmentation stem; reviewed board groups require a newly generated split.",
+    "This metadata-only audit does not promote images to training or count physical PCB IDs."
+  ]
+}
