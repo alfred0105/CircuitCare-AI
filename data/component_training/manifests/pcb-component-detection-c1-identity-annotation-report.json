@@ -22718,8 +22718,10 @@
       "EMPTY_UNREVIEWED": 114
     },
     "contact_sheet_pages": 5,
+    "auto_visual_partial_annotation_candidates": 114,
     "human_confirmed_count": 0,
-    "negative_samples_promoted": 0
+    "negative_samples_promoted": 0,
+    "visual_note": "All 114 empty-label images were visually inspected on contact sheets and appear to show populated PCB components; human review is still required."
   },
   "annotation_recovery": {
     "source_box_count": 11119,
