@@ -78,6 +78,62 @@ def test_native_tiled_frame_restores_detection_to_processed_coordinates():
     assert mapped["source_polygon_xy"][0] == pytest.approx([20, 12])
 
 
+def test_invalid_detections_are_rejected_without_losing_valid_candidates():
+    image = _textured_scene()
+    service = MultiImageComponentMapService()
+    session = service.ingest("invalid-detection-board", [PhotoInput(_png(image), "TOP")])
+    valid = [{"detection_id": f"ok-{index}", "class_name": "resistor", "confidence": 0.9,
+              "bbox_xyxy": [20 + index * 45, 30, 35 + index * 45, 45]} for index in range(9)]
+    invalid = [
+        {"detection_id": "missing-box", "class_name": "resistor", "confidence": 0.8},
+        {"detection_id": "short-box", "class_name": "resistor", "confidence": 0.8, "bbox_xyxy": [1, 2, 3]},
+        {"detection_id": "reversed", "class_name": "resistor", "confidence": 0.8, "bbox_xyxy": [8, 8, 2, 9]},
+        {"detection_id": "outside", "class_name": "resistor", "confidence": 0.8, "bbox_xyxy": [-1, 1, 5, 5]},
+        {"detection_id": "nan", "class_name": "resistor", "confidence": 0.8, "bbox_xyxy": [1, 1, float("nan"), 5]},
+        {"detection_id": "bad-confidence", "class_name": "resistor", "confidence": "high", "bbox_xyxy": [1, 1, 5, 5]},
+        {"detection_id": "bad-class", "class_name": "transformer", "confidence": 0.8, "bbox_xyxy": [1, 1, 5, 5]},
+        {"detection_id": "bad-polygon", "class_name": "resistor", "confidence": 0.8,
+         "bbox_xyxy": [1, 1, 5, 5], "polygon_xy": [[1, 1], [2, float("inf")], [4, 4]]},
+        {"detection_id": "missing-class", "confidence": 0.8, "bbox_xyxy": [1, 1, 5, 5]},
+        None,
+    ]
+    result = service.build_map(session, detector=lambda _: {
+        "status": "INFERENCE_COMPLETE", "detections": valid + invalid})
+    side = result["sides"]["TOP"]
+    assert len(side["components"]) == 9
+    assert len(side["component_observations"]) == 9
+    assert len(side["detection_rejections"]) == 10
+    assert {row["error_code"] for row in side["detection_rejections"]} == {
+        "INVALID_DETECTION_BOX", "INVALID_CONFIDENCE", "INVALID_DETECTION_CLASS",
+        "INVALID_DETECTION_POLYGON", "MALFORMED_DETECTOR_RESPONSE"}
+    assert result["detection_rejections"] == side["detection_rejections"]
+
+
+@pytest.mark.parametrize("response", [None, {"status": "INFERENCE_COMPLETE", "detections": {"bad": "shape"}}])
+def test_malformed_detector_response_produces_empty_map_and_structured_error(response):
+    image = _textured_scene()
+    service = MultiImageComponentMapService()
+    session = service.ingest("malformed-response", [PhotoInput(_png(image), "TOP")])
+    result = service.build_map(session, detector=lambda _: response)
+    assert result["sides"]["TOP"]["components"] == []
+    assert result["detection_rejections"][0]["error_code"] == "MALFORMED_DETECTOR_RESPONSE"
+
+
+def test_missing_confidence_is_retained_as_low_confidence_and_duplicate_ids_are_diagnosed():
+    image = _textured_scene()
+    service = MultiImageComponentMapService()
+    session = service.ingest("detection-confidence", [PhotoInput(_png(image), "TOP")])
+    result = service.build_map(session, detector=lambda _: {"detections": [
+        {"detection_id": "same", "class_name": "resistor", "bbox_xyxy": [50, 50, 70, 70]},
+        {"detection_id": "same", "class_name": "resistor", "confidence": 0.8,
+         "bbox_xyxy": [100, 50, 120, 70]},
+    ]})
+    side = result["sides"]["TOP"]
+    assert len(side["components"]) == 2
+    assert side["component_observations"][0]["recognition_status"] == "LOW_CONFIDENCE"
+    assert side["detection_warnings"][0]["error_code"] == "DUPLICATE_DETECTION_ID"
+
+
 def test_exif_orientation_is_applied_and_corrupt_images_fail_closed():
     image = Image.new("RGB", (120, 80), "navy")
     exif = Image.Exif()

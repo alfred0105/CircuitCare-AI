@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import math
+import numbers
 import os
 import time
 import base64
@@ -26,6 +27,7 @@ from PIL import Image, ImageOps
 from circuitcare.vision.board_detector import detect_board_candidates
 from circuitcare.vision.component_detector import detect_components, detect_components_tiled
 from circuitcare.vision.detector_backend import DetectorUnavailable
+from circuitcare.vision.detection_postprocess import PCB_MODEL_CLASSES
 from circuitcare.vision.image_loader import ImageLoadError, load_board_image
 from circuitcare.vision.perspective import rectify_board
 from circuitcare.vision.reconstruction.multiview_registration import register_same_side
@@ -272,6 +274,10 @@ class MultiImageComponentMapService:
                 "created_at_epoch": session.created_at_epoch, "processing_status": "PARTIAL_MAP_READY",
                 "design_registration": {"status": "NOT_RUN_SEPARATE_FROM_PHOTO_REGISTRATION"},
                 "sides": side_maps,
+                "detection_rejections": [record for value in side_maps.values()
+                                         for record in value.get("detection_rejections", [])],
+                "detection_warnings": [record for value in side_maps.values()
+                                       for record in value.get("detection_warnings", [])],
                 "identity_manifests": {side: value["identity_manifest"] for side, value in side_maps.items()},
                 "photos": photo_records,
                 "resource_limits": session.budget.__dict__.copy(),
@@ -404,6 +410,8 @@ class MultiImageComponentMapService:
                     record.candidate_matches, record.inlier_count, record.inlier_ratio, record.rmse_px,
                     record.overlap_ratio, record.failure_reason, record.p95_reprojection_error_px)
         observations = []
+        detection_rejections: list[dict[str, Any]] = []
+        detection_warnings: list[dict[str, Any]] = []
         detector_status = "DETECTOR_NOT_CONFIGURED"
         for photo in unique:
             if time.perf_counter() - started > budget.max_runtime_seconds:
@@ -422,11 +430,43 @@ class MultiImageComponentMapService:
                         timeout_seconds=remaining)
                 else:
                     detection_result = detect_components(photo.image, model_path)
-                detector_status = detection_result.get("status", "INFERENCE_COMPLETE")
+                if not isinstance(detection_result, dict) or not isinstance(detection_result.get("detections"), list):
+                    detection_rejections.append({"photo_id": photo.photo_id,
+                        "error_code": "MALFORMED_DETECTOR_RESPONSE", "detection_index": None,
+                        "details": "response must be an object with a detections list"})
+                    detector_status = "DETECTOR_ERROR"
+                    continue
+                result_status = detection_result.get("status", "INFERENCE_COMPLETE")
+                detector_status = result_status if isinstance(result_status, str) else "DETECTOR_ERROR"
+                if detector_status not in {"INFERENCE_COMPLETE", "PARTIAL_INFERENCE"}:
+                    detection_rejections.append({"photo_id": photo.photo_id,
+                        "error_code": "MALFORMED_DETECTOR_RESPONSE", "detection_index": None,
+                        "details": f"unsupported detector status: {detector_status}"})
+                    detector_status = "DETECTOR_ERROR"
+                    continue
+                detection_frame_size = native_image.size if inference_mode == "tiled" and detector is None and model_path is not None else photo.image.size
+                valid_detections = []
+                seen_source_ids: dict[str, int] = {}
+                for detection_index, raw_detection in enumerate(detection_result["detections"]):
+                    normalized, error_code, details = _normalize_detection(raw_detection, detection_frame_size)
+                    if error_code:
+                        detection_rejections.append({"photo_id": photo.photo_id,
+                            "detection_id": raw_detection.get("detection_id") if isinstance(raw_detection, dict) else None,
+                            "detection_index": detection_index, "error_code": error_code, "details": details})
+                        continue
+                    source_id = normalized.get("detection_id")
+                    if source_id:
+                        occurrence = seen_source_ids.get(source_id, 0)
+                        seen_source_ids[source_id] = occurrence + 1
+                        if occurrence:
+                            detection_warnings.append({"photo_id": photo.photo_id, "detection_id": source_id,
+                                "detection_index": detection_index, "error_code": "DUPLICATE_DETECTION_ID",
+                                "disposition": "RETAINED_WITH_DISAMBIGUATED_ID"})
+                    valid_detections.append(normalized)
                 transform = registrations[photo.photo_id].transform_moving_to_canonical
                 if transform is None or registrations[photo.photo_id].status not in {"REFERENCE", "REGISTERED_CANDIDATE"}:
                     continue
-                raw_detections = sorted(detection_result.get("detections", []), key=_detection_sort_key)
+                raw_detections = sorted(valid_detections, key=_detection_sort_key)
                 seen_detection_ids: set[str] = set()
                 seen_observation_ids: dict[str, int] = {}
                 for detection in raw_detections:
@@ -434,6 +474,12 @@ class MultiImageComponentMapService:
                         detection = _detection_to_processed_frame(detection, native_to_processed)
                     observation = _map_detection(detection, photo, np.asarray(transform), (0, 0),
                                                  registrations[photo.photo_id])
+                    if observation.get("status"):
+                        detection_rejections.append({"photo_id": photo.photo_id,
+                            "detection_id": detection.get("detection_id"), "detection_index": None,
+                            "error_code": observation["status"],
+                            "details": observation.get("reason", "invalid normalized detection")})
+                        continue
                     raw_id = observation["detection_id"]
                     if raw_id in seen_detection_ids:
                         original_id = raw_id
@@ -507,6 +553,8 @@ class MultiImageComponentMapService:
                     "coverage_metrics": mosaic_metrics},
                 "registrations": registration_records,
                 "components": components, "component_observations": observations,
+                "detection_rejections": detection_rejections,
+                "detection_warnings": detection_warnings,
                 "historical_component_id_mappings": identity_mappings,
                 "identity_manifest": {"schema_version": "circuitcare.component-identities.v1",
                     "board_id": board_id, "board_side": side, "reference_photo_id": reference.photo_id,
@@ -724,10 +772,73 @@ def _make_mosaic(reference: PhotoAsset, photos: list[PhotoAsset],
     return mosaic, sources, (int(min_x), int(min_y)), {photo.photo_id for photo, _, _ in placements}, metrics
 
 
+def _normalize_detection(detection: Any, frame_size: tuple[int, int]
+                         ) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    if not isinstance(detection, dict):
+        return None, "MALFORMED_DETECTOR_RESPONSE", "detection record must be an object"
+    bbox = detection.get("bbox_xyxy")
+    if bbox is None:
+        bbox = detection.get("bbox")
+    if isinstance(bbox, (str, bytes)) or bbox is None:
+        return None, "INVALID_DETECTION_BOX", "bounding box is missing or not a numeric sequence"
+    try:
+        values = list(bbox)
+        if len(values) != 4:
+            return None, "INVALID_DETECTION_BOX", "bounding box must contain exactly four coordinates"
+        x1, y1, x2, y2 = map(float, values)
+    except (TypeError, ValueError, OverflowError):
+        return None, "INVALID_DETECTION_BOX", "bounding box coordinates must be numeric"
+    width, height = frame_size
+    if (not all(math.isfinite(value) for value in (x1, y1, x2, y2))
+            or not (0 <= x1 < x2 <= width and 0 <= y1 < y2 <= height)):
+        return None, "INVALID_DETECTION_BOX", "bounding box must be finite, positive, and inside its source image"
+    raw_class = detection.get("class_name")
+    if not isinstance(raw_class, str) or not raw_class.strip():
+        raw_class = detection.get("predicted_class")
+    if not isinstance(raw_class, str) or not raw_class.strip():
+        return None, "INVALID_DETECTION_CLASS", "component class is missing"
+    class_name = raw_class.strip().lower()
+    if class_name not in set(PCB_MODEL_CLASSES) | {"unknown_component"}:
+        return None, "INVALID_DETECTION_CLASS", f"unsupported component class: {class_name}"
+    confidence = detection.get("confidence")
+    if confidence is not None:
+        if isinstance(confidence, bool) or not isinstance(confidence, numbers.Real):
+            return None, "INVALID_CONFIDENCE", "confidence must be a finite number in [0, 1] or null"
+        confidence = float(confidence)
+        if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+            return None, "INVALID_CONFIDENCE", "confidence must be a finite number in [0, 1] or null"
+    polygon = detection.get("source_polygon_xy")
+    if polygon is None:
+        polygon = detection.get("polygon_xy")
+    normalized = dict(detection)
+    normalized["bbox_xyxy"] = [x1, y1, x2, y2]
+    normalized["class_name"] = class_name
+    normalized["confidence"] = confidence
+    detection_id = detection.get("detection_id")
+    if detection_id is not None:
+        normalized["detection_id"] = (str(detection_id).strip()
+            if isinstance(detection_id, (str, int, float)) and not isinstance(detection_id, bool) else None)
+    if polygon is not None:
+        try:
+            points = np.asarray(polygon, dtype=np.float64)
+        except (TypeError, ValueError):
+            return None, "INVALID_DETECTION_POLYGON", "polygon must be a finite Nx2 coordinate sequence"
+        if (points.ndim != 2 or points.shape[1] != 2 or points.shape[0] < 3
+                or not np.isfinite(points).all()
+                or np.any(points[:, 0] < 0) or np.any(points[:, 0] > width)
+                or np.any(points[:, 1] < 0) or np.any(points[:, 1] > height)
+                or abs(float(cv2.contourArea(points.astype(np.float32)))) < 1e-6):
+            return None, "INVALID_DETECTION_POLYGON", "polygon needs at least three distinct in-bounds points with nonzero area"
+        normalized["source_polygon_xy"] = points.tolist()
+    return normalized, None, None
+
+
 def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
                    matrix: np.ndarray, canvas_origin: tuple[int, int],
                    registration: RegistrationRecord) -> dict[str, Any]:
-    bbox = detection.get("bbox_xyxy") or detection.get("bbox")
+    bbox = detection.get("bbox_xyxy")
+    if bbox is None:
+        bbox = detection.get("bbox")
     if bbox is None or len(bbox) != 4:
         return {"photo_id": photo.photo_id, "detection_id": detection.get("detection_id"),
                 "status": "INVALID_DETECTION_BOX"}
@@ -736,9 +847,10 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
             or not (x1 < x2 and y1 < y2)):
         return {"photo_id": photo.photo_id, "detection_id": detection.get("detection_id"),
                 "status": "INVALID_DETECTION_BOX"}
-    corners = np.asarray(detection.get("source_polygon_xy") or
+    raw_polygon = detection.get("source_polygon_xy")
+    corners = np.asarray(raw_polygon if raw_polygon is not None else
                          [[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32).reshape(-1, 2)
-    if (corners.shape[0] < 4 or not np.isfinite(corners).all()
+    if (corners.shape[0] < 3 or not np.isfinite(corners).all()
             or np.any(corners[:, 0] < 0) or np.any(corners[:, 0] > photo.image.width)
             or np.any(corners[:, 1] < 0) or np.any(corners[:, 1] > photo.image.height)):
         return {"photo_id": photo.photo_id, "detection_id": detection.get("detection_id"),
@@ -790,6 +902,7 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
             "original_coordinate_frame": "EXIF_CORRECTED_IMAGE_PIXEL",
             "source_image_size_px": list(photo.processed_size_px),
             "confidence": confidence, "ocr_marking": detection.get("ocr_text"),
+            "recognition_status": "LOW_CONFIDENCE" if confidence is None or confidence < 0.35 else "DETECTED_CANDIDATE",
             "possible_part_number": None, "identification_status": "SUGGESTED_CLASS_ONLY",
             "evidence": "MODEL_DETECTION_CANDIDATE", "coordinate_transform": "PHOTO_TO_CANONICAL_CANDIDATE",
             "registration_status": registration.status, "registration_rmse_px": registration.rmse_px,
@@ -833,7 +946,8 @@ def _detection_to_processed_frame(detection: dict[str, Any], native_to_processed
     if bbox is None or len(bbox) != 4:
         return detection
     x1, y1, x2, y2 = map(float, bbox)
-    corners = np.asarray([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+    corners = np.asarray(detection.get("source_polygon_xy") or
+                         [[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32).reshape(-1, 2)
     polygon = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), native_to_processed).reshape(-1, 2)
     row = dict(detection)
     row["source_polygon_xy"] = polygon.tolist()
