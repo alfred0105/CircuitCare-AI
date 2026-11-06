@@ -7,6 +7,7 @@ from typing import Any
 import cv2
 import numpy as np
 
+from circuitcare.vision.reconstruction.coordinate_frames import estimate_homography_ransac
 from circuitcare.vision.reconstruction.models import EvidenceStatus, RegisteredView
 
 
@@ -28,7 +29,7 @@ def register_same_side(reference: Any, moving: Any, *, source_photo_id: str,
         return _failed(source_photo_id, reference_photo_id, board_side, "insufficient_matches")
     src = np.float32([kp_mov[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
     dst = np.float32([kp_ref[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
-    matrix, inliers = cv2.findHomography(src, dst, cv2.RANSAC, 4.0)
+    matrix, inliers = estimate_homography_ransac(src, dst, 4.0)
     if matrix is None or inliers is None or not np.isfinite(matrix).all() or abs(float(np.linalg.det(matrix))) < 1e-12:
         return _failed(source_photo_id, reference_photo_id, board_side, "homography_failed")
     mask = inliers.ravel().astype(bool)
@@ -36,14 +37,19 @@ def register_same_side(reference: Any, moving: Any, *, source_photo_id: str,
     projected = cv2.perspectiveTransform(src[mask], matrix).reshape(-1, 2)
     errors = np.linalg.norm(projected - dst.reshape(-1, 2)[mask], axis=1)
     rmse = float(np.sqrt(np.mean(errors ** 2))) if len(errors) else None
+    p95 = float(np.percentile(errors, 95)) if len(errors) else None
+    inlier_ratio = count / len(good) if good else 0.0
     h, w = ref.shape
     coverage = _coverage(src.reshape(-1, 2)[mask], w, h)
-    valid = count >= min_inliers and rmse is not None and rmse <= max_reprojection_error_px and coverage >= 0.04
+    valid = (count >= min_inliers and inlier_ratio >= 0.2 and rmse is not None
+             and rmse <= max_reprojection_error_px and p95 is not None
+             and p95 <= max_reprojection_error_px * 2 and coverage >= 0.04)
     return RegisteredView(source_photo_id, reference_photo_id, board_side,
                           tuple(tuple(float(x) for x in row) for row in matrix),
                           "REGISTERED_CANDIDATE" if valid else "REGISTRATION_UNVERIFIED",
                           "ORB_RANSAC_HOMOGRAPHY", count, rmse, coverage,
-                          EvidenceStatus.INFERRED if valid else EvidenceStatus.UNKNOWN)
+                          EvidenceStatus.INFERRED if valid else EvidenceStatus.UNKNOWN,
+                          len(good), inlier_ratio, p95)
 
 
 def register_manual_correspondences(reference_points: Any, moving_points: Any, *,

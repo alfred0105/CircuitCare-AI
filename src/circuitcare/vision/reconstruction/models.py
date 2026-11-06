@@ -68,6 +68,9 @@ class RegisteredView:
     reprojection_error_px: float | None = None
     overlap_ratio: float = 0.0
     evidence_status: EvidenceStatus = EvidenceStatus.UNKNOWN
+    candidate_match_count: int | None = None
+    inlier_ratio: float | None = None
+    p95_reprojection_error_px: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

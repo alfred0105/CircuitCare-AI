@@ -215,6 +215,16 @@ def estimate_affine_ransac(source: np.ndarray, target: np.ndarray, threshold_px:
         )
 
 
+def estimate_homography_ransac(source: np.ndarray, target: np.ndarray, threshold_px: float,
+                               *, max_iterations: int = 5000,
+                               confidence: float = 0.995) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Run homography RANSAC with the same stable, serialized RNG policy."""
+    with _CV_RANSAC_LOCK:
+        cv2.setRNGSeed(_ransac_seed(source, target))
+        return cv2.findHomography(source, target, cv2.RANSAC, threshold_px,
+                                  maxIters=max_iterations, confidence=confidence)
+
+
 def _ransac_seed(source: np.ndarray, target: np.ndarray) -> int:
     digest = hashlib.sha256(
         np.asarray(source, dtype="<f8").tobytes() + np.asarray(target, dtype="<f8").tobytes(),

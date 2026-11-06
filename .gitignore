@@ -22,6 +22,9 @@ data/benchmarks/phase21_1_2/anchors/
 data/benchmarks/phase21_1_2/matches/
 data/benchmarks/phase21_1_2/overlays/
 data/benchmarks/phase21_1_2/prism_baseline/
+data/benchmarks/phase21_2/*
+!data/benchmarks/phase21_2/synthetic_summary.json
+!data/benchmarks/phase21_2/prism_image_intake.json
 data/ui_runs/
 data/vision_results/
 data/visualizations/

@@ -2,12 +2,16 @@
 
 Phase 21 builds toward a repair workflow that can start from multiview PCB photos and natural-language symptoms. The three independently evaluated research contributions remain electrical connectivity reconstruction, physics-informed fault reasoning, and active-measurement efficiency. No stage may upgrade evidence status without the specified data and validation.
 
+## Phase 21.2 direction update
+
+The original Phase 21.2 plan prioritized board-level annotations, grouped dataset splits, and Ground Truth before a multiview application path. The implementation sequence has changed: first build a bounded local backend that accepts multiple same-board photos, registers photos only within the same declared side, emits a conservative mosaic and candidate component map, and returns a fault-overlay contract. This does not remove or relax the independent-label requirements in Phases 21.3–21.5. Photo-to-photo alignment is not KiCad alignment; image detections are candidate observations; inferred mosaics do not establish board geometry or electrical connectivity. Without independently reviewed real-board data, component accuracy remains `NOT_EVALUATED`.
+
 | Phase | Focus and dependency | Start condition | Completion evidence |
 |---|---|---|---|
 | 21.0 | Technical audit, scope, evaluation rules and initial workbench fixes | Existing repository | 20-area inventory, evidence limits, experiment schema, targeted regression and documented gaps |
 | 21.0.1 | Roadmap alignment, UI verification and final documentation | Phase 21.0 baseline | target product and 21.1–21.10 plan aligned; browser evidence and limitations recorded; docs and CI updated |
 | 21.1 | PCB data and registration foundation | Board identity/revision; front/back photos; matching KiCad PCB, Position CSV and netlist; independent calibration and validation points | reproducible photo↔design transform with residuals; image-only and design-assisted inputs separated |
-| 21.2 | Component, pad, via and copper annotations / dataset | Registered board samples and independent labels | frozen board-group split, annotation guide, inter-review agreement, candidate metrics and error taxonomy |
+| 21.2 | Multi-image PCB reconstruction and component mapping (revised from the label-dataset-first direction) | Bounded same-board photo intake; per-side image registration; partial component map; independent validation remains a separate gate | reference image and conservative same-side mosaic; registered/unregistered photo separation; provenance-preserving component observations and fault overlay contract; accuracy claims only with independent labels |
 | 21.3 | Image-only PCB Vision AI baseline | Development labels and sealed board holdout from 21.2 | per-board detection/segmentation scores, uncertainty and false merge/split; holdout scored once by isolated evaluator |
 | 21.4 | Design-assisted reconstruction and ablation | Matching design data, registered boards and frozen 21.3 baseline | separately scored design-assisted results and ablation; no design metadata in image-only track |
 | 21.5 | Electrical connectivity graph reconstruction | 21.4 plus independently reviewed pin/pad/net correspondence, including shorts/opens and layer links | net/edge and false-short/open metrics by board; visual candidates remain separate from confirmed electrical nets |
