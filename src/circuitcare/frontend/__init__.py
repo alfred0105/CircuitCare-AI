@@ -3,6 +3,7 @@
 from circuitcare.frontend.models import (
     ComponentViewModel,
     DiagnosisSummaryViewModel,
+    ImageRecord,
     MeasurementViewModel,
     ProjectContext,
     SelectionState,
@@ -11,6 +12,7 @@ from circuitcare.frontend.models import (
 __all__ = [
     "ComponentViewModel",
     "DiagnosisSummaryViewModel",
+    "ImageRecord",
     "MeasurementViewModel",
     "ProjectContext",
     "SelectionState",

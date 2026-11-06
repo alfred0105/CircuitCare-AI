@@ -14,10 +14,13 @@ DiagnosticStatus = Literal[
 @dataclass(frozen=True)
 class ImageRecord:
     image_id: str
-    side: Literal["front", "back", "detail", "unknown"] = "unknown"
+    side: Literal["front", "back", "unknown"] = "unknown"
+    capture_type: Literal["full_view", "close_up", "oblique", "marking_detail", "unknown"] = "unknown"
     filename: str | None = None
     content_sha256: str | None = None
     media_type: str | None = None
+    image_dimensions: tuple[int, int] | None = None
+    image_format: str | None = None
 
 
 @dataclass(frozen=True)

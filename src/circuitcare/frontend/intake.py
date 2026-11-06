@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree
 
 from circuitcare.frontend.models import ImageRecord, ProjectContext
+from circuitcare.frontend.photo_adapter import normalize_photo_metadata
 from circuitcare.vision.image_loader import ImageLoadError, load_board_image
 from circuitcare.schematic.identity import parse_sexpr
 
@@ -28,7 +29,13 @@ SYMPTOM_CATEGORIES = {
     "unknown": "증상 불명",
 }
 
-IMAGE_ROLES = {"front": "앞면", "back": "뒷면", "detail": "확대 사진", "unknown": "미지정"}
+PHOTO_SIDES = {"front": "앞면", "back": "뒷면", "unknown": "미지정"}
+CAPTURE_TYPES = {
+    "full_view": "전체 사진", "close_up": "확대 사진", "oblique": "비스듬한 사진",
+    "marking_detail": "부품 표기", "unknown": "미지정",
+}
+# Compatibility alias for the F1 widget/tests; new code must use PHOTO_SIDES/CAPTURE_TYPES.
+IMAGE_ROLES = PHOTO_SIDES
 
 
 def safe_filename(filename: str) -> str:
@@ -88,9 +95,11 @@ def add_image_batch(
             messages.append("전체 사진 용량 한도를 초과해 이후 사진을 추가하지 않았습니다.")
             break
         images.append({
-            "image_id": digest[:20], "sha256": digest, "filename": safe_filename(filename),
-            "data": bytes(data), "role": "unknown", "media_type": f"image/{'jpeg' if suffix_is_jpeg(filename) else image_subtype(filename)}",
+            "image_id": str(uuid.uuid4()), "sha256": digest, "filename": safe_filename(filename),
+            "data": bytes(data), "side": "unknown", "capture_type": "unknown",
+            "media_type": f"image/{'jpeg' if suffix_is_jpeg(filename) else image_subtype(filename)}",
             "width": width, "height": height,
+            "image_dimensions": (width, height), "image_format": "JPEG" if suffix_is_jpeg(filename) else image_subtype(filename).upper(),
         })
         existing_hashes.add(digest)
         total_bytes += len(data)
@@ -155,22 +164,26 @@ def create_project_context(
     records: list[ImageRecord] = []
     fingerprint_images = []
     for item in image_items:
-        role = item.get("role", "unknown")
-        if role not in IMAGE_ROLES:
-            raise ValueError("사진 역할을 확인해 주세요.")
-        record = ImageRecord(
-            image_id=str(item["image_id"]), side=role,
-            filename=str(item["filename"]), content_sha256=str(item["sha256"]),
-            media_type=str(item.get("media_type") or "application/octet-stream"),
-        )
+        normalized, _ = normalize_photo_metadata(item)
+        if not normalized.image_id or not normalized.content_sha256:
+            raise ValueError("사진 식별자와 콘텐츠 SHA-256이 필요합니다.")
+        record = normalized
         records.append(record)
-        fingerprint_images.append({"sha256": record.content_sha256, "role": record.side})
+        fingerprint_images.append({
+            "sha256": record.content_sha256,
+            "side": record.side,
+            "capture_type": record.capture_type,
+        })
     source = dict(circuit_source) if circuit_source else None
+    source_fingerprint = (
+        {"content_sha256": source.get("content_sha256"), "source_type": source.get("source_type")}
+        if source else None
+    )
     fingerprint_payload = {
         "images": fingerprint_images,
         "symptom_category": category,
         "symptom_description": description,
-        "circuit_source": source,
+        "circuit_source": source_fingerprint,
     }
     fingerprint = hashlib.sha256(json.dumps(
         fingerprint_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")

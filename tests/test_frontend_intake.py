@@ -7,8 +7,9 @@ import pytest
 from PIL import Image
 
 from circuitcare.frontend.intake import (
-    IMAGE_ROLES,
+    CAPTURE_TYPES,
     MAX_SYMPTOM_CHARS,
+    PHOTO_SIDES,
     add_image_batch,
     create_project_context,
     normalize_symptom_description,
@@ -27,8 +28,9 @@ def png_bytes(size: tuple[int, int] = (20, 12), color: str = "red") -> bytes:
 def make_image(data: bytes, filename: str = "board.png", role: str = "unknown") -> dict:
     digest, width, height = validate_image_upload(filename, data)
     return {
-        "image_id": digest[:20], "sha256": digest, "filename": filename,
-        "data": data, "role": role, "media_type": "image/png", "width": width, "height": height,
+        "image_id": "photo-1", "sha256": digest, "filename": filename,
+        "data": data, "side": role, "capture_type": "unknown", "media_type": "image/png",
+        "width": width, "height": height, "image_dimensions": (width, height), "image_format": "PNG",
     }
 
 
@@ -37,7 +39,9 @@ def test_accepts_multiple_images_with_roles_and_skips_duplicate():
     images, messages = add_image_batch([], [("front.png", first), ("detail.png", second)])
     assert len(images) == 2
     assert not messages
-    assert [item["role"] for item in images] == ["unknown", "unknown"]
+    assert [item["side"] for item in images] == ["unknown", "unknown"]
+    assert [item["capture_type"] for item in images] == ["unknown", "unknown"]
+    assert images[0]["image_id"] != images[1]["image_id"]
     images, messages = add_image_batch(images, [("copy.png", first)])
     assert len(images) == 2
     assert "중복" in messages[0]
@@ -78,20 +82,43 @@ def test_project_ids_and_fingerprints_capture_inputs_and_roles():
     base = create_project_context(images=[image], symptom_category="unknown", symptom_description=None)
     another_project = create_project_context(images=[image], symptom_category="unknown", symptom_description=None)
     changed_symptom = create_project_context(images=[image], symptom_category="overheating", symptom_description=None)
-    changed_role = create_project_context(
-        images=[{**image, "role": "front"}], symptom_category="unknown", symptom_description=None,
+    changed_side = create_project_context(
+        images=[{**image, "side": "front"}], symptom_category="unknown", symptom_description=None,
+    )
+    changed_capture = create_project_context(
+        images=[{**image, "capture_type": "close_up"}], symptom_category="unknown", symptom_description=None,
     )
     assert base.project_id != another_project.project_id
     assert base.board_id != another_project.board_id
     assert base.input_fingerprint == another_project.input_fingerprint
     assert base.input_fingerprint != changed_symptom.input_fingerprint
-    assert base.input_fingerprint != changed_role.input_fingerprint
+    assert base.input_fingerprint != changed_side.input_fingerprint
+    assert base.input_fingerprint != changed_capture.input_fingerprint
+    assert base.image_records[0].capture_type == "unknown"
     assert base.image_records[0].side == "unknown"
 
 
+def test_circuit_attachment_fingerprint_uses_content_and_type_not_display_filename():
+    image = make_image(png_bytes())
+    a = create_project_context(
+        images=[image], symptom_category="unknown", symptom_description=None,
+        circuit_source={"filename": "first.xml", "content_sha256": "a" * 64, "source_type": "kicad_xml_netlist"},
+    )
+    renamed = create_project_context(
+        images=[image], symptom_category="unknown", symptom_description=None,
+        circuit_source={"filename": "renamed.xml", "content_sha256": "a" * 64, "source_type": "kicad_xml_netlist"},
+    )
+    changed = create_project_context(
+        images=[image], symptom_category="unknown", symptom_description=None,
+        circuit_source={"filename": "first.xml", "content_sha256": "b" * 64, "source_type": "kicad_xml_netlist"},
+    )
+    assert a.input_fingerprint == renamed.input_fingerprint
+    assert a.input_fingerprint != changed.input_fingerprint
+
+
 def test_image_order_affects_fingerprint_and_empty_photo_set_is_rejected():
-    first = make_image(png_bytes(color="red"), "a.png", "front")
-    second = make_image(png_bytes(color="blue"), "b.png", "back")
+    first = {**make_image(png_bytes(color="red"), "a.png", "front"), "image_id": "photo-a"}
+    second = {**make_image(png_bytes(color="blue"), "b.png", "back"), "image_id": "photo-b"}
     one = create_project_context(images=[first, second], symptom_category="unknown", symptom_description="")
     two = create_project_context(images=[second, first], symptom_category="unknown", symptom_description="")
     assert one.input_fingerprint != two.input_fingerprint
@@ -109,6 +136,10 @@ def test_existing_supported_kicad_files_are_validated():
         validate_circuit_upload("board.kicad_pcb", b"(kicad_pcb)")
 
 
-def test_role_codes_are_explicit_and_default_is_unspecified():
-    assert set(IMAGE_ROLES) == {"front", "back", "detail", "unknown"}
-    assert make_image(png_bytes())["role"] == "unknown"
+def test_side_and_capture_codes_are_separate_and_default_unspecified():
+    assert set(PHOTO_SIDES) == {"front", "back", "unknown"}
+    assert set(CAPTURE_TYPES) == {"full_view", "close_up", "oblique", "marking_detail", "unknown"}
+    image = add_image_batch([], [("board.png", png_bytes())])[0][0]
+    assert image["side"] == image["capture_type"] == "unknown"
+    assert image["image_dimensions"] == (20, 12)
+    assert image["image_format"] == "PNG"

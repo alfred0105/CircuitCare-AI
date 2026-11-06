@@ -7,21 +7,24 @@ import inspect
 from typing import Any
 
 from circuitcare.frontend.intake import (
-    IMAGE_ROLES,
+    CAPTURE_TYPES,
     MAX_PHOTOS,
     MAX_SYMPTOM_CHARS,
+    PHOTO_SIDES,
     SYMPTOM_CATEGORIES,
     add_image_batch,
     create_project_context,
     normalize_symptom_description,
     validate_circuit_upload,
 )
+from circuitcare.frontend.photo_adapter import normalize_photo_metadata
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY,
     INTAKE_PROJECT_KEY,
     INTAKE_UPLOAD_BATCH_KEY,
     clear_intake_draft,
     draft_is_current,
+    reset_intake_for_new_project,
 )
 from circuitcare.vision.image_loader import load_board_image
 
@@ -61,11 +64,34 @@ def _current_fingerprint(state: Any, category: str, description: str | None) -> 
         return None
 
 
+def _normalize_photo_state(images: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Migrate old session roles while preserving bytes, IDs, and source hashes."""
+    normalized_images = []
+    for existing in images:
+        normalized, _ = normalize_photo_metadata(existing)
+        item = dict(existing)
+        item.update({
+            "image_id": normalized.image_id,
+            "side": normalized.side,
+            "capture_type": normalized.capture_type,
+            "sha256": normalized.content_sha256,
+            "image_dimensions": normalized.image_dimensions,
+            "image_format": normalized.image_format,
+        })
+        item.pop("role", None)
+        normalized_images.append(item)
+    return normalized_images
+
+
 def _render_project_ready(st: Any, project: Any) -> None:
     st.markdown('<div class="cc-entry-brand">CircuitCare AI</div>', unsafe_allow_html=True)
     st.markdown('<div class="cc-entry-title">프로젝트 입력 완료</div>', unsafe_allow_html=True)
     st.success("프로젝트 생성 완료 · 진단 미실행")
     st.write(f"사진 {len(project.image_records)}장 · {SYMPTOM_CATEGORIES[project.symptom_category]}")
+    st.caption("촬영면·유형: " + " · ".join(
+        f"{PHOTO_SIDES[item.side]} / {CAPTURE_TYPES[item.capture_type]}"
+        for item in project.image_records
+    ))
     if project.symptom_description:
         st.caption(project.symptom_description)
     if project.circuit_source:
@@ -74,8 +100,12 @@ def _render_project_ready(st: Any, project: Any) -> None:
         st.caption("설계 자료 없음 · 전기적 분석 자료 추가 필요")
     st.caption(f"프로젝트 ID · {project.project_id}")
     st.info("작업공간 준비 · PCB/회로도 통합 Viewer는 다음 단계에서 연결됩니다.")
-    if st.button("새 진단 입력", use_container_width=True, key="cc_v2_new_intake"):
+    edit_col, new_col = st.columns(2)
+    if edit_col.button("입력 수정", use_container_width=True, key="cc_v2_edit_intake"):
         clear_intake_draft(st.session_state)
+        st.rerun()
+    if new_col.button("새 프로젝트", use_container_width=True, key="cc_v2_new_project"):
+        reset_intake_for_new_project(st.session_state)
         st.rerun()
 
 
@@ -83,7 +113,8 @@ def render_diagnosis_entry(st: Any) -> str | None:
     """Render the intake flow. Returns `demo` to route into the legacy demo UI."""
     _style(st)
     state = st.session_state
-    images = state.setdefault(INTAKE_IMAGES_KEY, [])
+    images = _normalize_photo_state(state.setdefault(INTAKE_IMAGES_KEY, []))
+    state[INTAKE_IMAGES_KEY] = images
     state.setdefault(INTAKE_UPLOAD_BATCH_KEY, 0)
     category = state.get("circuitcare_v2_symptom_category", "unknown")
     description_raw = state.get("circuitcare_v2_symptom_description", "")
@@ -137,19 +168,29 @@ def render_diagnosis_entry(st: Any) -> str | None:
                         preview = load_board_image(image_record["data"], max_edge=640).image
                         st.image(preview, use_container_width=True)
                         st.caption(image_record["filename"][:36])
-                        role = st.selectbox(
-                            "사진 역할", list(IMAGE_ROLES),
-                            index=list(IMAGE_ROLES).index(image_record["role"]),
-                            format_func=lambda value: IMAGE_ROLES[value],
-                            key=f"cc_v2_photo_role_{image_record['sha256']}",
+                        side = st.selectbox(
+                            "촬영면", list(PHOTO_SIDES),
+                            index=list(PHOTO_SIDES).index(image_record["side"]),
+                            format_func=lambda value: PHOTO_SIDES[value],
+                            key=f"cc_v2_photo_side_{image_record['image_id']}",
                             label_visibility="collapsed",
                         )
-                        if role != image_record["role"]:
-                            image_record["role"] = role
+                        capture_type = st.selectbox(
+                            "촬영 유형", list(CAPTURE_TYPES),
+                            index=list(CAPTURE_TYPES).index(image_record["capture_type"]),
+                            format_func=lambda value: CAPTURE_TYPES[value],
+                            key=f"cc_v2_photo_capture_{image_record['image_id']}",
+                            label_visibility="collapsed",
+                        )
+                        if side != image_record["side"] or capture_type != image_record["capture_type"]:
+                            image_record["side"] = side
+                            image_record["capture_type"] = capture_type
                             state.pop(INTAKE_PROJECT_KEY, None)
+                            state.pop("circuitcare_v2_analysis_status", None)
                         if st.button("사진 제거", key=f"cc_v2_remove_{image_record['sha256']}", use_container_width=True):
                             state[INTAKE_IMAGES_KEY] = [item for item in images if item["sha256"] != image_record["sha256"]]
                             state.pop(INTAKE_PROJECT_KEY, None)
+                            state.pop("circuitcare_v2_analysis_status", None)
                             st.rerun()
         else:
             st.info("PCB 사진을 한 장 이상 추가하세요.")

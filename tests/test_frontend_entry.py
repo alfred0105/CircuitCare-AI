@@ -97,11 +97,14 @@ def test_photo_upload_role_assignment_and_start_create_session_project(monkeypat
 
     assert not app.exception
     assert len(app.session_state[INTAKE_IMAGES_KEY]) == 2
-    assert all(item["role"] == "unknown" for item in app.session_state[INTAKE_IMAGES_KEY])
+    assert all(item["side"] == "unknown" for item in app.session_state[INTAKE_IMAGES_KEY])
+    assert all(item["capture_type"] == "unknown" for item in app.session_state[INTAKE_IMAGES_KEY])
     assert next(button for button in app.button if button.label == "진단 시작").disabled is False
 
     app.selectbox[0].set_value("front").run()
-    assert app.session_state[INTAKE_IMAGES_KEY][0]["role"] == "front"
+    app.selectbox[1].set_value("close_up").run()
+    assert app.session_state[INTAKE_IMAGES_KEY][0]["side"] == "front"
+    assert app.session_state[INTAKE_IMAGES_KEY][0]["capture_type"] == "close_up"
     app.radio[0].set_value("overheating").run()
     app.text_area[0].set_value("  전원을 켜면   과열됨  ").run()
     next(button for button in app.button if button.label == "진단 시작").click().run()
@@ -111,6 +114,7 @@ def test_photo_upload_role_assignment_and_start_create_session_project(monkeypat
     assert project.symptom_category == "overheating"
     assert project.symptom_description == "전원을 켜면 과열됨"
     assert project.image_records[0].side == "front"
+    assert project.image_records[0].capture_type == "close_up"
     assert project.input_fingerprint
     assert any("프로젝트 생성 완료 · 진단 미실행" in item.value for item in app.success)
 
@@ -133,4 +137,51 @@ def test_photo_removal_preserves_symptom_input(monkeypatch):
     assert app.session_state[INTAKE_IMAGES_KEY] == []
     assert app.radio[0].value == "power_failure"
     assert next(button for button in app.button if button.label == "진단 시작").disabled
+
+
+def test_edit_preserves_inputs_and_new_project_clears_inputs_and_widget_state(monkeypatch):
+    pytest.importorskip("streamlit")
+    from streamlit.testing.v1 import AppTest
+
+    image = Image.new("RGB", (40, 30), "blue")
+    stream = io.BytesIO()
+    image.save(stream, format="PNG")
+    raw = stream.getvalue()
+    digest = hashlib.sha256(raw).hexdigest()
+    record = {
+        "image_id": "photo-1", "sha256": digest, "filename": "board.png", "data": raw,
+        "side": "back", "capture_type": "oblique", "media_type": "image/png",
+        "width": 40, "height": 30, "image_dimensions": (40, 30), "image_format": "PNG",
+    }
+    project = create_project_context(
+        images=[record], symptom_category="overheating", symptom_description="뜨거움",
+    )
+    project_root = Path(__file__).parents[1]
+    monkeypatch.setenv("CIRCUITCARE_UI_V2", "1")
+    app = AppTest.from_file(str(project_root / "src/circuitcare/ui.py"), default_timeout=30)
+    app.session_state[INTAKE_IMAGES_KEY] = [record]
+    app.session_state[INTAKE_PROJECT_KEY] = project
+    app.session_state["circuitcare_v2_symptom_category"] = "overheating"
+    app.session_state["circuitcare_v2_symptom_description"] = "뜨거움"
+    app.session_state["circuitcare_v2_analysis_status"] = "STALE"
+    app.run()
+
+    next(button for button in app.button if button.label == "입력 수정").click().run()
+    assert len(app.session_state[INTAKE_IMAGES_KEY]) == 1
+    assert app.session_state["circuitcare_v2_symptom_category"] == "overheating"
+    assert "circuitcare_v2_analysis_status" not in app.session_state
+
+    # Recreate a completed draft and perform a clean new-project transition.
+    project = create_project_context(
+        images=app.session_state[INTAKE_IMAGES_KEY], symptom_category="overheating",
+        symptom_description="뜨거움",
+    )
+    app.session_state[INTAKE_PROJECT_KEY] = project
+    app.run()
+    app.session_state["cc_v2_photo_upload_0"] = "old-upload-widget-state"
+    next(button for button in app.button if button.label == "새 프로젝트").click().run()
+    assert app.session_state[INTAKE_IMAGES_KEY] == []
+    assert app.session_state["circuitcare_v2_symptom_category"] == "unknown"
+    assert app.session_state["circuitcare_v2_symptom_description"] == ""
+    assert "cc_v2_photo_upload_0" not in app.session_state
 
