@@ -8,6 +8,10 @@ SPEC=importlib.util.spec_from_file_location('verify_pcb_dslr',ROOT/'scripts/veri
 VERIFY=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(VERIFY)
 def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 
+def test_data_yaml_path_reader_handles_quoted_and_unquoted_values(tmp_path):
+    data=tmp_path/'data.yaml';data.write_text(f'path: "{tmp_path} with spaces"\ntrain: images/train\nval: images/validation\ntest: images/test\nnames:\n  0: integrated_circuit\n')
+    assert VERIFY.read_data_paths(data)=={'path':f'{tmp_path} with spaces','train':'images/train','val':'images/validation','test':'images/test'}
+
 def test_dataset_audit_detects_bad_hash_and_board_leakage(tmp_path):
     rows=[]
     for i,split in enumerate(('train','validation')):
