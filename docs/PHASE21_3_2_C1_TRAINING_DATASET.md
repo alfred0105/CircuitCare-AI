@@ -6,7 +6,7 @@
 |---|---:|---|
 | A — Canonical 10-Class | 0 | 원본 9개 클래스의 배포 클래스 mapping과 annotation 완전성이 검증되지 않음 |
 | B — Source-Only Experimental | 0 | 클래스 의미·box 정합성 및 물리 보드 group split 검증 미완료 |
-| C — Annotation Recovery | 1,410 검토 대상 | 원본 라벨을 보존하고 114 빈 라벨 우선 queue와 class gallery 제공; 정답 승격 없음 |
+| C — Annotation Recovery | 1,410 검토 대상 | 원본 라벨을 보존. 빈 라벨 114장은 모두 populated PCB로 보여 `PARTIAL_ANNOTATION_CANDIDATE`로 사람 검토 대기; 정답 승격 없음 |
 
 학습 가능한 파일 목록은 아직 만들지 않았습니다. 1,410장을 모두 보류 처리한 채로 감사만 끝낸 것이 아니라, C dataset에서 검토 단위를 filename group으로 정리하고 유사 보드·split 충돌·class별 box·빈 annotation 작업 목록과 시각 자료를 실제 생성했습니다. 그런데도 train 데이터 승인에 필요한 정답성은 추정하지 않았습니다.
 

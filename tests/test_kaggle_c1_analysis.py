@@ -38,6 +38,7 @@ def test_c1_audit_keeps_identity_and_annotation_approval_pending(tmp_path):
                for group in report["filename_group_summary"])
     queue = (output / "pcb-component-detection-c1-empty-review-queue.csv").read_text()
     assert "EMPTY_UNREVIEWED" in queue
+    assert "PARTIAL_ANNOTATION_CANDIDATE" in queue
     assert (assets / "empty-annotation-review" / "sheet-001.jpg").is_file()
 
 

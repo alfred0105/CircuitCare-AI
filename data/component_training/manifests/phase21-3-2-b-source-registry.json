@@ -374,6 +374,8 @@
       "stress": "11 passed",
       "crash_injection": "3 passed",
       "native_ocr_required": "1 passed"
-    }
+    },
+    "empty_annotation_auto_visual_partial_annotation_candidates": 114,
+    "empty_annotation_manifest_status": "EMPTY_UNREVIEWED"
   }
 }

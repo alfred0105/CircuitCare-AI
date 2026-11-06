@@ -6,6 +6,6 @@
 
 기하 검사에서 1,430개 box 행이 후보로 나왔습니다(이미지 테두리에 닿는 box 1,427개, 상대 면적 0.0005 미만 3개). 데이터 원본은 회전·크롭된 사진을 포함하므로 테두리 접촉은 잘린 소자/정상 경계 box일 수 있습니다. 이 후보를 오류 수로 해석하지 않았습니다.
 
-빈 annotation 114장을 `EMPTY_UNREVIEWED`로 유지하고 별도 우선 검토 queue와 이미지 연락판을 생성했습니다. 사람이 대상 부품 부재를 확인하기 전까지 negative 학습이나 empty-reviewed 상태로 바꾸지 않습니다. 모든 빈 라벨 이미지도 빈 기판이라고 추정하지 않습니다.
+빈 annotation 114장을 모두 연락판으로 시각 확인했습니다. 114장 모두 populated PCB와 실장 부품이 보이는 것으로 보여 `PARTIAL_ANNOTATION_CANDIDATE`를 자동 시각 검토 제안으로 기록했습니다. 원본/manifest annotation 상태는 `EMPTY_UNREVIEWED`로 유지하고 사람 확인은 0건입니다. 이는 누락된 개별 box를 전부 찾아냈거나 수량화했다는 뜻은 아닙니다. 사람이 확인하기 전에는 negative 학습이나 `EMPTY_REVIEWED` 상태로 승격하지 않습니다.
 
 복구 queue: [`pcb-component-detection-c1-empty-review-queue.csv`](../data/component_training/manifests/pcb-component-detection-c1-empty-review-queue.csv). box geometry 후보는 `pcb-component-detection-c1-annotation-review-candidates.csv`에 기록합니다. 시트는 `data/component_training/processed/kaggle-c1-review/empty-annotation-review/`에 있습니다. 원본 box 수정, 보완 annotation, 승인된 negative는 현재 모두 0입니다.

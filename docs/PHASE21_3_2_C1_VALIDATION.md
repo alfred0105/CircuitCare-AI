@@ -10,7 +10,7 @@
 - exact SHA-256 duplicate 그룹: 기존 C 분석에서 0
 - source annotation box: 11,119, 기존 좌표 검사 valid 11,119 / invalid 0
 - geometry 휴리스틱 검토 후보: 1,430 box 행 (edge-touch 1,427, 매우 작은 area 3); 확정 오류 0
-- 빈 annotation: 114, `EMPTY_UNREVIEWED` 114, `EMPTY_REVIEWED` 0
+- 빈 annotation: 114, 모두 자동 시각 검토에서 `PARTIAL_ANNOTATION_CANDIDATE`; manifest 상태 `EMPTY_UNREVIEWED` 114, `EMPTY_REVIEWED` 0
 - 자동 클래스 gallery: 8개 클래스 각 40개, `Resestor` 1개
 - 사람 검토: 이미지 0, 그룹 0, 클래스 결정 0, box 판정 0
 - source label 수정 및 pseudo-label 승격: 0

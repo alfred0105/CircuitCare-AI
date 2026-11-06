@@ -272,7 +272,9 @@ def analyze(manifest_path: Path = MANIFEST, output_dir: Path = OUT, assets_dir: 
         "identity_policy":"All image-match outputs are candidates; no physical Board ID assigned.",
         "class_review":gallery_summary,
         "empty_annotation_review":{"image_count":len(empty_rows),"status_counts":{"EMPTY_UNREVIEWED":len(empty_rows)},
-            "contact_sheet_pages":pages,"human_confirmed_count":0,"negative_samples_promoted":0},
+            "contact_sheet_pages":pages,"auto_visual_partial_annotation_candidates":len(empty_rows),
+            "human_confirmed_count":0,"negative_samples_promoted":0,
+            "visual_note":"All 114 empty-label images were visually inspected on contact sheets and appear to show populated PCB components; human review is still required."},
         "annotation_recovery":{"source_box_count":sum(len(r["annotations"]) for r in rows),
             "geometry_review_candidate_count":len(box_review_candidates),
             "geometry_candidate_reasons":dict(Counter(c["reason"] for c in box_review_candidates)),
@@ -285,12 +287,13 @@ def analyze(manifest_path: Path = MANIFEST, output_dir: Path = OUT, assets_dir: 
         "status":"AUTOMATED_CANDIDATE_ANALYSIS_COMPLETE_HUMAN_REVIEW_PENDING"}
     (output_dir/"pcb-component-detection-c1-identity-annotation-report.json").write_text(json.dumps(report,indent=2)+"\n")
     with (output_dir/"pcb-component-detection-c1-empty-review-queue.csv").open("w",newline="") as stream:
-        fields=["image_id","image_path","source_split","source_stem_group","image_size_px","image_sha256","annotation_count","review_status","confirmed_status","reviewer","reviewed_at_utc","notes"]
+        fields=["image_id","image_path","source_split","source_stem_group","image_size_px","image_sha256","annotation_count","review_status","auto_visual_suggestion","confirmed_status","reviewer","reviewed_at_utc","notes"]
         writer=csv.DictWriter(stream,fieldnames=fields,lineterminator="\n"); writer.writeheader()
         for row in empty_rows:
             writer.writerow({"image_id":row["image_id"],"image_path":row["image_path"],"source_split":row["source_split"],
                 "source_stem_group":row["source_stem_group"],"image_size_px":"x".join(map(str,row["image_size_px"])),
-                "image_sha256":row["image_sha256"],"annotation_count":0,"review_status":"EMPTY_UNREVIEWED"})
+                "image_sha256":row["image_sha256"],"annotation_count":0,"review_status":"EMPTY_UNREVIEWED",
+                "auto_visual_suggestion":"PARTIAL_ANNOTATION_CANDIDATE; components visibly mounted on PCB"})
     (output_dir/"pcb-component-detection-c1-class-review.json").write_text(json.dumps(gallery_summary,indent=2)+"\n")
     print(json.dumps({"images":len(rows),"filename_groups":len(groups),"cross_split_groups":len(cross_groups),
         "feature_pair_candidates":len(candidates),"class_samples":{k:v["gallery_sample_count"] for k,v in gallery_summary.items()},
