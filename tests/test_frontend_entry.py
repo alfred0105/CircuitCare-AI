@@ -409,13 +409,13 @@ def test_broken_canonical_artifact_falls_back_to_source_without_dropping_map(mon
     app.run()
 
     assert not app.exception
-    assert len(app.image) == 1
     assert app.session_state["circuitcare_v3_view_mode"] == "원본 사진"
     assert any("원본 사진으로 전환" in warning.value for warning in app.warning)
     assert app.session_state[COMPONENT_MAP_STATE_KEY]["component_map"] == bad_map
     assert app.session_state[COMPONENT_MAP_STATE_KEY]["failed_artifacts"]
+    assert app.session_state["circuitcare_v2_view_transform"]["source_frame_id"] == record.image_id
     app.run()
     assert not app.exception
     assert not app.warning
-    assert len(app.image) == 1
+    assert app.session_state["circuitcare_v2_view_transform"]["source_frame_id"] == record.image_id
 

@@ -6,12 +6,15 @@ import base64
 import binascii
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 import hashlib
 import importlib
 import io
 import json
 import logging
 import math
+import os
+from pathlib import Path
 from collections.abc import Mapping, MutableMapping
 from typing import Any, Protocol
 
@@ -27,6 +30,8 @@ LEGACY_COMPONENT_MAP_KEYS = (
     "circuitcare_v3_registration_status", "circuitcare_v3_processing_error",
     "circuitcare_v3_active_side", "circuitcare_v3_view_mode", "circuitcare_v3_failed_artifacts",
     "circuitcare_v2_view_transform", "circuitcare_v2_active_photo_id", "circuitcare_v2_view_zoom",
+    "circuitcare_v4_selection_map_key", "circuitcare_v4_current_components",
+    "circuitcare_v4_detection_status",
 )
 LOGGER = logging.getLogger(__name__)
 MAX_CANONICAL_BYTES = 24 * 1024 * 1024
@@ -40,8 +45,19 @@ REGISTRATION_LABELS = {
 }
 
 
+@lru_cache(maxsize=8)
+def _model_sha256(path: str, size: int, modified_ns: int) -> str:
+    """Hash a model once per file version; Streamlit reruns must stay cheap."""
+    del size, modified_ns  # Metadata intentionally participates in the cache key.
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as model_file:
+        for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 class ComponentMapProvider(Protocol):
-    def build_component_map(self, *, board_id: str, photos: list[dict[str, Any]], previous_map: dict | None = None) -> dict:
+    def build_component_map(self, *, board_id: str, photos: list[dict[str, Any]], previous_map: dict | None = None, options: dict | None = None) -> dict:
         """Build the backend's component map for one board."""
 
 
@@ -79,12 +95,27 @@ def optional_backend_provider() -> ComponentMapProvider | None:
         return None
 
     class LocalServiceProvider:
-        def build_component_map(self, *, board_id: str, photos: list[dict[str, Any]], previous_map: dict | None = None) -> dict:
+        def __init__(self) -> None:
+            configured = os.environ.get("CIRCUITCARE_PCB_MODEL_PATH")
+            default_path = Path(__file__).resolve().parents[3] / "models" / "pcb_component_detector.onnx"
+            self.model_path = Path(configured).expanduser() if configured else default_path if default_path.is_file() else None
+            model_digest = None
+            if self.model_path and self.model_path.is_file():
+                metadata = self.model_path.stat()
+                model_digest = _model_sha256(str(self.model_path.resolve()), metadata.st_size, metadata.st_mtime_ns)
+            self.cache_options = {
+                "model_path": str(self.model_path) if self.model_path else None,
+                "model_sha256": model_digest,
+            }
+
+        def build_component_map(self, *, board_id: str, photos: list[dict[str, Any]], previous_map: dict | None = None, options: dict | None = None) -> dict:
             service = service_type()
             inputs = [photo_type(data=item["data"], side=item["side"], role=item["role"], name=item["name"])
                       for item in photos]
             session = service.ingest(board_id, inputs)
-            return service.build_map(session, previous_component_map=previous_map)
+            actual_options = options or self.cache_options
+            model_path = actual_options.get("model_path")
+            return service.build_map(session, model_path=model_path, previous_component_map=previous_map)
 
     return LocalServiceProvider()
 
@@ -202,12 +233,23 @@ def component_map_cache_key(
 def clear_component_map_state(state: MutableMapping[str, Any], *, clear_viewer_selection: bool = True) -> None:
     """Clear F3 results and viewer coordinates without touching intake inputs."""
     state.pop(COMPONENT_MAP_STATE_KEY, None)
+    for key in tuple(state):
+        if str(key).startswith(("cc_v4_pcb_viewer_", "circuitcare_v4_pcb_")):
+            state.pop(key, None)
     for key in LEGACY_COMPONENT_MAP_KEYS:
         if not clear_viewer_selection and key in {
             "circuitcare_v3_active_side", "circuitcare_v2_active_photo_id",
         }:
             continue
         state.pop(key, None)
+    if clear_viewer_selection:
+        current = state.get("circuitcare_v2_selection")
+        if current is not None and hasattr(current, "selected_component"):
+            try:
+                from dataclasses import replace
+                state["circuitcare_v2_selection"] = replace(current, selected_component=None, selected_probe=None)
+            except (TypeError, ValueError):
+                pass
 
 
 def component_map_entry_is_current(

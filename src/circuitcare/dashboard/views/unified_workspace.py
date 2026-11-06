@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import base64
 from pathlib import Path
 import tempfile
 from typing import Any
 
 from circuitcare.frontend.models import ProjectContext
+from circuitcare.frontend.component_overlay_adapter import (
+    adapt_component_map_components, adapt_original_photo_components,
+)
+from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
 from circuitcare.frontend.component_map_adapter import (
     COMPONENT_MAP_STATE_KEY, LOGGER, REGISTRATION_LABELS, available_photo_sides,
     clear_component_map_state,
@@ -16,6 +21,10 @@ from circuitcare.frontend.component_map_adapter import (
     validate_component_map,
 )
 from circuitcare.frontend.photo_adapter import adapt_component_map_input
+from circuitcare.dashboard.components.pcb_workspace import (
+    SELECTED_MAP_KEY, render_component_viewer, scale_overlay_to_display,
+)
+from circuitcare.dashboard.views.inspection_panel import render_inspection_panel
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY, clear_intake_draft,
     reset_intake_for_new_project,
@@ -85,6 +94,13 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         project_id=project.project_id, board_id=project.board_id or "", inputs=ready_inputs,
         photo_manifest=list(project.image_records),
     )
+    provider = optional_backend_provider()
+    provider_options = getattr(provider, "cache_options", {}) if provider else {}
+    if provider_options:
+        cache_key = component_map_cache_key(
+            project_id=project.project_id, board_id=project.board_id or "", inputs=ready_inputs,
+            photo_manifest=list(project.image_records), options=provider_options,
+        )
     entry = st.session_state.get(COMPONENT_MAP_STATE_KEY)
     if not component_map_entry_is_current(
         entry, project_id=project.project_id, board_id=project.board_id,
@@ -92,8 +108,11 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     ):
         clear_component_map_state(st.session_state, clear_viewer_selection=False)
         entry = None
+    selection = st.session_state.get(SELECTION_KEY)
+    if getattr(selection, "selected_component", None) and st.session_state.get(SELECTED_MAP_KEY) != cache_key:
+        update_selection(st.session_state, selected_component=None)
+        st.session_state.pop(SELECTED_MAP_KEY, None)
 
-    provider = optional_backend_provider()
     if provider is None:
         st.caption("백엔드 미연결 · 원본 사진 보기")
     elif not ready_inputs:
@@ -101,10 +120,14 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     else:
         if st.button("사진 정합 실행", key="circuitcare_v3_build_map"):
             try:
+                if getattr(st.session_state.get(SELECTION_KEY), "selected_component", None):
+                    update_selection(st.session_state, selected_component=None)
+                    st.session_state.pop(SELECTED_MAP_KEY, None)
                 raw_map = provider.build_component_map(
                     board_id=project.board_id,
                     photos=[{"data": p.data, "side": p.side, "role": p.role, "name": p.name}
                             for p in ready_inputs],
+                    options=provider_options,
                 )
                 validated_map = validate_component_map(raw_map, board_id=project.board_id)
                 photo_id_map = map_backend_photo_ids(
@@ -188,27 +211,64 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         st.caption(f"{record.filename or 'PCB 사진'} · {record.side} / {record.capture_type} · {size[0]}×{size[1]} px")
     else:
         st.caption(f"{record.filename or 'PCB 사진'} · {record.side} / {record.capture_type}")
-    zoom = st.slider("확대", min_value=1.0, max_value=2.5, step=0.1,
-                     key=VIEW_ZOOM_KEY, label_visibility="collapsed")
+    canonical_png_bytes = None
     try:
         if mode == "통합 이미지" and canonical:
             # Decoded above before the widget is built so failures can safely switch its state.
             image = decoded_canonical.image
             source_size = (decoded_canonical.width, decoded_canonical.height)
+            display_size = source_size
             active_image_id = decoded_canonical.frame_id
+            canonical_png_bytes = base64.b64decode(canonical["image_png_base64"], validate=True)
             st.caption(f"MOSAIC_PIXEL · 기준 사진 {decoded_canonical.reference_backend_photo_id or '미지정'} · 정합 후보 · 미검증")
         else:
             loaded = load_board_image(image_data)
             image = loaded.image
             source_size = loaded.original_size
+            display_size = loaded.processed_size
             active_image_id = selected
     except (ImageLoadError, ValueError):
         st.warning("이미지 표시 실패 · 원본 사진 보기")
         return
-    width = min(1600, max(320, int(720 * zoom)))
+    side_result = side_result if isinstance(side_result, dict) else {}
+    detection_status = str(side_result.get("detection_status", "UNKNOWN"))
+    overlay_result = adapt_component_map_components(
+        component_map, project_id=project.project_id, board_id=project.board_id or "", side=side_enum or "",
+    ) if component_map and side_enum else None
+    if mode == "통합 이미지" and canonical:
+        component_models = overlay_result.components if overlay_result and overlay_result.status == "READY" else ()
+        frame_id = decoded_canonical.frame_id
+        viewer_size = source_size
+    else:
+        component_models = ()
+        frame_id = selected
+        viewer_size = display_size
+        if side_enum and entry:
+            photo_mapping = next((row for row in entry.get("photo_id_map", [])
+                                  if row.project_id == project.project_id and row.board_id == project.board_id
+                                  and row.frontend_photo_id == selected and row.mapping_status == "MAPPED"), None)
+            if photo_mapping and photo_mapping.backend_photo_id:
+                source_models = adapt_original_photo_components(
+                    component_map, project_id=project.project_id, board_id=project.board_id or "",
+                    side=side_enum, frontend_photo_id=selected,
+                    backend_photo_id=photo_mapping.backend_photo_id, image_size=source_size,
+                )
+                component_models = scale_overlay_to_display(
+                    source_models, source_size=source_size, display_size=display_size,
+                )
+    if overlay_result and overlay_result.status == "INVALID_DATA":
+        st.warning("일부 부품 좌표를 검증할 수 없어 표시하지 않았습니다.")
+    st.session_state["circuitcare_v4_current_components"] = tuple(component_models)
+    st.session_state["circuitcare_v4_detection_status"] = detection_status
+    current_selection = st.session_state.get(SELECTION_KEY)
+    selected_component_id = getattr(current_selection, "selected_component", None)
+    if selected_component_id and selected_component_id not in {item.component_id for item in component_models}:
+        update_selection(st.session_state, selected_component=None)
+        st.session_state.pop(SELECTED_MAP_KEY, None)
+        selected_component_id = None
     transform = requested_view_transform(
         source_size=source_size,
-        display_size=(width, max(1, round(width * image.height / image.width))),
+        display_size=viewer_size,
         active_photo_id=active_image_id,
     )
     transform.update({
@@ -221,15 +281,35 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         "source_dimensions": list(source_size),
         "canonical_dimensions": canonical.get("image_size_px") if canonical else None,
         "registration_status": "CANDIDATE_GEOMETRY_ONLY" if mode == "통합 이미지" else "SOURCE_PHOTO",
-        "coordinate_status": "UNVERIFIED_RESPONSIVE_CSS",
+        "coordinate_status": "VERIFIED_SHARED_SVG_VIEWBOX",
     })
     st.session_state[VIEW_TRANSFORM_KEY] = transform
-    with st.container(key="cc_viewer_canvas"):
-        st.image(image, width=width)
+    interactive, _viewer_key = render_component_viewer(
+        st, image=image, source_image_bytes=image_data, canonical_png_bytes=canonical_png_bytes,
+        image_size_px=viewer_size, components=tuple(component_models), project=project,
+        board_side=side_enum or active_side, frame_id=frame_id,
+        selected_component_id=selected_component_id,
+        map_cache_key=cache_key if entry else "no-map", image_mode=mode,
+    )
+    if not interactive:
+        with st.container(key="cc_viewer_canvas"):
+            st.image(image, width=720)
+        if component_models:
+            st.warning("인터랙티브 Viewer를 사용할 수 없습니다 · 부품 Overlay를 숨겼습니다.")
+        else:
+            st.caption("Zoom / Pan Viewer를 사용할 수 없어 정적 이미지로 표시합니다.")
+    if overlay_result and overlay_result.status == "READY":
+        st.caption(f"검출 결과 · {len(overlay_result.components)}개 · 후보 · 고장 진단 미실행")
+    elif detection_status == "DETECTOR_NOT_CONFIGURED":
+        st.caption("검출 모델 미설정 · 원본 사진 보기 가능")
+    elif detection_status == "BLOCKED_MODEL_UNAVAILABLE":
+        st.caption("검출 모델을 사용할 수 없습니다 · 원본 사진 보기 가능")
+    elif component_map and not side_result.get("components"):
+        st.caption("검출 결과 없음 · 고장 진단 미실행")
     if mode == "원본 사진":
         mapped = entry.get("photo_id_map", []) if entry else []
-        entry = next((row for row in mapped if row.frontend_photo_id == selected and row.project_id == project.project_id), None)
-        st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(entry.registration_status, '상태 미확인') if entry else '정합 결과 없음'}")
+        photo_mapping = next((row for row in mapped if row.frontend_photo_id == selected and row.project_id == project.project_id), None)
+        st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(photo_mapping.registration_status, '상태 미확인') if photo_mapping else '정합 결과 없음'}")
 
 
 def _photo_label(record: Any, number: int) -> str:
@@ -239,29 +319,6 @@ def _photo_label(record: Any, number: int) -> str:
         "marking_detail": "부품 표기", "unknown": "미지정",
     }[record.capture_type]
     return f"{side} {number} · {role}"
-
-
-def render_inspection_panel(st: Any, project: ProjectContext, *, preview: bool = False) -> None:
-    with st.container(border=True):
-        st.markdown('<span class="cc-inspection-marker"></span>', unsafe_allow_html=True)
-        st.markdown("### 전체 진단")
-        if preview:
-            st.info("미리보기 · 진단 미실행")
-        else:
-            st.info("진단 미실행")
-        st.caption(f"사진 · {len(project.image_records)}장")
-        symptom = {
-            "power_failure": "전원 불량", "output_anomaly": "출력 이상",
-            "overheating": "과열", "intermittent_operation": "간헐적 작동",
-            "unknown": "증상 불명",
-        }.get(project.symptom_category or "unknown", "증상 불명")
-        st.caption(f"증상 · {symptom}")
-        if project.symptom_description:
-            st.caption(project.symptom_description)
-        st.divider()
-        st.markdown("**부품** · 미선택")
-        st.markdown("**측정값** · 없음")
-        st.markdown("**다음 점검** · 분석 데이터 없음")
 
 
 def render_workbench_shell(st: Any, project: ProjectContext) -> None:
@@ -320,7 +377,15 @@ def render_workbench_shell(st: Any, project: ProjectContext) -> None:
                         st, project, st.session_state.get("circuitcare_v2_circuit_bytes"),
                     )
         with right:
-            render_inspection_panel(st, project, preview=preview)
+            current_components = tuple(st.session_state.get("circuitcare_v4_current_components", ()))
+            selection = st.session_state.get(SELECTION_KEY)
+            selected_id = getattr(selection, "selected_component", None)
+            selected_component = next((item for item in current_components if item.component_id == selected_id), None)
+            render_inspection_panel(
+                st, project, preview=preview, components=current_components,
+                selected_component=selected_component,
+                detection_status=st.session_state.get("circuitcare_v4_detection_status", "UNKNOWN"),
+            )
 
 
 def _render_schematic(st: Any, project: ProjectContext, circuit_bytes: bytes | None = None) -> None:
