@@ -155,6 +155,8 @@ def create_project_context(
     symptom_category: str,
     symptom_description: str | None,
     circuit_source: Mapping[str, Any] | None = None,
+    project_id: str | None = None,
+    board_id: str | None = None,
 ) -> ProjectContext:
     image_items = list(images)
     if not image_items:
@@ -189,7 +191,7 @@ def create_project_context(
         fingerprint_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")).hexdigest()
     return ProjectContext(
-        project_id=str(uuid.uuid4()), board_id=str(uuid.uuid4()),
+        project_id=project_id or str(uuid.uuid4()), board_id=board_id or str(uuid.uuid4()),
         image_records=tuple(records), symptom_category=category,
         symptom_description=description, circuit_source=source,
         input_fingerprint=fingerprint,

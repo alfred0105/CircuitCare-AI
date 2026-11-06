@@ -49,3 +49,11 @@ The intake payload includes `project_id`, `board_id`, `image_id`, `content_sha25
 F1.1 supports legacy intake metadata where old `side=detail` and no `capture_type` means `side=unknown`, `capture_type=close_up`. The current UI does not emit this legacy shape. Unknown `capture_type` is valid for creating a project draft but cannot enter `collect_photos()` until the backend accepts it or the user classifies the image. No silent default is applied.
 
 The generated `ProjectContext` is session-local; it is not durable storage and does not invoke diagnosis. **입력 수정** removes the current draft/analysis state while retaining editable inputs. **새 프로젝트** clears current project inputs and namespaced widget state but leaves any unrelated or persisted data untouched. The legacy demo remains reachable and the existing UI remains the default when the feature flag is unset.
+
+## F2 workbench contract
+
+The `CIRCUITCARE_UI_V2=1` flow now records a PCB-first workbench screen after intake. `SelectionState` is scoped to the active `project_id` and carries `board_id`, active tab, and active photo. The viewer uses the decoded original photo independently from display sizing; image coordinates remain the source frame and are not transformed into a canonical board frame in F2. Zoom is a view-only operation. No photo registration, component detection, electrical connectivity, diagnosis, or overlay is run.
+
+The Phase 21.2 boundary is represented by `frontend.photo_adapter.adapt_component_map_input()` without importing backend modules on the frontend branch. Current mappings are `front → TOP`, `back → BOTTOM`, `full_view → OVERVIEW`, `close_up → CLOSEUP`, and `oblique → ANGLED`. `unknown` side/capture and `marking_detail` return `UNSUPPORTED`. `full_view` never becomes `REFERENCE`; the backend requires explicit reference-selection policy. `frontend_photo_id` and content SHA-256 are retained because backend-generated `photo_id` may differ. Calling the backend service and rendering a canonical map are deferred to F3.
+
+The F2 schematic tab renders only data that is present. A KiCad XML Netlist is connectivity data and does not imply an original drawing layout. `.kicad_sch` uploads are identified as available source material, but the existing schematic renderer is not connected to this intake-only workbench yet.

@@ -23,3 +23,9 @@ Current UI work can proceed using frontend-owned models and an explicit demo-onl
 6. Confirm project and board persistence/identity semantics. F1.1 IDs and image bytes are session-local and do not provide durable storage.
 
 These are integration requests for later phases. F1.1 only creates/validates intake records and exercises the metadata adapter; it does not call registration, component detection, topology reconstruction or diagnosis.
+
+## F2 / Phase 21.2 adapter boundary
+
+The latest `origin/main` adds `MultiImageComponentMapService.ingest/build_map/fault_overlay` and `PhotoInput`. The frontend keeps this optional and does not import backend code on its own branch. F2 defines a local request DTO and conservative mappings: `front/back → TOP/BOTTOM`; `full_view/close_up/oblique → OVERVIEW/CLOSEUP/ANGLED`. `unknown` and `marking_detail` are withheld, and `full_view` is not promoted to `REFERENCE`. Preserve `frontend_photo_id`, content hash and board ID because backend `photo_id` is derived independently.
+
+F3 should add a service adapter on a branch containing the backend interface, call bounded ingest/map APIs, persist the frontend↔backend photo-ID map, and display only returned per-photo/canonical artifacts with registration provenance. The F2 workbench displays one original photo at a time and labels registration as not run. Backend detection without a configured model yields no detections; do not substitute mock boxes. Canonical mosaics, component overlays and fault overlays are not part of F2.

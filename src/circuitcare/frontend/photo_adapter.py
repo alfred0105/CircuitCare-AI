@@ -34,6 +34,26 @@ class PhotoAdapterResult:
     legacy_converted: bool = False
 
 
+@dataclass(frozen=True)
+class ComponentMapPhotoInput:
+    """Stable frontend-owned request DTO for the optional Phase 21.2 service."""
+
+    board_id: str
+    frontend_photo_id: str
+    content_sha256: str
+    side: Literal["TOP", "BOTTOM"]
+    role: Literal["OVERVIEW", "CLOSEUP", "ANGLED"]
+    data: bytes
+    name: str
+
+
+@dataclass(frozen=True)
+class ComponentMapAdapterResult:
+    status: Literal["READY", "UNSUPPORTED"]
+    request: ComponentMapPhotoInput | None
+    reason: str | None = None
+
+
 def normalize_photo_metadata(value: ImageRecord | Mapping[str, Any]) -> tuple[ImageRecord, bool]:
     """Normalize current and legacy intake records without guessing unspecified values."""
     if isinstance(value, ImageRecord):
@@ -125,3 +145,30 @@ def adapt_photo_record(
         BackendPhotoInput(project_id, board_id, image.image_id, image.content_sha256, record),
         legacy_converted=legacy_converted,
     )
+
+
+def adapt_component_map_input(
+    metadata: ImageRecord | Mapping[str, Any], *, board_id: str, data: bytes,
+) -> ComponentMapAdapterResult:
+    """Map known F1.1 axes to Phase 21.2 enum values without guessing reference roles."""
+    image, _ = normalize_photo_metadata(metadata)
+    if not board_id or not image.image_id or not image.content_sha256:
+        raise ValueError("사진 매핑 요청에는 board_id, image_id 및 SHA-256이 필요합니다.")
+    if not re.fullmatch(r"[0-9a-f]{64}", image.content_sha256):
+        raise ValueError("원본 콘텐츠 SHA-256 형식이 올바르지 않습니다.")
+    if not isinstance(data, bytes) or not data:
+        raise ValueError("사진 원본 바이트가 필요합니다.")
+    side = {"front": "TOP", "back": "BOTTOM"}.get(image.side)
+    role = {
+        "full_view": "OVERVIEW", "close_up": "CLOSEUP", "oblique": "ANGLED",
+    }.get(image.capture_type)
+    if side is None or role is None:
+        return ComponentMapAdapterResult(
+            "UNSUPPORTED", None,
+            "미지정 촬영면·유형 또는 부품 표기는 자동 매핑되지 않습니다.",
+        )
+    return ComponentMapAdapterResult("READY", ComponentMapPhotoInput(
+        board_id=board_id, frontend_photo_id=image.image_id,
+        content_sha256=image.content_sha256, side=side, role=role,
+        data=data, name=image.filename or image.image_id,
+    ))

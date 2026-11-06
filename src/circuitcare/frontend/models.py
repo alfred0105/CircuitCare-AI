@@ -74,4 +74,6 @@ class SelectionState:
     selected_component: str | None = None
     selected_probe: str | None = None
     active_tab: Literal["pcb", "schematic"] = "pcb"
+    active_photo_id: str | None = None
+    analysis_context_id: str | None = None
 

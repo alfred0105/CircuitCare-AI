@@ -5,7 +5,9 @@ import pytest
 from PIL import Image
 
 from circuitcare.frontend.intake import add_image_batch, create_project_context
-from circuitcare.frontend.photo_adapter import adapt_photo_record, normalize_photo_metadata
+from circuitcare.frontend.photo_adapter import (
+    adapt_component_map_input, adapt_photo_record, normalize_photo_metadata,
+)
 
 
 def photo(**overrides):
@@ -112,3 +114,36 @@ def test_same_content_has_stable_hash_but_distinct_photo_record_ids_across_proje
     assert project_one.input_fingerprint != project_two.input_fingerprint
     assert project_one.project_id != project_two.project_id
     assert project_one.board_id != project_two.board_id
+
+
+@pytest.mark.parametrize(
+    "side,capture_type,backend_side,backend_role",
+    [("front", "full_view", "TOP", "OVERVIEW"), ("back", "close_up", "BOTTOM", "CLOSEUP"),
+     ("front", "oblique", "TOP", "ANGLED")],
+)
+def test_phase21_2_contract_mapping_preserves_frontend_identity_and_hash(
+    side, capture_type, backend_side, backend_role,
+):
+    raw = png_bytes()
+    result = adapt_component_map_input(
+        photo(side=side, capture_type=capture_type), board_id="board-7", data=raw,
+    )
+    assert result.status == "READY"
+    assert result.request.board_id == "board-7"
+    assert result.request.frontend_photo_id == "photo-record-1"
+    assert result.request.content_sha256 == "a" * 64
+    assert result.request.side == backend_side
+    assert result.request.role == backend_role
+    assert result.request.data == raw
+
+
+@pytest.mark.parametrize(
+    "side,capture_type", [("unknown", "full_view"), ("front", "unknown"),
+                          ("front", "marking_detail")],
+)
+def test_phase21_2_adapter_withholds_unknown_and_unmapped_values(side, capture_type):
+    result = adapt_component_map_input(
+        photo(side=side, capture_type=capture_type), board_id="board-7", data=png_bytes(),
+    )
+    assert result.status == "UNSUPPORTED"
+    assert result.request is None

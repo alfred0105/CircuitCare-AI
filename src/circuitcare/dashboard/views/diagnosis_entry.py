@@ -26,6 +26,7 @@ from circuitcare.frontend.state import (
     draft_is_current,
     reset_intake_for_new_project,
 )
+from circuitcare.frontend.workbench_state import SCREEN_KEY, enter_workbench
 from circuitcare.vision.image_loader import load_board_image
 
 
@@ -261,12 +262,17 @@ def render_diagnosis_entry(st: Any) -> str | None:
                     images=state[INTAKE_IMAGES_KEY], symptom_category=category_code,
                     symptom_description=description,
                     circuit_source=state.get("circuitcare_v2_circuit_source"),
+                    project_id=state.get("circuitcare_v2_edit_project_id"),
+                    board_id=state.get("circuitcare_v2_edit_board_id"),
                 )
             except ValueError as exc:
                 st.error(str(exc))
             else:
                 state[INTAKE_PROJECT_KEY] = project
                 state["circuitcare_v2_analysis_status"] = "NOT_RUN"
+                state.pop("circuitcare_v2_edit_project_id", None)
+                state.pop("circuitcare_v2_edit_board_id", None)
+                enter_workbench(state, project)
                 st.rerun()
 
         if st.button("예제 회로 체험", use_container_width=True, key="cc_v2_demo"):
