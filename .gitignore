@@ -4,6 +4,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .venv/
+.venv-component-train/
 venv/
 dist/
 build/
@@ -40,3 +41,11 @@ data/schematic_equivalence_cache/
 models/*.pt
 models/*.onnx
 reports/
+data/component_training/raw/
+data/component_training/processed/
+data/component_training/manifests/private/
+data/component_training/splits/
+data/component_training/runs/
+data/component_training/checkpoints/
+data/component_training/reports/
+/yolov8n.pt
