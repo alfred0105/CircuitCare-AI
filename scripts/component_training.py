@@ -103,7 +103,8 @@ def _dataset_fingerprint(data_yaml: Path) -> tuple[str, list[str]]:
 
 
 def _new_experiment(data: Path, profile: str, resume: Path | None = None, epochs: int | None = None,
-                   init_weights: Path | None = None):
+                   init_weights: Path | None = None, model_override: str | None = None,
+                   seed: int = 21, patience: int = 20, workers: int = 0):
     import psutil
     import torch
     from ultralytics import __version__ as ultra_version
@@ -118,7 +119,11 @@ def _new_experiment(data: Path, profile: str, resume: Path | None = None, epochs
         "expanded": dict(model="yolov8n.pt", imgsz=640, batch=2, epochs=100),
         "highres": dict(model="yolov8n.pt", imgsz=960, batch=1, epochs=80),
     }
-    cfg = profiles[profile]
+    cfg = dict(profiles[profile])
+    if model_override:
+        cfg["model"] = model_override
+    if workers < 0 or patience < 0:
+        raise ValueError("workers and patience must be non-negative")
     if epochs is not None:
         if epochs < 1 or epochs > 1000:
             raise ValueError("epochs must be between 1 and 1000")
@@ -155,8 +160,9 @@ def _new_experiment(data: Path, profile: str, resume: Path | None = None, epochs
                     "data_yaml_sha256": _hash(data), "dataset_sha256": dataset_hash,
                     "dataset_image_count": len(dataset_files), "device": device, "mps_probe": mps,
                     "python": sys.version, "platform": platform.platform(), "machine": platform.machine(),
-                    "torch": torch.__version__, "ultralytics": ultra_version, "seed": 21,
+                    "torch": torch.__version__, "ultralytics": ultra_version, "seed": seed,
                     "imgsz": cfg["imgsz"], "batch_initial": cfg["batch"], "epochs": cfg["epochs"],
+                    "patience": patience, "workers": workers,
                     "started_utc": datetime.now(timezone.utc).isoformat(), "memory_start_gib": psutil.virtual_memory().available / 2**30}
         (out / "experiment.json").write_text(json.dumps(metadata, indent=2))
     model = YOLO(str(resume or init_weights) if (resume or init_weights) else cfg["model"])
@@ -187,8 +193,8 @@ def _new_experiment(data: Path, profile: str, resume: Path | None = None, epochs
     while True:
         try:
             model.train(data=str(data.resolve()), imgsz=cfg["imgsz"], batch=effective_batch,
-                        epochs=cfg["epochs"], workers=0, device=device, amp=False, seed=21,
-                        patience=20, project=str(project), name=run_id, exist_ok=True, resume=bool(resume),
+                        epochs=cfg["epochs"], workers=workers, device=device, amp=False, seed=seed,
+                        patience=patience, project=str(project), name=run_id, exist_ok=True, resume=bool(resume),
                         save=True, save_period=5, cache=False, plots=True, verbose=True)
             break
         except (RuntimeError, MemoryError) as exc:
@@ -279,12 +285,17 @@ def main():
     p.add_argument("--resume", type=Path, help="resume from an existing Ultralytics checkpoint")
     p.add_argument("--init-weights", type=Path, help="start a new run from prior weights with a fresh optimizer")
     p.add_argument("--epochs", type=int, help="override profile epoch count (for controlled short runs)")
+    p.add_argument("--model", help="override profile model, for example yolov8s.pt")
+    p.add_argument("--seed", type=int, default=21)
+    p.add_argument("--patience", type=int, default=20)
+    p.add_argument("--workers", type=int, default=0)
     p = subs.add_parser("export"); p.add_argument("--weights", type=Path, required=True)
     p.add_argument("--imgsz", type=int, default=640); p.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.command == "doctor": return doctor()
     if args.command == "smoke": return smoke(args.data)
-    if args.command == "train": return _new_experiment(args.data, args.profile, args.resume, args.epochs, args.init_weights)
+    if args.command == "train": return _new_experiment(args.data, args.profile, args.resume, args.epochs,
+        args.init_weights, args.model, args.seed, args.patience, args.workers)
     if args.command == "export":
         from ultralytics import YOLO
         from ultralytics import __version__ as version

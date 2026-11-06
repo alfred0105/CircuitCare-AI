@@ -49,3 +49,5 @@ data/component_training/runs/
 data/component_training/checkpoints/
 data/component_training/reports/
 /yolov8n.pt
+
+/yolov8s.pt
