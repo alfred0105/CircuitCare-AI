@@ -141,7 +141,10 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
                   image_size_px: tuple[int, int], scale_range: tuple[float, float] = (1.0, 80.0),
                   scale_peak_count: int = 4, scale_tolerance: float = 0.015,
                   match_tolerance_px: float | None = None,
-                  ransac_threshold_px: float = 2.0) -> AutomaticMatchResult:
+                  ransac_threshold_px: float = 2.0,
+                  max_pair_products: int = 1_000_000,
+                  max_hypotheses: int = 120_000,
+                  timeout_seconds: float = 20.0) -> AutomaticMatchResult:
     """Search pair-distance consensus, score similarity/mirror hypotheses, then affine-RANSAC refine.
 
     The design anchors participate in correspondence matching. This is therefore
@@ -154,6 +157,20 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
         raise ValueError("Design anchor IDs must be unique")
     if len({anchor.anchor_id for anchor in image}) != len(image):
         raise ValueError("Image anchor IDs must be unique")
+    if (max_pair_products < 1 or max_hypotheses < 1
+            or not math.isfinite(timeout_seconds) or timeout_seconds <= 0):
+        raise ValueError("Matching resource budgets must be positive and finite")
+    if (not (0 < scale_range[0] < scale_range[1])
+            or not all(math.isfinite(value) for value in scale_range)
+            or scale_peak_count < 1 or not 0 < scale_tolerance < 1
+            or ransac_threshold_px <= 0 or not math.isfinite(ransac_threshold_px)
+            or match_tolerance_px is not None and
+               (match_tolerance_px <= 0 or not math.isfinite(match_tolerance_px))):
+        raise ValueError("Invalid matching geometry configuration")
+    d_pair_count = len(design) * (len(design) - 1) // 2
+    i_pair_count = len(image) * (len(image) - 1) // 2
+    if d_pair_count * i_pair_count > max_pair_products:
+        return _failure(design, image, started, "RESOURCE_LIMIT_PAIR_PRODUCTS")
     src = np.asarray([[item.x_mm, item.y_mm] for item in design], dtype=np.float64)
     dst = np.asarray([item.center_px for item in image], dtype=np.float64)
     width, height = image_size_px
@@ -175,8 +192,12 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
     scales = [math.exp((edges[index] + edges[index + 1]) * 0.5) for index in peak_indices]
     candidates: list[tuple[tuple[int, float, float], np.ndarray, list[tuple[int, int, float]], str]] = []
     candidate_transform_count = 0
+    hypotheses_examined = 0
     for scale in scales:
         for (si, sj), source_distance in zip(d_pairs, d_dist):
+            if time.perf_counter() - started >= timeout_seconds:
+                return _failure(design, image, started, "RESOURCE_LIMIT_TIMEOUT",
+                                candidate_transform_count=candidate_transform_count)
             possible = np.flatnonzero(np.abs(i_dist - source_distance * scale)
                                       <= source_distance * scale * scale_tolerance)
             for target_pair_index in possible:
@@ -195,6 +216,13 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
                     target_axis = target_vector / target_length
                     target_normal = np.array([-target_axis[1], target_axis[0]])
                     for handedness in (1.0, -1.0):
+                        if hypotheses_examined >= max_hypotheses:
+                            return _failure(design, image, started, "RESOURCE_LIMIT_HYPOTHESES",
+                                            candidate_transform_count=candidate_transform_count)
+                        if time.perf_counter() - started >= timeout_seconds:
+                            return _failure(design, image, started, "RESOURCE_LIMIT_TIMEOUT",
+                                            candidate_transform_count=candidate_transform_count)
+                        hypotheses_examined += 1
                         basis = np.column_stack((target_axis, handedness * target_normal)) @ np.column_stack((source_axis, source_normal)).T
                         matrix = basis * (target_length / source_length)
                         translation = dst[first] - matrix @ src[si]
