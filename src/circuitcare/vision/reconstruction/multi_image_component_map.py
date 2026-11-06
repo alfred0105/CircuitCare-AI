@@ -8,8 +8,10 @@ reviewed; no electrical connectivity is created here.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import math
+import os
 import time
 import base64
 from dataclasses import dataclass, field
@@ -23,6 +25,7 @@ from PIL import Image
 
 from circuitcare.vision.board_detector import detect_board_candidates
 from circuitcare.vision.component_detector import detect_components
+from circuitcare.vision.detector_backend import DetectorUnavailable
 from circuitcare.vision.image_loader import ImageLoadError, load_board_image
 from circuitcare.vision.perspective import rectify_board
 from circuitcare.vision.reconstruction.multiview_registration import register_same_side
@@ -58,6 +61,9 @@ class ImageBudget:
                 self.max_canvas_pixels)
         if any(value < 1 for value in ints) or not math.isfinite(self.max_runtime_seconds) or self.max_runtime_seconds <= 0:
             raise ValueError("image budgets must be positive")
+        if (self.max_canvas_edge < self.max_decoded_edge
+                or self.max_canvas_pixels < self.max_decoded_edge * self.max_decoded_edge):
+            raise ValueError("canvas limits must accommodate a single maximum-size decoded image")
 
 
 @dataclass(frozen=True)
@@ -76,6 +82,7 @@ class PhotoAsset:
     side: str
     role: str
     name: str
+    legacy_photo_id: str
     original_size_px: tuple[int, int]
     processed_size_px: tuple[int, int]
     decoded_size_px: tuple[int, int]
@@ -84,14 +91,16 @@ class PhotoAsset:
     original_bytes: bytes = field(repr=False)
     duplicate_of: str | None = None
     rectification: dict[str, Any] | None = None
+    coordinate_transforms: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {"photo_id": self.photo_id, "sha256": self.sha256, "side": self.side,
                 "role": self.role, "name": self.name, "original_size_px": list(self.original_size_px),
+                "legacy_photo_id": self.legacy_photo_id,
                 "processed_size_px": list(self.processed_size_px), "decoded_size_px": list(self.decoded_size_px),
                 "image_format": self.image_format,
                 "duplicate_of": self.duplicate_of, "original_preserved": True,
-                "rectification": self.rectification}
+                "rectification": self.rectification, "coordinate_transforms": self.coordinate_transforms}
 
 
 @dataclass
@@ -149,6 +158,7 @@ class MultiImageComponentMapService:
         if not values or len(values) > self.budget.max_images:
             raise MultiImageError("IMAGE_COUNT_LIMIT", f"Provide 1 to {self.budget.max_images} photos")
         seen: dict[str, str] = {}
+        photo_key_counts: dict[str, int] = {}
         assets: list[PhotoAsset] = []
         total_pixels = 0
         total_bytes = 0
@@ -171,25 +181,52 @@ class MultiImageComponentMapService:
                                           max_edge=self.budget.max_decoded_edge)
             except ImageLoadError as exc:
                 raise MultiImageError("INVALID_IMAGE", str(exc)) from exc
+            encoded_size, exif_orientation = _encoded_image_info(raw)
             total_pixels += loaded.original_size[0] * loaded.original_size[1]
             if total_pixels > self.budget.max_total_pixels:
                 raise MultiImageError("TOTAL_PIXEL_LIMIT", "Session exceeds total original image pixel budget")
-            photo_id = "photo_" + hashlib.sha256(
+            stable_name = Path(str(item.name)).name
+            photo_key = hashlib.sha256(
+                f"{board_id}|{side}|{role}|{stable_name}|{loaded.sha256}".encode()).hexdigest()[:16]
+            occurrence = photo_key_counts.get(photo_key, 0)
+            photo_key_counts[photo_key] = occurrence + 1
+            photo_id = f"photo_{photo_key}" + (f"_dup{occurrence}" if occurrence else "")
+            legacy_photo_id = "photo_" + hashlib.sha256(
                 f"{board_id}|{side}|{role}|{item.name}|{index}|{loaded.sha256}".encode()).hexdigest()[:16]
-            asset = PhotoAsset(photo_id, loaded.sha256, side, role, str(item.name),
+            asset = PhotoAsset(photo_id, loaded.sha256, side, role, str(item.name), legacy_photo_id,
                                loaded.original_size, loaded.processed_size, loaded.processed_size, loaded.format,
                                loaded.image.copy(), raw, seen.get(loaded.sha256))
+            asset.coordinate_transforms = {
+                "encoded_image_frame": "IMAGE_FILE_PIXEL",
+                "encoded_size_px": list(encoded_size),
+                "exif_orientation": exif_orientation,
+                "encoded_to_exif_corrected": _exif_orientation_matrix(exif_orientation, encoded_size).tolist(),
+                "exif_corrected_frame": "EXIF_CORRECTED_IMAGE_PIXEL",
+                "exif_corrected_size_px": list(loaded.original_size),
+                "exif_corrected_to_decoded": [[loaded.scale_xy[0], 0.0, 0.0],
+                                                [0.0, loaded.scale_xy[1], 0.0], [0.0, 0.0, 1.0]],
+                "decoded_frame": "DOWNSCALED_IMAGE_PIXEL",
+                "decoded_size_px": list(loaded.processed_size),
+                "decoded_to_rectified": np.eye(3).tolist(),
+            }
             if item.rectification_corners_px is not None:
-                asset = self._rectify_asset(asset, item.rectification_corners_px)
+                asset = self._rectify_asset(asset, item.rectification_corners_px, method="USER_SUPPLIED_BOARD_CORNERS")
+            else:
+                asset = self._try_auto_rectification(asset)
             seen.setdefault(loaded.sha256, photo_id)
             assets.append(asset)
         return PCBPhotoSession(board_id.strip(), assets, time.time(), self.budget)
 
     def build_map(self, session: PCBPhotoSession, *, detector: Callable[[Any], dict[str, Any]] | None = None,
-                  model_path: str | Path | None = None) -> dict[str, Any]:
+                  model_path: str | Path | None = None,
+                  previous_component_map: dict[str, Any] | str | Path | None = None,
+                  confirmed_identity_by_observation_id: dict[str, str] | None = None) -> dict[str, Any]:
         started = time.perf_counter()
         if not session.photos:
             raise MultiImageError("EMPTY_SESSION", "No photos are available")
+        previous = _load_previous_map(previous_component_map)
+        if previous and previous.get("board_id") != session.board_id:
+            raise MultiImageError("PREVIOUS_MAP_BOARD_MISMATCH", "Previous component map belongs to another board")
         sides: dict[str, list[PhotoAsset]] = {side.value: [p for p in session.photos if p.side == side.value]
                                               for side in BoardSide}
         side_maps = {}
@@ -197,27 +234,96 @@ class MultiImageComponentMapService:
             if photos:
                 if time.perf_counter() - started > session.budget.max_runtime_seconds:
                     raise MultiImageError("TIMEOUT", "Multi-image processing exceeded its time budget")
+                previous_side = (previous or {}).get("sides", {}).get(side, {})
+                if previous_side:
+                    previous_side = {**previous_side, "_previous_photos": (previous or {}).get("photos", [])}
                 side_maps[side] = self._build_side(session.board_id, side, photos, detector, model_path,
-                                                   started, session.budget)
+                    started, session.budget, previous_side=previous_side,
+                    confirmed_identity_by_observation_id=confirmed_identity_by_observation_id or {})
+        registration_by_photo = {item["photo_id"]: item for side_map in side_maps.values()
+                                 for item in side_map["registrations"]}
+        photo_records = []
+        for photo in session.photos:
+            record = photo.to_dict()
+            registration = registration_by_photo.get(photo.photo_id)
+            transform = registration.get("transform_moving_to_canonical") if registration else None
+            if transform:
+                image_to_canonical = np.asarray(transform, dtype=np.float64)
+                decoded_to_rectified = np.asarray(photo.coordinate_transforms["decoded_to_rectified"], dtype=np.float64)
+                exif_to_decoded = np.asarray(photo.coordinate_transforms["exif_corrected_to_decoded"], dtype=np.float64)
+                encoded_to_exif = np.asarray(photo.coordinate_transforms["encoded_to_exif_corrected"], dtype=np.float64)
+                chain = record["coordinate_transforms"]
+                chain["processed_to_canonical"] = image_to_canonical.tolist()
+                chain["decoded_to_canonical"] = (image_to_canonical @ decoded_to_rectified).tolist()
+                chain["exif_corrected_to_canonical"] = (image_to_canonical @ decoded_to_rectified @ exif_to_decoded).tolist()
+                chain["encoded_to_canonical"] = (
+                    image_to_canonical @ decoded_to_rectified @ exif_to_decoded @ encoded_to_exif).tolist()
+            else:
+                record["coordinate_transforms"]["processed_to_canonical"] = None
+                record["coordinate_transforms"]["encoded_to_canonical"] = None
+            photo_records.append(record)
         return {"schema_version": self.SCHEMA_VERSION, "board_id": session.board_id,
                 "created_at_epoch": session.created_at_epoch, "processing_status": "PARTIAL_MAP_READY",
                 "design_registration": {"status": "NOT_RUN_SEPARATE_FROM_PHOTO_REGISTRATION"},
                 "sides": side_maps,
-                "photos": [p.to_dict() for p in session.photos],
+                "identity_manifests": {side: value["identity_manifest"] for side, value in side_maps.items()},
+                "photos": photo_records,
                 "resource_limits": session.budget.__dict__.copy(),
                 "runtime_seconds": time.perf_counter() - started,
                 "electrical_connectivity": "NOT_INFERRED_FROM_PHOTOS"}
 
-    def _rectify_asset(self, photo: PhotoAsset, corners: Any) -> PhotoAsset:
+    def _try_auto_rectification(self, photo: PhotoAsset) -> PhotoAsset:
         try:
-            result = rectify_board(photo.image, corners, max_output_edge=self.budget.max_decoded_edge)
+            result = detect_board_candidates(photo.image, max_candidates=3)
+            candidates = result.get("candidates", [])
+            if not candidates:
+                photo.rectification = {"status": "RECTIFICATION_UNVERIFIED", "reason": "NO_BOARD_BOUNDARY_CANDIDATE",
+                                       "source_to_rectified": None, "confidence_diagnostics": result}
+                return photo
+            top = candidates[0]
+            second_area = float(candidates[1]["area_px"]) if len(candidates) > 1 else 0.0
+            clear_margin = second_area <= 0 or float(top["area_px"]) >= second_area * 1.35
+            corners = np.asarray(top.get("corners_px", []), dtype=np.float64).reshape(-1, 2)
+            width, height = photo.image.size
+            edge_margin = min(width, height) * 0.015
+            touches_frame = (corners.shape != (4, 2) or np.any(corners[:, 0] <= edge_margin)
+                             or np.any(corners[:, 0] >= width - 1 - edge_margin)
+                             or np.any(corners[:, 1] <= edge_margin)
+                             or np.any(corners[:, 1] >= height - 1 - edge_margin))
+            if touches_frame or float(top.get("area_ratio", 0.0)) < 0.15 or not clear_margin:
+                photo.rectification = {"status": "RECTIFICATION_UNVERIFIED",
+                    "reason": "BOUNDARY_TOUCHES_IMAGE_FRAME" if touches_frame else "AMBIGUOUS_OR_SMALL_BOARD_BOUNDARY",
+                    "source_to_rectified": None,
+                    "confidence_diagnostics": {"candidate_count": len(candidates),
+                                                "top_area_ratio": top.get("area_ratio"),
+                                                "second_area_px": second_area,
+                                                "image_size_px": [width, height]}}
+                return photo
+            return self._rectify_asset(photo, top["corners_px"],
+                method="AUTO_UNIQUE_LARGE_BOUNDARY_CANDIDATE",
+                diagnostics={"candidate_count": len(candidates), "area_ratio": top.get("area_ratio"),
+                             "runner_up_area_px": second_area})
+        except (ValueError, cv2.error) as exc:
+            photo.rectification = {"status": "RECTIFICATION_UNVERIFIED", "reason": str(exc),
+                                   "source_to_rectified": None}
+            return photo
+
+    def _rectify_asset(self, photo: PhotoAsset, corners: Any, *, method: str,
+                       diagnostics: dict[str, Any] | None = None) -> PhotoAsset:
+        try:
+            output_edge = min(self.budget.max_decoded_edge, max(photo.image.size))
+            result = rectify_board(photo.image, corners, max_output_edge=max(64, output_edge))
             photo.rectification = {"status": "RECTIFIED_CANDIDATE_NOT_PHYSICALLY_VALIDATED",
                                    "source_to_rectified": result["transform_matrix"],
                                    "output_size_px": result["output_size_px"],
-                                   "confidence_diagnostics": {"method": "USER_SUPPLIED_BOARD_CORNERS",
+                                   "confidence_diagnostics": {"method": method,
+                                                               "boundary": diagnostics,
                                                                "physical_dimensions_known": False}}
             photo.image = result["image"]
             photo.processed_size_px = tuple(result["output_size_px"])
+            photo.coordinate_transforms["decoded_to_rectified"] = result["transform_matrix"]
+            photo.coordinate_transforms["processed_frame"] = "RECTIFIED_IMAGE_PIXEL"
+            photo.coordinate_transforms["rectified_size_px"] = result["output_size_px"]
         except (ValueError, cv2.error) as exc:
             photo.rectification = {"status": "RECTIFICATION_FAILED_KEEP_ORIGINAL", "reason": str(exc),
                                    "source_to_rectified": None}
@@ -225,7 +331,8 @@ class MultiImageComponentMapService:
 
     def _build_side(self, board_id: str, side: str, photos: list[PhotoAsset],
                     detector: Callable[[Any], dict[str, Any]] | None, model_path: str | Path | None,
-                    started: float, budget: ImageBudget) -> dict[str, Any]:
+                    started: float, budget: ImageBudget, *, previous_side: dict[str, Any],
+                    confirmed_identity_by_observation_id: dict[str, str]) -> dict[str, Any]:
         unique = []
         duplicate_records = {}
         known_sha: dict[str, str] = {}
@@ -235,9 +342,18 @@ class MultiImageComponentMapService:
             else:
                 unique.append(photo)
                 known_sha[photo.sha256] = photo.photo_id
-        reference = min(unique, key=lambda p: (0 if p.role == CaptureRole.REFERENCE.value else
+        prior_reference_id = _previous_reference_id(previous_side)
+        reference = next((photo for photo in unique
+                          if prior_reference_id in {photo.photo_id, photo.legacy_photo_id}), None)
+        reference = reference or min(unique, key=lambda p: (0 if p.role == CaptureRole.REFERENCE.value else
                                                1 if p.role == CaptureRole.OVERVIEW.value else 2,
                                                -p.image.width * p.image.height, p.sha256))
+        previous_ref_photo = next((photo for photo in (previous_side.get("_previous_photos") or [])
+                                   if photo.get("photo_id") == prior_reference_id), None)
+        previous_rectification = (previous_side.get("canonical_image", {}).get("reference_rectification_matrix")
+                                  or ((previous_ref_photo or {}).get("rectification") or {}).get("source_to_rectified"))
+        current_rectification = (reference.rectification or {}).get("source_to_rectified")
+        rectification_compatible = _same_matrix(previous_rectification, current_rectification)
         registrations: dict[str, RegistrationRecord] = {
             reference.photo_id: RegistrationRecord(reference.photo_id, side, reference.photo_id,
                 "REFERENCE", "IDENTITY", tuple(tuple(float(x) for x in row) for row in np.eye(3)))
@@ -263,9 +379,10 @@ class MultiImageComponentMapService:
             registrations[duplicate_id] = RegistrationRecord(duplicate_id, side, reference.photo_id,
                 "DUPLICATE_SKIPPED", "SHA256_DUPLICATE", registrations[original_id].transform_moving_to_canonical)
 
-        mosaic, source_map, canvas_origin, included_ids = _make_mosaic(reference, unique, registrations, budget)
+        mosaic, source_map, canvas_origin, included_ids, mosaic_metrics = _make_mosaic(
+            reference, unique, registrations, budget)
         for photo_id, record in list(registrations.items()):
-            if photo_id not in included_ids and record.status not in {"DUPLICATE_SKIPPED"}:
+            if photo_id not in included_ids and record.status in {"REFERENCE", "REGISTERED_CANDIDATE"}:
                 registrations[photo_id] = RegistrationRecord(photo_id, side, reference.photo_id,
                     "UNREGISTERED", record.method, None, record.candidate_matches, record.inlier_count,
                     record.inlier_ratio, record.rmse_px, record.overlap_ratio,
@@ -294,22 +411,57 @@ class MultiImageComponentMapService:
                 if transform is None or registrations[photo.photo_id].status not in {"REFERENCE", "REGISTERED_CANDIDATE"}:
                     continue
                 for detection in detection_result.get("detections", []):
-                    observations.append(_map_detection(detection, photo, np.asarray(transform), (0, 0)))
+                    observations.append(_map_detection(detection, photo, np.asarray(transform), (0, 0),
+                                                        registrations[photo.photo_id]))
+            except DetectorUnavailable as exc:
+                detector_status = "BLOCKED_MODEL_UNAVAILABLE" if model_path else "DETECTOR_ERROR"
+                observations.append({"photo_id": photo.photo_id, "error": str(exc), "status": detector_status})
             except (ValueError, OSError, RuntimeError, cv2.error) as exc:
                 detector_status = "DETECTOR_ERROR"
                 observations.append({"photo_id": photo.photo_id, "error": str(exc), "status": "DETECTION_FAILED"})
-        components = _fuse_observations(board_id, side, observations)
+        components, identity_mappings = _fuse_observations(
+            board_id, side, observations, previous_side=previous_side,
+            confirmed_identity_by_observation_id=confirmed_identity_by_observation_id,
+            previous_canvas_origin=previous_side.get("canonical_image", {}).get("canvas_origin_in_reference_px"),
+            current_canvas_origin=canvas_origin,
+            previous_reference_id=prior_reference_id,
+            current_reference_id=reference.photo_id,
+            previous_frame_compatible=(prior_reference_id in {reference.photo_id, reference.legacy_photo_id}
+                                       and rectification_compatible))
         canonical_id = f"mosaic:{board_id}:{side}"
+        registration_records = []
+        photo_by_id = {photo.photo_id: photo for photo in photos}
+        for record in registrations.values():
+            serialized = record.to_dict()
+            source_photo = photo_by_id.get(record.photo_id)
+            serialized["source_coordinate_frame"] = (
+                (source_photo.coordinate_transforms.get("processed_frame")
+                 or source_photo.coordinate_transforms.get("decoded_frame"))
+                if source_photo else "IMAGE_PIXEL")
+            serialized["target_coordinate_frame"] = "MOSAIC_PIXEL"
+            serialized["matrix_direction"] = "SOURCE_TO_CANONICAL"
+            serialized["matrix_units"] = {"source": "px", "target": "px"}
+            registration_records.append(serialized)
         return {"board_id": board_id, "board_side": side,
                 "canonical_image": {"image_id": canonical_id, "coordinate_frame": "MOSAIC_PIXEL",
+                    "reference_photo_id": reference.photo_id,
+                    "reference_rectification_matrix": current_rectification,
                     "image_size_px": [int(mosaic.shape[1]), int(mosaic.shape[0])],
                     "canvas_origin_in_reference_px": list(canvas_origin),
                     "image_png_base64": _png_base64(mosaic),
                     "pixel_source_map_png_base64": _png_base64(source_map),
                     "pixel_source_map_values": {str(index + 1): photo.photo_id for index, photo in enumerate(unique)},
-                    "rectification_validation": "CANDIDATE_GEOMETRY_ONLY"},
-                "registrations": [record.to_dict() for record in registrations.values()],
+                    "rectification_validation": "CANDIDATE_GEOMETRY_ONLY",
+                    "coverage_metrics": mosaic_metrics},
+                "registrations": registration_records,
                 "components": components, "component_observations": observations,
+                "historical_component_id_mappings": identity_mappings,
+                "identity_manifest": {"schema_version": "circuitcare.component-identities.v1",
+                    "board_id": board_id, "board_side": side, "reference_photo_id": reference.photo_id,
+                    "canonical_coordinate_frame": "MOSAIC_PIXEL",
+                    "canonical_image": {"reference_photo_id": reference.photo_id,
+                        "canvas_origin_in_reference_px": list(canvas_origin),
+                        "reference_rectification_matrix": current_rectification}, "components": components},
                 "detection_status": detector_status,
                 "board_boundary_candidates": _board_boundary_records(unique, started, budget),
                 "functional_blocks": {"status": "NOT_EVALUATED", "candidates": []},
@@ -365,6 +517,33 @@ def _read_bytes(value: Any, limit: int) -> bytes:
     if not data or len(data) > limit:
         raise MultiImageError("FILE_SIZE_LIMIT", f"Image bytes must be between 1 and {limit}")
     return data
+
+
+def _encoded_image_info(raw: bytes) -> tuple[tuple[int, int], int]:
+    try:
+        with Image.open(io.BytesIO(raw)) as source:
+            width, height = source.size
+            orientation = int(source.getexif().get(274, 1))
+    except (OSError, ValueError) as exc:
+        raise MultiImageError("INVALID_IMAGE", f"Could not inspect EXIF image frame: {exc}") from exc
+    if orientation not in range(1, 9):
+        orientation = 1
+    return (int(width), int(height)), orientation
+
+
+def _exif_orientation_matrix(orientation: int, size: tuple[int, int]) -> np.ndarray:
+    width, height = size
+    matrices = {
+        1: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        2: [[-1, 0, width - 1], [0, 1, 0], [0, 0, 1]],
+        3: [[-1, 0, width - 1], [0, -1, height - 1], [0, 0, 1]],
+        4: [[1, 0, 0], [0, -1, height - 1], [0, 0, 1]],
+        5: [[0, 1, 0], [1, 0, 0], [0, 0, 1]],
+        6: [[0, -1, height - 1], [1, 0, 0], [0, 0, 1]],
+        7: [[0, -1, height - 1], [-1, 0, width - 1], [0, 0, 1]],
+        8: [[0, 1, 0], [-1, 0, width - 1], [0, 0, 1]],
+    }
+    return np.asarray(matrices[orientation], dtype=np.float64)
 
 
 def _validate_registration(photo: PhotoAsset, reference: PhotoAsset, result: Any) -> RegistrationRecord:
@@ -431,8 +610,11 @@ def _make_mosaic(reference: PhotoAsset, photos: list[PhotoAsset],
     max_x, max_y = np.ceil(points.max(axis=0)).astype(int)
     width, height = max_x - min_x + 1, max_y - min_y + 1
     if width <= 0 or height <= 0 or width > budget.max_canvas_edge or height > budget.max_canvas_edge or width * height > budget.max_canvas_pixels:
-        placements = [(reference, np.eye(3), np.array([[0, 0], [reference.image.width-1, 0],
-                        [reference.image.width-1, reference.image.height-1], [0, reference.image.height-1]], dtype=np.float32))]
+        reference_corners = np.array([[0, 0], [reference.image.width-1, 0],
+                                      [reference.image.width-1, reference.image.height-1],
+                                      [0, reference.image.height-1]], dtype=np.float32)
+        placements = [(reference, np.eye(3), reference_corners)]
+        all_points = reference_corners.tolist()
         min_x = min_y = 0
         width, height = reference.image.size
         # The reference itself is already capped by the intake pixel and edge budgets.
@@ -440,6 +622,9 @@ def _make_mosaic(reference: PhotoAsset, photos: list[PhotoAsset],
     mosaic = np.zeros((height, width, 3), dtype=np.uint8)
     sources = np.zeros((height, width), dtype=np.uint8)
     quality = np.full((height, width), -1.0, dtype=np.float32)
+    coverage_count = np.zeros((height, width), dtype=np.uint8)
+    overlap_pixel_count = 0
+    overlap_residuals = []
     for photo, matrix, _ in sorted(placements, key=lambda item: item[0].photo_id):
         transform = shift @ matrix
         array = np.asarray(photo.image.convert("RGB"))
@@ -450,8 +635,11 @@ def _make_mosaic(reference: PhotoAsset, photos: list[PhotoAsset],
         if np.any(overlap_mask):
             current_pixels = mosaic[overlap_mask].astype(np.int16)
             new_pixels = warped[overlap_mask].astype(np.int16)
+            overlap_pixel_count += int(np.count_nonzero(overlap_mask))
+            overlap_residuals.extend(np.mean(np.abs(current_pixels - new_pixels), axis=1)[::max(1, int(np.count_nonzero(overlap_mask)) // 2000)].tolist())
             channel_delta = np.median(current_pixels - new_pixels, axis=0)
             warped = np.clip(warped.astype(np.int16) + np.clip(channel_delta, -32, 32), 0, 255).astype(np.uint8)
+        coverage_count += mask.astype(np.uint8)
         gray = cv2.cvtColor(array, cv2.COLOR_RGB2GRAY)
         score = max(0.0, float(cv2.Laplacian(gray, cv2.CV_32F).var()))
         replace_mask = mask & (score > quality)
@@ -459,11 +647,32 @@ def _make_mosaic(reference: PhotoAsset, photos: list[PhotoAsset],
         photo_index = next(index for index, candidate in enumerate(photos) if candidate.photo_id == photo.photo_id)
         sources[replace_mask] = photo_index + 1
         quality[replace_mask] = score
-    return mosaic, sources, (int(min_x), int(min_y)), {photo.photo_id for photo, _, _ in placements}
+    valid_pixels = int(np.count_nonzero(coverage_count))
+    canvas_pixels = int(width * height)
+    footprint_hull = cv2.convexHull(np.asarray(all_points, dtype=np.float32)) if all_points else None
+    footprint_pixels = abs(float(cv2.contourArea(footprint_hull))) if footprint_hull is not None else 0.0
+    overlap_union = int(np.count_nonzero(coverage_count > 1))
+    assigned = {photo.photo_id: int(np.count_nonzero(sources == index + 1))
+                for index, photo in enumerate(photos)}
+    metrics = {"valid_pixel_count": valid_pixels, "canvas_pixel_count": canvas_pixels,
+               "valid_pixel_coverage_ratio": valid_pixels / canvas_pixels if canvas_pixels else 0.0,
+               "canvas_coverage_ratio": min(1.0, footprint_pixels / canvas_pixels) if canvas_pixels else 0.0,
+               "unobserved_pixel_count": canvas_pixels - valid_pixels,
+               "unobserved_area_ratio": (canvas_pixels - valid_pixels) / canvas_pixels if canvas_pixels else 0.0,
+               "overlap_union_pixel_count": overlap_union,
+               "overlap_union_ratio_to_canvas": overlap_union / canvas_pixels if canvas_pixels else 0.0,
+               "overlap_pixel_count_accumulated": overlap_pixel_count,
+               "source_contribution_pixels": assigned,
+               "source_contribution_ratio": {photo_id: count / valid_pixels if valid_pixels else 0.0
+                                              for photo_id, count in assigned.items()},
+               "overlap_photometric_residual_mean_abs_rgb": float(np.mean(overlap_residuals)) if overlap_residuals else None,
+               "ghosting_diagnostics": "NOT_EVALUATED_PARALLAX_AND_EDGE_ARTIFACT_GROUND_TRUTH_UNAVAILABLE"}
+    return mosaic, sources, (int(min_x), int(min_y)), {photo.photo_id for photo, _, _ in placements}, metrics
 
 
 def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
-                   matrix: np.ndarray, canvas_origin: tuple[int, int]) -> dict[str, Any]:
+                   matrix: np.ndarray, canvas_origin: tuple[int, int],
+                   registration: RegistrationRecord) -> dict[str, Any]:
     bbox = detection.get("bbox_xyxy") or detection.get("bbox")
     if bbox is None or len(bbox) != 4:
         return {"photo_id": photo.photo_id, "detection_id": detection.get("detection_id"),
@@ -478,13 +687,18 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
     mapped[:, 0] -= canvas_origin[0]
     mapped[:, 1] -= canvas_origin[1]
     min_xy, max_xy = mapped.min(axis=0), mapped.max(axis=0)
-    original_corners = corners.copy()
-    if photo.rectification and photo.rectification.get("source_to_rectified"):
-        inverse_rectification = np.linalg.inv(np.asarray(photo.rectification["source_to_rectified"], dtype=np.float64))
-        original_corners = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), inverse_rectification).reshape(-1, 2)
-    original_corners[:, 0] *= photo.original_size_px[0] / photo.decoded_size_px[0]
-    original_corners[:, 1] *= photo.original_size_px[1] / photo.decoded_size_px[1]
-    original_min, original_max = original_corners.min(axis=0), original_corners.max(axis=0)
+    transforms = photo.coordinate_transforms
+    decoded_to_rectified = np.asarray(transforms["decoded_to_rectified"], dtype=np.float64)
+    exif_corrected_to_decoded = np.asarray(transforms["exif_corrected_to_decoded"], dtype=np.float64)
+    encoded_to_exif_corrected = np.asarray(transforms["encoded_to_exif_corrected"], dtype=np.float64)
+    processed_to_exif_corrected = np.linalg.inv(decoded_to_rectified @ exif_corrected_to_decoded)
+    processed_to_encoded = np.linalg.inv(
+        decoded_to_rectified @ exif_corrected_to_decoded @ encoded_to_exif_corrected)
+    exif_corners = cv2.perspectiveTransform(corners.reshape(-1, 1, 2),
+                                            processed_to_exif_corrected).reshape(-1, 2)
+    encoded_corners = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), processed_to_encoded).reshape(-1, 2)
+    exif_min, exif_max = exif_corners.min(axis=0), exif_corners.max(axis=0)
+    encoded_min, encoded_max = encoded_corners.min(axis=0), encoded_corners.max(axis=0)
     confidence = detection.get("confidence")
     if confidence is not None:
         try:
@@ -493,20 +707,42 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
             confidence = None
         if confidence is not None and (not math.isfinite(confidence) or not 0 <= confidence <= 1):
             confidence = None
-    return {"photo_id": photo.photo_id, "detection_id": str(detection.get("detection_id") or "detection"),
+    detection_id = str(detection.get("detection_id") or "detection")
+    observation_id = "observation_" + hashlib.sha256(
+        f"{photo.photo_id}|{detection_id}|{detection.get('class_name', detection.get('predicted_class', 'unknown_component'))}".encode()
+    ).hexdigest()[:16]
+    return {"observation_id": observation_id, "photo_id": photo.photo_id, "detection_id": detection_id,
             "class_name": str(detection.get("class_name", detection.get("predicted_class", "unknown_component"))),
             "bbox_xyxy": [float(min_xy[0]), float(min_xy[1]), float(max_xy[0]), float(max_xy[1])],
             "polygon_xy": [[float(x), float(y)] for x, y in mapped],
             "processed_bbox_xyxy": [x1, y1, x2, y2],
-            "original_bbox_xyxy": [float(original_min[0]), float(original_min[1]),
-                                   float(original_max[0]), float(original_max[1])],
+            "original_bbox_xyxy": [float(exif_min[0]), float(exif_min[1]),
+                                   float(exif_max[0]), float(exif_max[1])],
+            "exif_corrected_bbox_xyxy": [float(exif_min[0]), float(exif_min[1]),
+                                         float(exif_max[0]), float(exif_max[1])],
+            "encoded_bbox_xyxy": [float(encoded_min[0]), float(encoded_min[1]),
+                                  float(encoded_max[0]), float(encoded_max[1])],
+            "encoded_image_size_px": list(transforms["encoded_size_px"]),
+            "original_coordinate_frame": "EXIF_CORRECTED_IMAGE_PIXEL",
             "source_image_size_px": list(photo.processed_size_px),
             "confidence": confidence, "ocr_marking": detection.get("ocr_text"),
             "possible_part_number": None, "identification_status": "SUGGESTED_CLASS_ONLY",
-            "evidence": "MODEL_DETECTION_CANDIDATE", "coordinate_transform": "PHOTO_TO_CANONICAL_CANDIDATE"}
+            "evidence": "MODEL_DETECTION_CANDIDATE", "coordinate_transform": "PHOTO_TO_CANONICAL_CANDIDATE",
+            "registration_status": registration.status, "registration_rmse_px": registration.rmse_px,
+            "registration_p95_px": registration.p95_reprojection_error_px,
+            "registration_inlier_ratio": registration.inlier_ratio,
+            "registration_uncertainty": "INFERRED_NOT_INDEPENDENTLY_VALIDATED",
+            "is_reference_photo": registration.status == "REFERENCE"}
 
 
-def _fuse_observations(board_id: str, side: str, observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _fuse_observations(board_id: str, side: str, observations: list[dict[str, Any]], *,
+                       previous_side: dict[str, Any] | None = None,
+                       confirmed_identity_by_observation_id: dict[str, str] | None = None,
+                       previous_canvas_origin: list[int] | tuple[int, int] | None = None,
+                       current_canvas_origin: tuple[int, int] = (0, 0),
+                       previous_reference_id: str | None = None,
+                       current_reference_id: str | None = None,
+                       previous_frame_compatible: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     valid = [item for item in observations if item.get("bbox_xyxy")]
     groups: list[list[dict[str, Any]]] = []
     for item in sorted(valid, key=lambda row: (row["class_name"], row["bbox_xyxy"], row["photo_id"])):
@@ -515,25 +751,146 @@ def _fuse_observations(board_id: str, side: str, observations: list[dict[str, An
             target.append(item)
         else:
             groups.append([item])
+    previous_components = list((previous_side or {}).get("components", []))
+    confirmation_map = confirmed_identity_by_observation_id or {}
+    adjusted_previous = []
+    if previous_frame_compatible and previous_reference_id and current_reference_id:
+        old_origin = previous_canvas_origin or (0, 0)
+        dx = float(old_origin[0]) - float(current_canvas_origin[0])
+        dy = float(old_origin[1]) - float(current_canvas_origin[1])
+        for prior in previous_components:
+            item = dict(prior)
+            if item.get("bbox_xyxy"):
+                item["bbox_xyxy"] = [item["bbox_xyxy"][0] + dx, item["bbox_xyxy"][1] + dy,
+                                     item["bbox_xyxy"][2] + dx, item["bbox_xyxy"][3] + dy]
+                item["canonical_position_xy"] = [item["canonical_position_xy"][0] + dx,
+                                                   item["canonical_position_xy"][1] + dy]
+            adjusted_previous.append(item)
+    prior_by_id = {str(item.get("component_id")): item for item in previous_components if item.get("component_id")}
+    used_previous_ids: set[str] = set()
     components = []
     for group in groups:
         boxes = np.asarray([item["bbox_xyxy"] for item in group], dtype=np.float64)
         box = np.median(boxes, axis=0).tolist()
         center = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
-        key = f"{board_id}|{side}|{group[0]['class_name']}|{round(center[0], 1)}|{round(center[1], 1)}"
-        component_id = "component_" + hashlib.sha256(key.encode()).hexdigest()[:16]
+        observation_ids = sorted({str(item.get("observation_id") or _observation_id(item)) for item in group})
+        explicit_ids = {confirmation_map[item_id] for item_id in observation_ids if item_id in confirmation_map}
+        identity_status = "NEW_COMPONENT"
+        identity_confidence = None
+        identity_evidence: list[dict[str, Any]] = []
+        matched_prior = None
+        if len(explicit_ids) > 1:
+            identity_status = "IDENTITY_CONFLICT"
+        elif explicit_ids:
+            requested_id = next(iter(explicit_ids))
+            requested = prior_by_id.get(requested_id)
+            if requested and str(requested.get("component_type", "")).lower() == group[0]["class_name"].lower() and requested_id not in used_previous_ids:
+                matched_prior = requested
+                identity_status, identity_confidence = "USER_CONFIRMED", 1.0
+                identity_evidence.append({"method": "EXPLICIT_USER_IDENTITY_MAPPING", "component_id": requested_id})
+            else:
+                identity_status = "IDENTITY_CONFLICT"
+                identity_evidence.append({"method": "USER_MAPPING_REJECTED", "requested_component_id": requested_id,
+                                          "reason": "unknown_id_duplicate_assignment_or_class_conflict"})
+        elif adjusted_previous:
+            ranked = sorted(((score, prior) for prior in adjusted_previous
+                             if str(prior.get("component_id")) not in used_previous_ids
+                             for score in [_identity_match_score(group, box, prior)] if score is not None),
+                            key=lambda row: row[0], reverse=True)
+            if ranked:
+                best_score, best_prior = ranked[0]
+                next_score = ranked[1][0] if len(ranked) > 1 else 0.0
+                if best_score >= 0.78 and best_score - next_score >= 0.15:
+                    matched_prior = best_prior
+                    identity_status, identity_confidence = "IDENTITY_MATCHED", float(best_score)
+                    if matched_prior.get("user_confirmed_identity"):
+                        identity_status, identity_confidence = "USER_CONFIRMED", 1.0
+                    identity_evidence.append({"method": "ONE_TO_ONE_GEOMETRY_AND_CLASS_MATCH",
+                                              "score": float(best_score), "runner_up_score": float(next_score),
+                                              "coordinate_frame_compatible": True})
+                elif best_score >= 0.60:
+                    identity_status = "IDENTITY_AMBIGUOUS"
+                    identity_evidence.append({"method": "AMBIGUOUS_PRIOR_COMPONENT_MATCH",
+                                              "best_score": float(best_score), "runner_up_score": float(next_score)})
+        if matched_prior:
+            component_id = str(matched_prior["component_id"])
+            used_previous_ids.add(component_id)
+        else:
+            reference_observations = [item for item in group if item.get("is_reference_photo")]
+            primary_observation = min(reference_observations or group,
+                                      key=lambda item: str(item.get("observation_id") or _observation_id(item)))
+            stable_seed = str(primary_observation.get("observation_id") or _observation_id(primary_observation))
+            component_id = "component_" + hashlib.sha256(
+                f"{board_id}|{side}|{group[0]['class_name']}|{stable_seed}".encode()).hexdigest()[:16]
+        markings = {str(item["ocr_marking"]).strip().upper() for item in group if item.get("ocr_marking")}
+        if len(markings) > 1:
+            identity_status = "IDENTITY_CONFLICT"
+            identity_evidence.append({"method": "OCR_MARKING_CONFLICT", "markings": sorted(markings)})
+        for other in valid:
+            if other in group or other.get("photo_id") in {item.get("photo_id") for item in group}:
+                continue
+            proximity = _observation_pair_metrics(group[0], other)
+            if (proximity["iou"] < 0.65 or proximity["normalized_center_distance"] > 0.25
+                    or proximity["bbox_scale_ratio"] < 0.65):
+                continue
+            if str(other.get("class_name", "")).lower() != str(group[0].get("class_name", "")).lower():
+                identity_status = "IDENTITY_CONFLICT"
+                identity_evidence.append({"method": "OVERLAPPING_CLASS_CONFLICT",
+                    "observation_id": other.get("observation_id"), "other_class": other.get("class_name"),
+                    **proximity})
+            elif not all(item.get("registration_status") in {None, "REFERENCE", "REGISTERED_CANDIDATE"}
+                         and (item.get("registration_rmse_px") is None or item["registration_rmse_px"] <= 4.0)
+                         and (item.get("registration_inlier_ratio") is None or item["registration_inlier_ratio"] >= 0.2)
+                         for item in (*group, other)):
+                if identity_status != "IDENTITY_CONFLICT":
+                    identity_status = "IDENTITY_AMBIGUOUS"
+                identity_evidence.append({"method": "POTENTIAL_MATCH_REJECTED_UNCERTAIN_REGISTRATION",
+                                          "observation_id": other.get("observation_id"), **proximity})
+        if len(group) > 1:
+            identity_evidence.extend({"method": "SAME_COMPONENT_GEOMETRY_GATE",
+                "observation_ids": [str(first.get("observation_id") or _observation_id(first)),
+                                    str(second.get("observation_id") or _observation_id(second))],
+                **_observation_pair_metrics(first, second)}
+                for index, first in enumerate(group) for second in group[index + 1:])
+        if any(item.get("registration_rmse_px") is not None and item["registration_rmse_px"] > 4.0 for item in group):
+            identity_status = "IDENTITY_AMBIGUOUS"
+            identity_evidence.append({"method": "REGISTRATION_UNCERTAINTY", "reason": "RMSE_ABOVE_4PX"})
+        historical_refs = list((matched_prior or {}).get("measurement_history_refs", []))
+        if (matched_prior or {}).get("measurement_history_ref"):
+            historical_refs.append(matched_prior["measurement_history_ref"])
         components.append({"component_id": component_id, "component_type": group[0]["class_name"],
             "canonical_position_xy": [float(center[0]), float(center[1])], "bbox_xyxy": [float(x) for x in box],
             "polygon_xy": [[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]],
             "source_image_ids": sorted({item["photo_id"] for item in group}),
+            "component_observation_ids": observation_ids,
             "original_image_positions": [{"photo_id": item["photo_id"], "bbox_xyxy": item["original_bbox_xyxy"]} for item in group],
             "detection_confidence": max((float(item["confidence"]) for item in group if item.get("confidence") is not None), default=None),
             "ocr_marking": next((item["ocr_marking"] for item in group if item.get("ocr_marking")), None),
             "possible_part_number": None, "identification_status": "SUGGESTED_UNCONFIRMED",
             "identity_fusion_status": "MULTI_OBSERVATION_FUSED" if len(group) > 1 else "SINGLE_OBSERVATION",
+            "identity_match_status": identity_status,
+            "identity_confidence": identity_confidence,
+            "identity_evidence": identity_evidence,
+            "user_confirmed_identity": identity_status == "USER_CONFIRMED" or bool((matched_prior or {}).get("user_confirmed_identity")),
+            "measurement_history_refs": sorted(set(map(str, historical_refs))),
+            "historical_component_ids": sorted(set((matched_prior or {}).get("historical_component_ids", []))),
             "evidence": [{"photo_id": item["photo_id"], "detection_id": item["detection_id"],
-                          "confidence": item["confidence"], "source": item["evidence"]} for item in group]})
-    return components
+                          "observation_id": item.get("observation_id"), "confidence": item["confidence"],
+                          "registration_status": item.get("registration_status"),
+                          "registration_uncertainty": item.get("registration_uncertainty"),
+                          "source": item["evidence"]} for item in group]})
+    mappings = []
+    for prior in previous_components:
+        prior_id = str(prior.get("component_id", ""))
+        if not prior_id:
+            continue
+        current = next((item for item in components if item["component_id"] == prior_id), None)
+        mappings.append({"previous_component_id": prior_id,
+                         "current_component_id": prior_id if current else None,
+                         "status": "PRESERVED" if current else "NOT_OBSERVED_NO_ID_REASSIGNMENT",
+                         "measurement_history_refs_preserved": list(prior.get("measurement_history_refs", [])),
+                         "identity_review_required": not bool(current)})
+    return components, mappings
 
 
 def _same_component(first: dict[str, Any], second: dict[str, Any]) -> bool:
@@ -541,6 +898,22 @@ def _same_component(first: dict[str, Any], second: dict[str, Any]) -> bool:
         return False
     if first["class_name"].lower() != second["class_name"].lower():
         return False
+    first_marking = str(first.get("ocr_marking") or "").strip().upper()
+    second_marking = str(second.get("ocr_marking") or "").strip().upper()
+    if first_marking and second_marking and first_marking != second_marking:
+        return False
+    for observation in (first, second):
+        if (observation.get("registration_status") not in {None, "REFERENCE", "REGISTERED_CANDIDATE"}
+                or (observation.get("registration_rmse_px") is not None
+                    and observation["registration_rmse_px"] > 4.0)
+                or (observation.get("registration_inlier_ratio") is not None
+                    and observation["registration_inlier_ratio"] < 0.2)):
+            return False
+    metrics = _observation_pair_metrics(first, second)
+    return metrics["iou"] >= 0.65 and metrics["normalized_center_distance"] <= 0.25 and metrics["bbox_scale_ratio"] >= 0.65
+
+
+def _observation_pair_metrics(first: dict[str, Any], second: dict[str, Any]) -> dict[str, float]:
     a, b = first["bbox_xyxy"], second["bbox_xyxy"]
     intersection = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
     area_a = max(1e-9, (a[2]-a[0]) * (a[3]-a[1]))
@@ -548,8 +921,90 @@ def _same_component(first: dict[str, Any], second: dict[str, Any]) -> bool:
     iou = intersection / (area_a + area_b - intersection)
     center_a = np.array([(a[0]+a[2])/2, (a[1]+a[3])/2])
     center_b = np.array([(b[0]+b[2])/2, (b[1]+b[3])/2])
-    diagonal = max(1.0, math.hypot(a[2]-a[0], a[3]-a[1]))
-    return iou >= 0.65 and float(np.linalg.norm(center_a-center_b)) <= diagonal * 0.25
+    diagonal_a = max(1.0, math.hypot(a[2]-a[0], a[3]-a[1]))
+    diagonal_b = max(1.0, math.hypot(b[2]-b[0], b[3]-b[1]))
+    distance = float(np.linalg.norm(center_a-center_b)) / max(1.0, (diagonal_a + diagonal_b) / 2)
+    return {"iou": float(iou), "normalized_center_distance": float(distance),
+            "bbox_scale_ratio": float(min(area_a, area_b) / max(area_a, area_b))}
+
+
+def _observation_id(item: dict[str, Any]) -> str:
+    return "observation_" + hashlib.sha256(
+        f"{item.get('photo_id')}|{item.get('detection_id')}|{item.get('class_name')}".encode()).hexdigest()[:16]
+
+
+def _identity_match_score(group: list[dict[str, Any]], new_box: list[float], prior: dict[str, Any]) -> float | None:
+    if str(prior.get("component_type", "")).lower() != str(group[0].get("class_name", "")).lower():
+        return None
+    old = prior.get("bbox_xyxy")
+    if not old or len(old) != 4:
+        return None
+    metrics = _observation_pair_metrics({"bbox_xyxy": new_box}, {"bbox_xyxy": old})
+    if metrics["normalized_center_distance"] > 0.8 or metrics["bbox_scale_ratio"] < 0.3:
+        return None
+    return 0.55 * metrics["iou"] + 0.30 * max(0.0, 1.0 - metrics["normalized_center_distance"]) + 0.15 * metrics["bbox_scale_ratio"]
+
+
+def _previous_reference_id(previous_side: dict[str, Any]) -> str | None:
+    canonical = previous_side.get("canonical_image", {})
+    if canonical.get("reference_photo_id"):
+        return canonical["reference_photo_id"]
+    return next((item.get("photo_id") for item in previous_side.get("registrations", [])
+                 if item.get("status") == "REFERENCE"), None)
+
+
+def _same_matrix(first: Any, second: Any) -> bool:
+    if first is None or second is None:
+        return first is None and second is None
+    try:
+        a, b = np.asarray(first, dtype=np.float64), np.asarray(second, dtype=np.float64)
+        return a.shape == (3, 3) and b.shape == (3, 3) and np.allclose(a, b, rtol=0.0, atol=1e-7)
+    except (TypeError, ValueError):
+        return False
+
+
+def _load_previous_map(value: dict[str, Any] | str | Path | None) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if isinstance(value, (str, Path)):
+        try:
+            value = json.loads(Path(value).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise MultiImageError("INVALID_PREVIOUS_MAP", str(exc)) from exc
+    if not isinstance(value, dict):
+        raise MultiImageError("INVALID_PREVIOUS_MAP", "Previous identity data must be a JSON object")
+    if isinstance(value.get("sides"), dict):
+        return value
+    if value.get("schema_version") == "circuitcare.component-identity-bundle.v1":
+        sides = {}
+        for side, manifest in value.get("sides", {}).items():
+            sides[side] = {"components": manifest.get("components", []),
+                           "canonical_image": manifest.get("canonical_image", {})}
+        return {"board_id": value.get("board_id"), "sides": sides}
+    if value.get("schema_version") == "circuitcare.component-identities.v1":
+        side = value.get("board_side")
+        if side not in {"TOP", "BOTTOM"}:
+            raise MultiImageError("INVALID_PREVIOUS_MAP", "Identity manifest has an invalid side")
+        return {"board_id": value.get("board_id"), "sides": {side: {
+            "components": value.get("components", []), "canonical_image": value.get("canonical_image", {})}}}
+    raise MultiImageError("INVALID_PREVIOUS_MAP", "Unsupported previous component map or identity manifest schema")
+
+
+def save_identity_manifest(path: str | Path, component_map: dict[str, Any]) -> None:
+    """Atomically persist stable IDs and provenance without serializing image blobs."""
+    destination = Path(path)
+    bundle = {"schema_version": "circuitcare.component-identity-bundle.v1",
+              "board_id": component_map.get("board_id"),
+              "sides": {side: record["identity_manifest"]
+                        for side, record in component_map.get("sides", {}).items()}}
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".tmp")
+    try:
+        temporary.write_text(json.dumps(bundle, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
 
 def _board_boundary_records(photos: list[PhotoAsset], started: float,

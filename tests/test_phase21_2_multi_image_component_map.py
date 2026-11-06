@@ -8,7 +8,7 @@ from PIL import ImageFilter
 
 from circuitcare.vision.reconstruction.multi_image_component_map import (
     CaptureRole, ImageBudget, MultiImageComponentMapService, MultiImageError,
-    PhotoInput, to_json,
+    PhotoInput, save_identity_manifest, to_json,
 )
 
 
@@ -40,6 +40,14 @@ def test_intake_hashes_orients_limits_and_keeps_sides_separate():
     assert session.photos[0].sha256 == session.photos[2].sha256
     assert session.photos[0].photo_id != session.photos[1].photo_id
     assert session.photos[2].duplicate_of == session.photos[0].photo_id
+    reordered = service.ingest("board-1", [
+        PhotoInput(_png(image), "TOP", CaptureRole.ANGLED, "top-copy.png"),
+        PhotoInput(_png(image), "BOTTOM", CaptureRole.CLOSEUP, "bottom.png"),
+        PhotoInput(_png(image), "TOP", CaptureRole.OVERVIEW, "top.png"),
+    ])
+    reordered_by_name = {photo.name: photo.photo_id for photo in reordered.photos}
+    original_by_name = {photo.name: photo.photo_id for photo in session.photos}
+    assert reordered_by_name == original_by_name
     result = service.build_map(session)
     assert set(result["sides"]) == {"TOP", "BOTTOM"}
     assert result["design_registration"]["status"] == "NOT_RUN_SEPARATE_FROM_PHOTO_REGISTRATION"
@@ -65,6 +73,24 @@ def test_exif_orientation_is_applied_and_corrupt_images_fail_closed():
     session = service.ingest("exif-board", [PhotoInput(stream.getvalue(), "TOP")])
     assert session.photos[0].original_size_px == (80, 120)
     assert session.photos[0].processed_size_px == (80, 120)
+    assert session.photos[0].coordinate_transforms["exif_orientation"] == 6
+    assert np.asarray(session.photos[0].coordinate_transforms["encoded_to_exif_corrected"]).shape == (3, 3)
+
+    result = service.build_map(session, detector=lambda _: {"status": "INFERENCE_COMPLETE", "detections": [{
+        "detection_id": "rotated-u1", "class_name": "integrated_circuit", "confidence": 0.9,
+        "bbox_xyxy": [10, 20, 30, 40],
+    }]})
+    photo_record = result["photos"][0]
+    transforms = photo_record["coordinate_transforms"]
+    encoded_to_canonical = np.asarray(transforms["encoded_to_canonical"])
+    assert np.allclose(encoded_to_canonical, np.asarray(transforms["processed_to_canonical"])
+                       @ np.asarray(transforms["decoded_to_rectified"])
+                       @ np.asarray(transforms["exif_corrected_to_decoded"])
+                       @ np.asarray(transforms["encoded_to_exif_corrected"]))
+    observation = result["sides"]["TOP"]["component_observations"][0]
+    assert np.allclose(observation["encoded_bbox_xyxy"], [20, 49, 40, 69], atol=1)
+    assert np.allclose(observation["original_bbox_xyxy"], [10, 20, 30, 40], atol=1)
+    assert observation["original_coordinate_frame"] == "EXIF_CORRECTED_IMAGE_PIXEL"
     try:
         service.ingest("bad-image", [PhotoInput(b"not an image", "TOP")])
     except MultiImageError as exc:
@@ -104,6 +130,12 @@ def test_overlapping_photos_stitch_and_fuse_same_detection_with_provenance():
     assert len({component["component_id"] for component in top["components"]}) == 1
     mosaic_png = base64.b64decode(top["canonical_image"]["image_png_base64"])
     assert Image.open(io.BytesIO(mosaic_png)).size == tuple(top["canonical_image"]["image_size_px"])
+    coverage = top["canonical_image"]["coverage_metrics"]
+    source_map = np.asarray(Image.open(io.BytesIO(base64.b64decode(
+        top["canonical_image"]["pixel_source_map_png_base64"]))))
+    assert coverage["valid_pixel_count"] == int(np.count_nonzero(source_map))
+    assert coverage["unobserved_pixel_count"] == coverage["canvas_pixel_count"] - coverage["valid_pixel_count"]
+    assert abs(sum(coverage["source_contribution_ratio"].values()) - 1.0) < 1e-6
 
     overlay = service.fault_overlay(result, "TOP", [
         {"component_id": top["components"][0]["component_id"], "status": "CONFIRMED_FAULT",
@@ -127,3 +159,131 @@ def test_nonoverlapping_photos_are_not_forced_into_mosaic():
     records = {item["photo_id"]: item for item in result["sides"]["TOP"]["registrations"]}
     assert records[moving.photo_id]["status"] == "UNREGISTERED"
     assert records[moving.photo_id]["transform_moving_to_canonical"] is None
+
+
+def test_component_ids_and_measurement_refs_survive_reprocessing_and_added_views(tmp_path):
+    image = _textured_scene()[:, :400]
+    service = MultiImageComponentMapService()
+    base = PhotoInput(_png(image), "TOP", CaptureRole.REFERENCE, "reference.png")
+    session = service.ingest("identity-board", [base])
+
+    def detector_at(x):
+        def detect(image):
+            local_x = x if image.width == 400 else x - 100
+            return {"status": "INFERENCE_COMPLETE", "detections": [{
+                "detection_id": "U7", "class_name": "integrated_circuit", "confidence": 0.88,
+                "bbox_xyxy": [local_x - 16, 130, local_x + 16, 162],
+            }]}
+        return detect
+
+    first = service.build_map(session, detector=detector_at(175))
+    old_component = first["sides"]["TOP"]["components"][0]
+    old_component["user_confirmed_identity"] = True
+    old_component["measurement_history_refs"] = ["measurement-0042"]
+    old_component_id = old_component["component_id"]
+
+    # Add a close-up after the original reference. The old frame/reference is retained.
+    closeup = PhotoInput(_png(image[:, 100:400]), "TOP", CaptureRole.CLOSEUP, "closeup.png")
+    expanded = service.ingest("identity-board", [base, closeup])
+    updated = service.build_map(expanded, detector=detector_at(177), previous_component_map=first)
+    component = updated["sides"]["TOP"]["components"][0]
+    assert component["component_id"] == old_component_id
+    assert component["identity_match_status"] == "USER_CONFIRMED"
+    assert component["measurement_history_refs"] == ["measurement-0042"]
+    mapping = updated["sides"]["TOP"]["historical_component_id_mappings"][0]
+    assert mapping["status"] == "PRESERVED"
+
+    manifest = tmp_path / "identity.json"
+    save_identity_manifest(manifest, updated)
+    reloaded = service.build_map(expanded, detector=detector_at(177), previous_component_map=manifest)
+    assert reloaded["sides"]["TOP"]["components"][0]["component_id"] == old_component_id
+    assert reloaded["sides"]["TOP"]["components"][0]["measurement_history_refs"] == ["measurement-0042"]
+
+
+def test_fusion_rejects_same_photo_duplicate_and_conflicting_ocr():
+    image = _textured_scene()[:, :400]
+    service = MultiImageComponentMapService()
+    session = service.ingest("fusion-board", [PhotoInput(_png(image), "TOP", CaptureRole.REFERENCE, "ref.png")])
+
+    def detector(_):
+        return {"status": "INFERENCE_COMPLETE", "detections": [
+            {"detection_id": "R1", "class_name": "resistor", "confidence": 0.8,
+             "bbox_xyxy": [90, 100, 120, 130], "ocr_text": "1001"},
+            {"detection_id": "R2", "class_name": "resistor", "confidence": 0.8,
+             "bbox_xyxy": [92, 102, 122, 132], "ocr_text": "1001"},
+        ]}
+    result = service.build_map(session, detector=detector)
+    assert len(result["sides"]["TOP"]["components"]) == 2
+
+    two_views = service.ingest("ocr-conflict", [
+        PhotoInput(_png(image), "TOP", CaptureRole.REFERENCE, "ref.png"),
+        PhotoInput(_png(np.clip(image.astype(np.int16) + 1, 0, 255).astype(np.uint8)),
+                   "TOP", CaptureRole.CLOSEUP, "duplicate-view.png"),
+    ])
+    def conflicting_ocr(_):
+        # Homography is identity for identical input pixels, so boxes coincide.
+        marker = "1001" if calls[0] == 0 else "1002"
+        calls[0] += 1
+        return {"status": "INFERENCE_COMPLETE", "detections": [{
+            "detection_id": "R", "class_name": "resistor", "confidence": 0.9,
+            "bbox_xyxy": [90, 100, 120, 130], "ocr_text": marker,
+        }]}
+    calls = [0]
+    conflict_result = service.build_map(two_views, detector=conflicting_ocr)
+    assert len(conflict_result["sides"]["TOP"]["components"]) == 2
+
+    class_calls = [0]
+    def conflicting_class(_):
+        class_name = "resistor" if class_calls[0] == 0 else "capacitor"
+        class_calls[0] += 1
+        return {"status": "INFERENCE_COMPLETE", "detections": [{
+            "detection_id": "same-position", "class_name": class_name, "confidence": 0.9,
+            "bbox_xyxy": [90, 100, 120, 130],
+        }]}
+    class_result = service.build_map(two_views, detector=conflicting_class)
+    class_components = class_result["sides"]["TOP"]["components"]
+    assert len(class_components) == 2
+    assert all(component["identity_match_status"] == "IDENTITY_CONFLICT" for component in class_components)
+    assert all(any(evidence["method"] == "OVERLAPPING_CLASS_CONFLICT"
+                   for evidence in component["identity_evidence"]) for component in class_components)
+
+
+def test_automatic_rectification_uses_clear_boundary_candidate_and_detector_absence_is_explicit(tmp_path):
+    import cv2
+
+    board = np.full((300, 400, 3), 230, dtype=np.uint8)
+    cv2.rectangle(board, (60, 40), (340, 260), (30, 70, 30), -1)
+    cv2.rectangle(board, (60, 40), (340, 260), (255, 255, 255), 5)
+    service = MultiImageComponentMapService()
+    session = service.ingest("rectification-board", [PhotoInput(_png(board), "TOP")])
+    assert session.photos[0].rectification["status"] == "RECTIFIED_CANDIDATE_NOT_PHYSICALLY_VALIDATED"
+    assert session.photos[0].rectification["confidence_diagnostics"]["method"] == "AUTO_UNIQUE_LARGE_BOUNDARY_CANDIDATE"
+
+    missing = service.build_map(session, model_path=tmp_path / "missing.onnx")
+    assert missing["sides"]["TOP"]["detection_status"] == "BLOCKED_MODEL_UNAVAILABLE"
+    assert missing["sides"]["TOP"]["components"] == []
+
+    random_pixels = np.random.default_rng(216).integers(0, 256, (420, 660, 3), dtype=np.uint8)
+    frame_texture = np.asarray(Image.fromarray(random_pixels).filter(ImageFilter.GaussianBlur(0.8)))[:, :420]
+    frame_like = MultiImageComponentMapService().ingest("frame-like", [PhotoInput(_png(frame_texture), "TOP")])
+    assert frame_like.photos[0].rectification["status"] == "RECTIFICATION_UNVERIFIED"
+    assert frame_like.photos[0].rectification["reason"] == "BOUNDARY_TOUCHES_IMAGE_FRAME"
+    assert frame_like.photos[0].processed_size_px == (420, 420)
+
+
+def test_canvas_budget_falls_back_to_reference_and_does_not_keep_overflow_transform():
+    scene = _textured_scene()[:, :520]
+    budget = ImageBudget(max_decoded_edge=400, max_canvas_edge=400, max_canvas_pixels=160_000)
+    # The first view is the reference, while the second has a large translation.
+    first, second = scene[:, :400], scene[:, 120:520]
+    session = MultiImageComponentMapService(budget=budget).ingest("canvas-budget", [
+        PhotoInput(_png(first), "TOP", CaptureRole.REFERENCE, "reference.png"),
+        PhotoInput(_png(second), "TOP", CaptureRole.CLOSEUP, "closeup.png"),
+    ])
+    result = MultiImageComponentMapService(budget=budget).build_map(session)
+    side = result["sides"]["TOP"]
+    assert side["canonical_image"]["image_size_px"] == [400, 400]
+    moving = next(photo for photo in session.photos if photo.name == "closeup.png")
+    record = next(item for item in side["registrations"] if item["photo_id"] == moving.photo_id)
+    assert record["status"] == "UNREGISTERED"
+    assert record["transform_moving_to_canonical"] is None
