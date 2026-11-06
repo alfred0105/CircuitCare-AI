@@ -24,8 +24,13 @@ sys.path.insert(0, str(ROOT / "src"))
 from circuitcare.vision.reconstruction.coordinate_frames import (
     CalibrationPoint, CoordinateFrame, TransformType, fit_transform,
 )
+from circuitcare.vision.reconstruction.anchor_detection import detect_dark_round_anchors
+from circuitcare.vision.reconstruction.anchor_matching import extract_design_anchors, match_anchors
 from circuitcare.vision.reconstruction.dataset_bundle import build_prism_bundle
 from circuitcare.vision.reconstruction.ground_truth import summarize_reference_geometry
+from circuitcare.vision.reconstruction.registration_visualization import (
+    save_registration_overlay, save_top_bottom_comparison,
+)
 from circuitcare.vision.reconstruction.prism_dataset import (
     PRISM_COMMIT, SAMPLES, load_references, load_sample, validate_inventory,
 )
@@ -51,8 +56,17 @@ def _points(records: list[dict[str, Any]], role: str, side: str) -> list[Calibra
             source_frame=CoordinateFrame.KICAD_DESIGN,
             target_frame=CoordinateFrame.IMAGE_RAW,
             board_side=side, evidence=evidence, role=role,
+            review_status=str(row.get("review_status", "NOT_REVIEWED")),
         ))
     return result
+
+
+def _report_path(path: Path) -> str:
+    """Keep artifact references portable when they live inside the repository."""
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path.resolve())
 
 
 def _image_feature_diagnostics(image_path: Path, sample_name: str, side: str) -> dict[str, Any]:
@@ -82,7 +96,8 @@ def _image_feature_diagnostics(image_path: Path, sample_name: str, side: str) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset-root", type=Path, default=ROOT / "data/external/prism")
-    parser.add_argument("--output", type=Path, default=ROOT / "data/benchmarks/phase21_1/registration/summary.json")
+    parser.add_argument("--artifact-dir", type=Path, default=ROOT / "data/benchmarks/phase21_1_1")
+    parser.add_argument("--output", type=Path)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--sample", choices=SAMPLES)
     group.add_argument("--all", action="store_true")
@@ -107,7 +122,9 @@ def main() -> int:
         if commit != PRISM_COMMIT:
             parser.error(f"PRISM commit mismatch: expected {PRISM_COMMIT}, got {commit}")
         point_payload = json.loads(args.points_json.read_text(encoding="utf-8")) if args.points_json else {}
-        samples = list(SAMPLES) if args.all else [args.sample]
+        samples = (list(PRIORITY) + [name for name in SAMPLES if name not in PRIORITY]
+                   if args.all else [args.sample])
+        artifact_dir = args.artifact_dir.expanduser().resolve()
         rows = []
         for sample_name in samples:
             sample = load_sample(args.dataset_root, sample_name)
@@ -120,11 +137,14 @@ def main() -> int:
                 side_points = point_payload.get(sample_name, {}).get(side, {})
                 calibration = _points(side_points.get("calibration", []), "CALIBRATION", side)
                 validation = _points(side_points.get("validation", []), "VALIDATION", side)
+                automatic_result = None
+                image_anchors = []
+                design_anchors = []
                 row: dict[str, Any] = {
                     "registration_status": "REGISTRATION_UNVERIFIED",
                     "verification_status": "REGISTRATION_UNVERIFIED",
-                    "reason": ("MANUAL_CORRESPONDENCES_NOT_PROVIDED" if args.mode == "MANUAL_CALIBRATION"
-                               else "AUTO_CANDIDATES_NOT_MATCHED_TO_DESIGN_ANCHORS"),
+                    "reason": ("MANUAL_CORRESPONDENCES_NOT_PROVIDED"
+                               if args.mode == "MANUAL_CALIBRATION" and not calibration else None),
                     "board_side": side,
                     "image_size_px": size,
                     "image_feature_diagnostics": _image_feature_diagnostics(image_path, sample_name, side),
@@ -140,7 +160,78 @@ def main() -> int:
                     "image_only_status": "NOT_VERIFIED",
                     "design_assisted_status": "NOT_VERIFIED",
                 }
-                if calibration:
+                if args.mode == "AUTO_REGISTRATION":
+                    try:
+                        image_anchors, detected_size = detect_dark_round_anchors(
+                            image_path, photo_id=f"prism-{sample_name}-{side.lower()}",
+                            board_side=side,
+                        )
+                        design_anchors = extract_design_anchors(
+                            refs["expected_geometry"], board_side=side,
+                        )
+                        automatic_result = match_anchors(
+                            design_anchors, image_anchors, board_side=side,
+                            image_size_px=detected_size,
+                        )
+                        side_dir = artifact_dir / "anchors"
+                        side_dir.mkdir(parents=True, exist_ok=True)
+                        anchor_path = side_dir / f"{sample_name}_{side}.json"
+                        anchor_path.write_text(json.dumps({
+                            "image_anchors": [anchor.to_dict() for anchor in image_anchors],
+                            "design_anchors": [anchor.to_dict() for anchor in design_anchors],
+                            "experiment_track": "DESIGN_ASSISTED_REGISTRATION",
+                        }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                        match_path = artifact_dir / "matches" / f"{sample_name}_{side}.json"
+                        match_path.parent.mkdir(parents=True, exist_ok=True)
+                        match_path.write_text(json.dumps(automatic_result.to_dict(), indent=2,
+                                                         ensure_ascii=False) + "\n", encoding="utf-8")
+                        overlay_path = artifact_dir / "overlays" / f"{sample_name}_{side}_registration.png"
+                        save_registration_overlay(
+                            image_path, overlay_path, image_anchors=image_anchors,
+                            design_anchors=design_anchors, result=automatic_result,
+                        )
+                        row.update({
+                            "registration_status": automatic_result.status,
+                            "verification_status": automatic_result.status,
+                            "reason": automatic_result.reason,
+                            "calibration_point_count": automatic_result.candidate_count,
+                            "validation_point_count": 0,
+                            "fit_error_px": (automatic_result.transform.fit_error_px
+                                             if automatic_result.transform else None),
+                            "mean_error_px": automatic_result.mean_residual_px,
+                            "median_error_px": automatic_result.median_residual_px,
+                            "rmse_error_px": automatic_result.rmse_residual_px,
+                            "p95_error_px": automatic_result.p95_residual_px,
+                            "max_error_px": automatic_result.max_residual_px,
+                            "error_data_scope": "AUTO_MATCHED_INLIERS_TRAINING_ONLY_NOT_HELD_OUT",
+                            "inlier_count": len(automatic_result.matches),
+                            "review_flags": list(automatic_result.review_flags),
+                            "inlier_ratio": automatic_result.inlier_ratio,
+                            "candidate_match_count": automatic_result.candidate_count,
+                            "candidate_transform_count": automatic_result.candidate_transform_count,
+                            "design_anchor_count": automatic_result.design_anchor_count,
+                            "image_anchor_count": automatic_result.image_anchor_count,
+                            "spatial_coverage": automatic_result.spatial_coverage,
+                            "transform_stability_px": automatic_result.transform_stability_px,
+                            "orientation": automatic_result.orientation,
+                            "matching_reason": automatic_result.reason,
+                            "transform": automatic_result.transform.to_dict()
+                                         if automatic_result.transform else None,
+                            "matches": [match.to_dict() for match in automatic_result.matches],
+                            "anchor_file": _report_path(anchor_path),
+                            "match_file": _report_path(match_path),
+                            "overlay_file": _report_path(overlay_path),
+                            "design_assisted": True,
+                            "image_only_status": "CANDIDATES_ONLY",
+                            "design_assisted_status": automatic_result.status,
+                        })
+                    except (ValueError, OSError, KeyError, TypeError) as exc:
+                        row.update(
+                            registration_status="REGISTRATION_FAILED",
+                            verification_status="REGISTRATION_FAILED",
+                            reason=f"{type(exc).__name__}: {exc}",
+                        )
+                elif calibration:
                     try:
                         transform, metrics = fit_transform(
                             calibration, board_side=side,
@@ -171,6 +262,20 @@ def main() -> int:
                                    reason=f"{type(exc).__name__}: {exc}")
                 row["runtime_seconds"] = time.perf_counter() - side_started
                 sides[side] = row
+            top_result = None
+            bottom_result = None
+            # Recover match ID sets from side records rather than sharing loop-local variables.
+            for side_name, side_row in sides.items():
+                ids = {match.get("design_anchor_id") for match in side_row.get("matches", [])}
+                if side_name == "TOP":
+                    top_result = ids
+                else:
+                    bottom_result = ids
+            common_anchor_count = len((top_result or set()) & (bottom_result or set()))
+            save_top_bottom_comparison(
+                sample.top_image, sample.bottom_image,
+                artifact_dir / "overlays" / f"{sample_name}_top_bottom_unregistered.png",
+            )
             rows.append({
                 "sample_id": sample_name,
                 "board_revision": "NOT_AVAILABLE",
@@ -179,20 +284,41 @@ def main() -> int:
                 "reference_geometry": summarize_reference_geometry(refs["expected_geometry"]),
                 "bundle": bundle.to_dict(),
                 "sides": sides,
-                    "attempt_scope": ("DESIGN_ASSISTED" if args.design_assisted else args.mode),
+                "attempt_scope": ("DESIGN_ASSISTED" if args.design_assisted else args.mode),
+                "top_bottom_comparison": {
+                    "shared_design_anchor_matches": common_anchor_count,
+                    "coordinate_consistency_status": "NOT_VERIFIED",
+                    "note": "A side-by-side view and shared design anchor IDs do not independently validate TOP/BOTTOM transforms.",
+                },
                 "independent_physical_board_data": "NOT_AVAILABLE_PRISM_RENDERED_SYNTHETIC_CASE",
             })
             print(f"{sample_name}: TOP={sides['TOP']['registration_status']} BOTTOM={sides['BOTTOM']['registration_status']}", flush=True)
         report = {
-            "schema": "phase21.1-registration-attempt-v1",
+            "schema": "phase21.1.1-registration-attempt-v1",
             "dataset_source": "https://github.com/KamMalinski/PRISM",
             "prism_commit": commit,
             "circuitcare_commit": subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                                                   capture_output=True, text=True).stdout.strip(),
+            "circuitcare_worktree_dirty": bool(subprocess.run(
+                ["git", "-C", str(ROOT), "status", "--porcelain"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()),
             "calibration_mode": args.mode,
-            "experiment_track": "DESIGN_ASSISTED" if args.design_assisted else "IMAGE_ONLY_CANDIDATE_DIAGNOSTICS",
+            "experiment_track": "DESIGN_ASSISTED_REGISTRATION" if args.mode == "AUTO_REGISTRATION" or args.design_assisted else "MANUAL_CALIBRATION",
             "thresholds": {"ransac_threshold_px": args.ransac_threshold_px,
                            "acceptance_threshold_px": args.acceptance_threshold_px},
+            "automatic_matching_configuration": {
+                "image_anchor_detector": "dark connected components, circularity >= 0.35, gray < 28",
+                "design_anchor_types": ["through-hole pads", "vias"],
+                "scale_search_px_per_mm": [1.0, 80.0],
+                "pair_distance_scale_tolerance": 0.015,
+                "scale_histogram_bins": 720,
+                "ransac_model": "AFFINE",
+                "ransac_threshold_px": 2.0,
+                "match_tolerance_px": "max(3.5, 0.006 * min(image_width_px, image_height_px))",
+                "bottom_mirror": "searched as a negative-determinant similarity candidate; never forced",
+                "track": "DESIGN_ASSISTED_REGISTRATION",
+            },
             "samples_requested": len(rows), "sample_results": rows,
             "summary": {
                 "top_bottom_pairs": sum(len(row["sides"]) for row in rows),
@@ -200,10 +326,28 @@ def main() -> int:
                     side["registration_status"] == "VERIFIED"
                     for row in rows for side in row["sides"].values()),
                 "unverified_registrations": sum(
-                    side["registration_status"] == "REGISTRATION_UNVERIFIED"
+                    side["registration_status"] != "VERIFIED"
                     for row in rows for side in row["sides"].values()),
                 "failed_registrations": sum(
                     side["registration_status"] == "REGISTRATION_FAILED"
+                    for row in rows for side in row["sides"].values()),
+                "automatic_matches_found": sum(
+                    side.get("candidate_match_count", 0) > 0
+                    for row in rows for side in row["sides"].values()),
+                "candidate_correspondences": sum(
+                    side.get("candidate_match_count", 0)
+                    for row in rows for side in row["sides"].values()),
+                "geometric_inliers": sum(
+                    side.get("inlier_count", 0)
+                    for row in rows for side in row["sides"].values()),
+                "transforms_generated": sum(
+                    side.get("transform") is not None
+                    for row in rows for side in row["sides"].values()),
+                "auto_estimated_unverified": sum(
+                    side["registration_status"] == "AUTO_ESTIMATED_UNVERIFIED"
+                    for row in rows for side in row["sides"].values()),
+                "manual_review_required": sum(
+                    side["registration_status"] != "VERIFIED"
                     for row in rows for side in row["sides"].values()),
                 "registration_success_rate": (
                     sum(side["registration_status"] == "VERIFIED"
@@ -215,7 +359,7 @@ def main() -> int:
                 },
             },
         }
-        output = args.output.expanduser().resolve()
+        output = (args.output or artifact_dir / "summary.json").expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Saved registration attempt record to {output}")

@@ -62,7 +62,7 @@ Run the fast suite with `python -m pytest -q -m "not integration and not stress"
 | 19–20 | Schematic workbench, multi-view PCB pipeline, PRISM adapter and segmentation candidates | Partially implemented; real-board registration and electrical reconstruction remain unverified |
 | 21.0 | Scope, technical/evaluation audit and evidence inventory | Audit and docs pushed; no AI accuracy improvement claimed |
 | 21.0.1 | Roadmap alignment, actual browser UI verification, final documentation | Roadmap/docs aligned; narrow IAB interaction spot-check only. Target viewport screenshots and full browser E2E remain open; see [final alignment record](docs/PHASE21_0_1_FINAL_ALIGNMENT.md) |
-| 21.1 | PCB data and photo↔KiCad registration | Partial foundation; 12 PRISM bundles inventoried, 24 image sides remain unverified without independent correspondences; physical board bundle still required |
+| 21.1 | PCB data and photo↔KiCad registration | Partial foundation; see [21.1.1 automatic match benchmark](docs/PHASE21_1_1_BENCHMARK_RESULTS.md); automatic estimates remain unverified and physical board bundle still required |
 | 21.2 | Component/pad/via/copper labels and grouped splits | Planned; registered board samples and independent labels required |
 | 21.3 | Image-only PCB Vision baseline | Planned; sealed board-level holdout required |
 | 21.4 | Design-assisted reconstruction and ablation | Planned; separately reported from Image-only track |
@@ -73,7 +73,7 @@ Run the fast suite with `python -m pytest -q -m "not integration and not stress"
 | 21.9 | Integrated repair workbench and user-centered UI/UX | Planned; photo-to-report workflow, summary/detail, PCB viewer, measurement updates |
 | 21.10 | Competition evaluation and release | Planned; independently evaluate all three research contributions |
 
-Historical phase acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md). Current direction and gates: [Phase 21 roadmap](docs/PHASE21_ROADMAP.md). Phase 21.1 artifacts and limits: [dataset foundation](docs/PHASE21_1_DATASET_FOUNDATION.md), [coordinate registration](docs/PHASE21_1_COORDINATE_REGISTRATION.md), [ground-truth validation](docs/PHASE21_1_GROUND_TRUTH_VALIDATION.md), and [results/readiness](docs/PHASE21_1_FINAL_REPORT.md).
+Historical phase acceptance criteria: [docs/ROADMAP.md](docs/ROADMAP.md). Current direction and gates: [Phase 21 roadmap](docs/PHASE21_ROADMAP.md). Phase 21.1 artifacts and limits: [dataset foundation](docs/PHASE21_1_DATASET_FOUNDATION.md), [coordinate registration](docs/PHASE21_1_COORDINATE_REGISTRATION.md), [ground-truth validation](docs/PHASE21_1_GROUND_TRUTH_VALIDATION.md), [results/readiness](docs/PHASE21_1_FINAL_REPORT.md), and [21.1.1 automatic registration results](docs/PHASE21_1_1_BENCHMARK_RESULTS.md).
 
 ## Quick start
 

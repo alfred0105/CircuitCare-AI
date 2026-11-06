@@ -14,7 +14,7 @@ python scripts/calibrate_prism.py --sample Simple --mode MANUAL_CALIBRATION --po
 python scripts/validate_registration.py --registration data/benchmarks/phase21_1/registration/summary.json
 ```
 
-The optional point file is keyed by sample and side, with separate `calibration` and `validation` arrays. Each point needs `point_id`, `x_mm`, `y_mm`, `u_px`, `v_px`, and a non-empty `evidence` string. This records declared provenance, not an audit of human correctness. IMAGE_ONLY and DESIGN_ASSISTED are separately labeled; providing design-derived correspondences makes registration DESIGN_ASSISTED.
+The optional point file is keyed by sample and side, with separate `calibration` and `validation` arrays. Each point needs `point_id`, `x_mm`, `y_mm`, `u_px`, `v_px`, and a non-empty `evidence` string. A validation point must also set `review_status: "REVIEWED"` before the result can be marked verified; this records declared review provenance, not an audit of human correctness. IMAGE_ONLY and DESIGN_ASSISTED are separately labeled; providing design-derived correspondences makes registration DESIGN_ASSISTED.
 
 ## TOP / BOTTOM convention
 
@@ -31,3 +31,7 @@ The report preserves per-image feature diagnostic failures and distinguishes mis
 ## Limits
 
 PRISM rendered examples do not establish real-photo registration accuracy. A calibration point derived from KiCad is design-assisted. If the same pad/net labels are used to fit and score a transform, that metric is not independent; held-out point IDs must be disjoint. Independent validation should come from points reserved before fitting and, for physical claims, independently measured or reviewed physical features.
+
+## Phase 21.1.1 follow-up
+
+The statements above describe the original Phase 21.1 attempt and are historical. Phase 21.1.1 subsequently implemented design-assisted automatic anchor matching and produced 21 `AUTO_ESTIMATED_UNVERIFIED` transforms from 24 PRISM views; three fits failed and zero are independently verified. See [automatic registration method](PHASE21_1_1_AUTOMATIC_REGISTRATION.md) and [all-view benchmark](PHASE21_1_1_BENCHMARK_RESULTS.md). No fixed pixel/mm mapping was inferred from PRISM metadata.

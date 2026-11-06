@@ -74,7 +74,12 @@ def test_explicit_transform_families_are_representable(name, map_xy, kind, point
 def test_independent_validation_required_for_verified_state():
     calibration = [_point("a", (0, 0)), _point("b", (10, 0)),
                    _point("c", (10, 10)), _point("d", (0, 10))]
-    validation = [_point("heldout-1", (5, 5), role="VALIDATION")]
+    validation = [CalibrationPoint(
+        point_id="heldout-1", source_xy=(5, 5), target_xy=(20, 35),
+        source_frame=CoordinateFrame.KICAD_DESIGN, target_frame=CoordinateFrame.IMAGE_RAW,
+        board_side="TOP", evidence="separate synthetic held-out point",
+        role="VALIDATION", review_status="REVIEWED",
+    )]
     transform, report = fit_transform(
         calibration, board_side="TOP", source_frame=CoordinateFrame.KICAD_DESIGN,
         target_frame=CoordinateFrame.IMAGE_RAW, validation_points=validation,
@@ -82,7 +87,38 @@ def test_independent_validation_required_for_verified_state():
     )
     assert transform.verification_status == VerificationStatus.VERIFIED
     assert report["validation_point_count"] == 1
+    assert report["validation_independently_reviewed"]
     assert report["held_out_error_target_units"]["p95"] == pytest.approx(0, abs=1e-8)
+
+
+def test_unreviewed_validation_cannot_mark_transform_verified():
+    calibration = [_point("a", (0, 0)), _point("b", (10, 0)),
+                   _point("c", (10, 10)), _point("d", (0, 10))]
+    validation = [CalibrationPoint(
+        "heldout-1", (5, 5), (20, 35), CoordinateFrame.KICAD_DESIGN,
+        CoordinateFrame.IMAGE_RAW, "TOP", "not independently adjudicated", "VALIDATION",
+    )]
+    transform, report = fit_transform(
+        calibration, board_side="TOP", source_frame=CoordinateFrame.KICAD_DESIGN,
+        target_frame=CoordinateFrame.IMAGE_RAW, validation_points=validation,
+        acceptance_threshold_px=0.1,
+    )
+    assert transform.verification_status == VerificationStatus.CALIBRATED_NOT_INDEPENDENTLY_VERIFIED
+    assert not report["validation_independently_reviewed"]
+
+
+def test_same_physical_source_location_cannot_cross_calibration_validation_split():
+    calibration = [_point("a", (0, 0)), _point("b", (10, 0)),
+                   _point("c", (10, 10)), _point("d", (0, 10))]
+    validation = [CalibrationPoint(
+        "different-id-same-pad", (0, 0), (10, 20), CoordinateFrame.KICAD_DESIGN,
+        CoordinateFrame.IMAGE_RAW, "TOP", "duplicate physical point", "VALIDATION", "REVIEWED",
+    )]
+    with pytest.raises(ValueError, match="same physical source location"):
+        fit_transform(
+            calibration, board_side="TOP", source_frame=CoordinateFrame.KICAD_DESIGN,
+            target_frame=CoordinateFrame.IMAGE_RAW, validation_points=validation,
+        )
 
 
 def test_frame_side_and_split_errors_are_rejected():
@@ -123,7 +159,17 @@ def test_reference_projection_requires_verified_registration_and_marks_visibilit
            "segments": [{"start": [0, 0], "end": [10, 10], "net": "N"}]}
     with pytest.raises(ValueError, match="independently verified"):
         project_reference_geometry(ref, unverified, board_side="TOP", image_size_px=(100, 100))
-    validation = [_point("v1", (5, 5), role="VALIDATION")]
+    auto_estimated = unverified.__class__(
+        **{**unverified.__dict__,
+           "verification_status": VerificationStatus.AUTO_ESTIMATED_UNVERIFIED}
+    )
+    with pytest.raises(ValueError, match="independently verified"):
+        project_reference_geometry(ref, auto_estimated, board_side="TOP", image_size_px=(100, 100))
+    validation = [CalibrationPoint(
+        "v1", (5, 5), (20, 35), CoordinateFrame.KICAD_DESIGN,
+        CoordinateFrame.IMAGE_RAW, "TOP", "separate reviewed synthetic point",
+        "VALIDATION", "REVIEWED",
+    )]
     verified, _ = fit_transform(points, board_side="TOP",
                                  source_frame=CoordinateFrame.KICAD_DESIGN,
                                  target_frame=CoordinateFrame.IMAGE_RAW,

@@ -14,6 +14,10 @@ data/private/
 data/external/prism/
 data/benchmarks/prism/
 data/benchmarks/phase21_1/prism_baseline/
+data/benchmarks/phase21_1_1/prism_baseline/
+data/benchmarks/phase21_1_1/anchors/
+data/benchmarks/phase21_1_1/matches/
+data/benchmarks/phase21_1_1/overlays/
 data/ui_runs/
 data/vision_results/
 data/visualizations/

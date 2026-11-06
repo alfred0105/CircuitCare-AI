@@ -27,6 +27,7 @@ class TransformType(StrEnum):
 
 
 class VerificationStatus(StrEnum):
+    AUTO_ESTIMATED_UNVERIFIED = "AUTO_ESTIMATED_UNVERIFIED"
     CALIBRATED_NOT_INDEPENDENTLY_VERIFIED = "CALIBRATED_NOT_INDEPENDENTLY_VERIFIED"
     VERIFIED = "VERIFIED"
     REGISTRATION_UNVERIFIED = "REGISTRATION_UNVERIFIED"
@@ -43,6 +44,7 @@ class CalibrationPoint:
     board_side: str
     evidence: str
     role: str = "CALIBRATION"
+    review_status: str = "NOT_REVIEWED"
 
     def to_dict(self) -> dict[str, Any]:
         row = asdict(self)
@@ -124,6 +126,14 @@ def fit_transform(calibration_points: Iterable[CalibrationPoint], *, board_side:
     validation_ids = {point.point_id for point in validation}
     if calibration_ids & validation_ids:
         raise ValueError("Calibration and held-out validation point IDs must be disjoint")
+    calibration_locations = np.asarray([point.source_xy for point in calibration], dtype=np.float64)
+    validation_locations = np.asarray([point.source_xy for point in validation], dtype=np.float64)
+    if len(calibration_locations) and len(validation_locations):
+        duplicate_locations = np.linalg.norm(
+            calibration_locations[:, None, :] - validation_locations[None, :, :], axis=2,
+        ) <= 1e-6
+        if duplicate_locations.any():
+            raise ValueError("Calibration and validation cannot reuse the same physical source location")
     required = 3 if transform_type == TransformType.AFFINE else 4
     if len(calibration) < required:
         raise ValueError(f"{transform_type.value} requires at least {required} calibration points")
@@ -157,10 +167,13 @@ def fit_transform(calibration_points: Iterable[CalibrationPoint], *, board_side:
         val_predicted = cv2.perspectiveTransform(val_source.reshape(1, -1, 2), matrix).reshape(-1, 2)
         val_errors = {point.point_id: float(error) for point, error in
                       zip(validation, np.linalg.norm(val_predicted - val_target, axis=1))}
-        status = (VerificationStatus.VERIFIED if acceptance_threshold_px is not None
-                  and max(val_errors.values(), default=float("inf")) <= acceptance_threshold_px
-                  else VerificationStatus.REGISTRATION_FAILED if acceptance_threshold_px is not None
-                  else VerificationStatus.CALIBRATED_NOT_INDEPENDENTLY_VERIFIED)
+        reviewed = all(point.review_status == "REVIEWED" for point in validation)
+        if acceptance_threshold_px is None or not reviewed:
+            status = VerificationStatus.CALIBRATED_NOT_INDEPENDENTLY_VERIFIED
+        elif max(val_errors.values(), default=float("inf")) <= acceptance_threshold_px:
+            status = VerificationStatus.VERIFIED
+        else:
+            status = VerificationStatus.REGISTRATION_FAILED
     else:
         status = VerificationStatus.CALIBRATED_NOT_INDEPENDENTLY_VERIFIED
     transform = CoordinateTransform(
@@ -197,6 +210,8 @@ def registration_metrics(transform: CoordinateTransform, calibration: list[Calib
         "validation_point_count": len(validation),
         "calibration_error_px": _summary(fit),
         "held_out_error_target_units": _summary(val),
+        "validation_independently_reviewed": bool(validation) and all(
+            point.review_status == "REVIEWED" for point in validation),
         "forward_inverse_consistency_source_units": _summary(consistency),
         "transform_invertible": bool(abs(np.linalg.det(matrix)) > 1e-12),
         "inlier_count": transform.inlier_count,

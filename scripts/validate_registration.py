@@ -46,7 +46,9 @@ def validate_report(report: dict[str, Any], dataset_root: Path) -> dict[str, Any
                 if row.get("registration_status") == "VERIFIED":
                     threshold = report.get("thresholds", {}).get("acceptance_threshold_px")
                     errors = list((transform.get("validation_error_px") or {}).values())
-                    if threshold is None or not errors or max(errors) > threshold:
+                    metrics = row.get("metrics", {})
+                    if (threshold is None or not errors or max(errors) > threshold
+                            or metrics.get("validation_independently_reviewed") is not True):
                         issues.append({"code": "INVALID_VERIFIED_STATUS", "detail": f"{sample_id}/{side}"})
             elif row.get("registration_status") == "VERIFIED":
                 issues.append({"code": "VERIFIED_WITHOUT_TRANSFORM", "detail": f"{sample_id}/{side}"})
@@ -65,7 +67,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset-root", type=Path, default=ROOT / "data/external/prism")
     parser.add_argument("--registration", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "data/benchmarks/phase21_1/validation/summary.json")
+    parser.add_argument("--output", type=Path, default=ROOT / "data/benchmarks/phase21_1_1/validation/summary.json")
     args = parser.parse_args()
     try:
         report = json.loads(args.registration.read_text(encoding="utf-8"))
