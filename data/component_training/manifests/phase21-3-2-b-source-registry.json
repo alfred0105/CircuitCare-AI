@@ -2,7 +2,11 @@
   "phase": "21.3.2-B",
   "generated_at": "2026-11-06",
   "policy": {
-    "default_training_domains": ["POPULATED_PCB", "PARTIALLY_POPULATED_PCB", "PCB_COMPONENT_CLOSEUP"],
+    "default_training_domains": [
+      "POPULATED_PCB",
+      "PARTIALLY_POPULATED_PCB",
+      "PCB_COMPONENT_CLOSEUP"
+    ],
     "unknown_or_unreviewed_included": false,
     "empty_annotation_means_negative": false,
     "raw_sources_deleted": false
@@ -24,7 +28,11 @@
       "stem_groups_crossing_source_splits": 37,
       "physical_unique_boards": "UNVERIFIED",
       "status": "DOWNLOADED_NOT_TRAINING_READY",
-      "reason": ["BOARD_ID_UNRESOLVED", "SOURCE_SPLIT_LEAKAGE", "CANONICAL_10_CLASS_MAPPING_INCOMPLETE"],
+      "reason": [
+        "BOARD_ID_UNRESOLVED",
+        "SOURCE_SPLIT_LEAKAGE",
+        "CANONICAL_10_CLASS_MAPPING_INCOMPLETE"
+      ],
       "image_manifest": "data/component_training/manifests/pcb-component-detection-acquisition-manifest.json"
     },
     {
@@ -34,45 +42,234 @@
       "download": "data/component_training/raw/external/pcb-wacv-2019/pcb_wacv_2019.zip",
       "sha256": "d24cf0e3688a5c7a4d827b2363a2a5d6e3c88c189203876a9e9ef3ab6f45b01a",
       "downloaded_bytes": 298093226,
-      "images": 47,
+      "images": 53,
       "source_objects": 18201,
       "status": "DOWNLOADED_NOT_TRAINING_READY",
-      "reason": ["LICENSE_REVIEW_REQUIRED", "PARTIAL_CLASS_COVERAGE", "BOARD_GROUP_UNRESOLVED"],
-      "image_manifest": "data/component_training/manifests/pcb-wacv-2019-acquisition-manifest.json"
+      "reason": [
+        "LICENSE_REVIEW_REQUIRED",
+        "PARTIAL_CLASS_COVERAGE",
+        "BOARD_GROUP_UNRESOLVED"
+      ],
+      "image_manifest": "data/component_training/manifests/pcb-wacv-2019-acquisition-manifest.json",
+      "annotation_paired_images": 47,
+      "missing_annotation_images": 6
     },
     {
       "id": "fpic-physicaldb",
       "source_url": "https://physicaldb.ece.ufl.edu/pcb-dataset/",
       "license": "UNSPECIFIED_LICENSE_REVIEW_REQUIRED",
       "downloaded_annotation_archives": [
-        {"name": "smd_annotation.zip", "sha256": "01624144c27684d9a9b16a69c1d8d0d2fd6e8e6d93fac90fab1653ec65a4dc33", "bytes": 8235561, "rows": 52582, "csv_files": 228},
-        {"name": "ocr_annotation.zip", "sha256": "46d9c0f15e6aef4e466292deeb4e84c40dc0f5c0058666ae87905795c42f47a6", "bytes": 657972, "rows": 23218, "csv_files": 92},
-        {"name": "vtp_annotation.zip", "sha256": "3b14a03e7123ed9b00526a76dbe4edf4ae9940926a11834a4b338bda568af1a7", "bytes": 439755, "rows": 3954, "csv_files": 9},
-        {"name": "metadata.zip", "sha256": "d5ed5f42f525c5a73e91394cccc0046aca92e61f53a1c5ec1cbe11c06809d258", "bytes": 3298, "rows": 138, "csv_files": 2}
+        {
+          "name": "smd_annotation.zip",
+          "sha256": "01624144c27684d9a9b16a69c1d8d0d2fd6e8e6d93fac90fab1653ec65a4dc33",
+          "bytes": 8235561,
+          "rows": 52582,
+          "csv_files": 228
+        },
+        {
+          "name": "ocr_annotation.zip",
+          "sha256": "46d9c0f15e6aef4e466292deeb4e84c40dc0f5c0058666ae87905795c42f47a6",
+          "bytes": 657972,
+          "rows": 23218,
+          "csv_files": 92
+        },
+        {
+          "name": "vtp_annotation.zip",
+          "sha256": "3b14a03e7123ed9b00526a76dbe4edf4ae9940926a11834a4b338bda568af1a7",
+          "bytes": 439755,
+          "rows": 3954,
+          "csv_files": 9
+        },
+        {
+          "name": "metadata.zip",
+          "sha256": "d5ed5f42f525c5a73e91394cccc0046aca92e61f53a1c5ec1cbe11c06809d258",
+          "bytes": 3298,
+          "rows": 138,
+          "csv_files": 2
+        }
       ],
       "image_archive_bytes_not_downloaded": 7196349363,
       "status": "ANNOTATIONS_ONLY_NOT_TRAINING_READY",
-      "reason": ["LICENSE_REVIEW_REQUIRED", "SMD_HAS_NO_CLASS_FIELD", "OCR_AND_VTP_ARE_DIFFERENT_ANNOTATION_TASKS"]
+      "reason": [
+        "LICENSE_REVIEW_REQUIRED",
+        "SMD_HAS_NO_CLASS_FIELD",
+        "OCR_AND_VTP_ARE_DIFFERENT_ANNOTATION_TASKS"
+      ]
     },
     {
       "id": "fics-pcb",
       "source_url": "https://trust-hub.org/data",
       "license": "ACCESS_AND_LICENSE_UNRESOLVED",
       "status": "ACCESS_NOT_VERIFIED",
-      "reason": ["ANONYMOUS_DATA_DOWNLOAD_NOT_VERIFIED"]
+      "reason": [
+        "ANONYMOUS_DATA_DOWNLOAD_NOT_VERIFIED"
+      ]
     },
     {
-      "id": "pcb-dslr",
-      "source_url": "https://zenodo.org/records/13298212",
-      "license": "CONFLICTING_TERMS_REVIEW_REQUIRED",
-      "status": "NOT_DOWNLOADED",
-      "advertised_images": 748,
-      "advertised_boards": 165,
-      "class_scope": "IC_ONLY",
-      "advertised_archive_bytes": 6200000000,
-      "reason": ["RECORD_METADATA_CC_BY_4_LICENSE_TEXT_NONCOMMERCIAL_CONFLICT", "IC_ONLY_SCOPE", "LARGE_DOWNLOAD_HELD"]
+      "id": "pcb-dslr-archive-part-1",
+      "source_url": "https://zenodo.org/records/3886553",
+      "license": "Free for non-commercial research use only (official record text; commercial rights not granted)",
+      "download": "data/component_training/raw/external/pcb-dslr/cvl_pcb_dslr_1.zip",
+      "sha256": "1700e25683fae1280da86052da619e59d9ed65d658e0b3fcfdc7e7196a5c2920",
+      "downloaded_bytes": 708903524,
+      "archive_parts_available": 8,
+      "all_parts_downloaded": false,
+      "extracted_archive_members": 281,
+      "extracted_files": 261,
+      "expanded_bytes": 725793819,
+      "source_board_groups": 20,
+      "images": 87,
+      "ic_boxes": 2132,
+      "annotation_files": 87,
+      "status": "TRAINING_READY",
+      "training_scope": "Single-class integrated_circuit experiment, non-commercial research only",
+      "board_split": {
+        "train": 14,
+        "validation": 3,
+        "test": 3,
+        "leakage": "PASS"
+      },
+      "image_split": {
+        "train": 59,
+        "validation": 14,
+        "test": 14
+      },
+      "manifest": "data/component_training/manifests/pcb-dslr-part1-ic-manifest.json",
+      "reason": [
+        "ONLY_ARCHIVE_PART_1_ACQUIRED",
+        "OTHER_COMPONENT_CLASSES_OUT_OF_SCOPE",
+        "NON_COMMERCIAL_RESEARCH_ONLY"
+      ]
+    },
+    {
+      "id": "roboflow-gec-surat-pcb-object-detection",
+      "source_url": "https://universe.roboflow.com/gec-surat/pcb-w4vdj-fxxx5",
+      "license": "Public Domain (Roboflow page claim)",
+      "advertised_images": 672,
+      "advertised_classes": 23,
+      "status": "DOWNLOAD_VERSION_NOT_AVAILABLE",
+      "reason": [
+        "DATASET_PAGE_REPORTS_ZERO_VERSIONS",
+        "NO_EXPORT_URL_AVAILABLE"
+      ]
+    },
+    {
+      "id": "roboflow-doha-ragab-pcb-components-all",
+      "source_url": "https://universe.roboflow.com/doharagab/pcb-components-all-hsy38",
+      "license": "MIT (Roboflow page claim)",
+      "advertised_images": 1126,
+      "advertised_classes": [
+        "Resistor",
+        "Capacitor",
+        "Transformer",
+        "Diode",
+        "Transistor",
+        "IC",
+        "MOSFET",
+        "MOV"
+      ],
+      "status": "EXPORT_ACCESS_DENIED",
+      "reason": [
+        "PUBLIC_EXPORT_ENDPOINT_RETURNED_HTTP_403",
+        "SOURCE_IMAGE_OVERLAP_WITH_KAGGLE_CANDIDATE_NOT_ASSESSED"
+      ]
+    },
+    {
+      "id": "parsa-victor-pcb-component-yolo26",
+      "source_url": "https://github.com/ParsaVictor/pcb-component-detection-yolo26",
+      "license": "Repository MIT; source dataset declared CC BY 4.0",
+      "advertised_boards": 458,
+      "advertised_tiles": 3618,
+      "advertised_boxes": 107810,
+      "status": "ORIGINAL_DOWNLOAD_REQUIRES_ROBOFLOW_API_ACCESS",
+      "reason": [
+        "README_REBUILD_REQUIRES_ROBOFLOW_API_KEY",
+        "TILES_ARE_DERIVED_NOT_INDEPENDENT_IMAGES",
+        "SOURCE_OVERLAP_AND_LICENSE_ATTRIBUTION_NEED_AUDIT"
+      ]
+    },
+    {
+      "id": "arshia-huggingface-pcb-object-detection",
+      "source_url": "https://huggingface.co/datasets/Arshia82sbn/pcb-object-detection-dataset",
+      "license": "MIT (dataset card claim)",
+      "dataset_card_claimed_images": 1961,
+      "repository_files": [
+        "README.md",
+        "confusion_matrix.png",
+        "data_config.yaml",
+        "labels_distribution.jpg",
+        "training_results.png"
+      ],
+      "repository_total_bytes": 779866,
+      "status": "METADATA_ONLY_NO_IMAGE_OR_LABEL_FILES",
+      "reason": [
+        "HUGGING_FACE_REPOSITORY_CONTAINS_NO_DATASET_IMAGES_OR_LABELS"
+      ]
     }
   ],
-  "canonical_model_training_addition": {"images": 0, "verified_unique_boards": 0, "status": "NO_NEW_SOURCE_IS_TRAINING_READY"},
-  "existing_phase_a_dataset": {"images": 130, "boxes": 3300, "treatment": "PRESERVED_UNCHANGED_NOT_COUNTED_AS_NEW_ACQUISITION"}
+  "canonical_model_training_addition": {
+    "images": 0,
+    "verified_unique_boards": 0,
+    "status": "NO_ADDITION_TO_CANONICAL_10_CLASS_TRAINING"
+  },
+  "existing_phase_a_dataset": {
+    "images": 130,
+    "boxes": 3300,
+    "treatment": "PRESERVED_UNCHANGED_NOT_COUNTED_AS_NEW_ACQUISITION"
+  },
+  "candidate_loader_smoke": {
+    "manifest": "data/component_training/processed/external-pcb-candidate-loader-smoke-v3/candidate_manifest.json (local ignored artifact)",
+    "source_image_manifest_rows": 1410,
+    "exported_annotated_images": {
+      "train": 1099,
+      "validation": 197
+    },
+    "exported_boxes": 11119,
+    "excluded_unreviewed_empty_label_images": 114,
+    "status": "LOADER_SMOKE_ONLY_NOT_TRAINING_READY"
+  },
+  "phase_decision": "DATASET_EXPANSION_READY_FOR_SINGLE_CLASS_IC_EXPERIMENT",
+  "candidate_duplicate_audit": {
+    "exact_duplicates_within_kaggle_candidate": 0,
+    "phash_distance_le_2_pairs": 19,
+    "phash_distance_le_4_pairs": 74,
+    "source_stem_groups_crossing_splits": 37,
+    "cross_dataset_exact_overlaps_with_phase_a": 0,
+    "cross_dataset_phash_le_4_candidates_with_phase_a": 0,
+    "wacv_alternate_encoding_pairs": 6,
+    "wacv_exact_duplicate_pairs": 0,
+    "board_identity": "UNRESOLVED",
+    "pcb_dslr_part1": {
+      "images": 87,
+      "exact_duplicates": 0,
+      "phash_distance_le_4_pairs": 0,
+      "cross_phase_a_exact": 0,
+      "cross_phase_a_phash_le_4": 0
+    }
+  },
+  "experimental_training_addition": {
+    "dataset": "pcb-dslr-part1-ic-research-v1",
+    "images": 87,
+    "source_board_groups": 20,
+    "boxes": 2132,
+    "class_names": [
+      "integrated_circuit"
+    ],
+    "status": "TRAINING_READY",
+    "license_scope": "NON_COMMERCIAL_RESEARCH_ONLY"
+  },
+  "acquisition_totals": {
+    "new_image_files": 1550,
+    "annotation_paired_images": 1544,
+    "annotation_unmatched_wacv_images": 6,
+    "experimental_training_ready_images": 87,
+    "experimental_training_ready_source_board_ids": 20,
+    "canonical_10_class_new_images": 0,
+    "all_empty_annotations_are_negative_samples": false
+  },
+  "storage_audit": {
+    "raw_external_directory_approx_bytes": 2473000000,
+    "free_space_after_acquisition_approx_bytes": 142000000000,
+    "raw_data_committed_to_git": false
+  }
 }

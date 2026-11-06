@@ -1,17 +1,31 @@
 # Phase 21.3.2-B — 데이터 품질 및 평가 안전성
 
-## 후보 품질
+## PCB-DSLR part 1
 
-Kaggle/DatasetNinja 변환본은 1,410장, 11,119개의 기하학적으로 유효한 source boxes가 있습니다. 소스 split은 train 1,099 / validation 200 / test 111이며 빈 라벨 이미지는 각각 0 / 3 / 111입니다. 파일명 suffix를 제거한 stem 그룹은 433개이고 37개 그룹이 split을 넘습니다. 고유 파일 해시 1,410개라는 사실은 고유 보드 1,410개를 뜻하지 않습니다. 시각 표본에서도 같은 보드 캡처 시퀀스의 유사 프레임 정황이 있어, `board_group`은 비워 두고 실물 보드 수를 미검증으로 보고합니다.
+- ZIP archive: 281 members, 261 files, 725,793,819 uncompressed bytes; safe path/type/expanded-size checks passed.
+- 20 source PCB folders; 87 JPEG images, 87 annotation TXT files, 87 masks. All images are 4928×3280.
+- 2,132 source IC rotated boxes. Bounds, positive width/height, finite coordinates, image/label/mask pairing and duplicate row checks passed. The box center/size/angle format was confirmed against the publisher API. The export uses axis-aligned bounding boxes enclosing each rotated rectangle.
+- Source says 165 different PCBs for the complete dataset; part 1 contains 20 source PCB IDs. The other seven archives remain undownloaded.
+- Exact duplicates inside the 87 images: 0. pHash Hamming ≤4 pairs: 0. Phase A cross-dataset exact and pHash ≤4 overlaps: 0.
+- Human visual contact-sheet review covered all 87 images and all generated annotation overlays. All were populated PCB images; no domain misclassification was identified. The source boxes remain marked unadjudicated by the publisher.
+- Split by board ID: 14/3/3 train/validation/test board groups; leakage 0.
+- License scope: local non-commercial research only. No commercial or redistribution right is inferred.
 
-WACV는 47개 이미지와 18,201개 XML 객체를 포함하며 XML 안에 부품 외 text/pads/pins/unknown 등의 항목이 섞여 있습니다. 공식 설명은 약 62K component instances를 말하지만 이번 archive의 파싱 객체 수는 18,201입니다. 서로 다른 카운트 정의일 수 있어 혼합하지 않습니다. 라이선스가 확인되지 않아 격리합니다.
+The single-class IC dataset is **`TRAINING_READY` within this restricted experiment scope**. It is not a complete annotation source for the deployed ten-class detector, and must not be mixed with 10-class data as ordinary background.
 
-FPIC의 SMD 52,582행은 부품 클래스 없이 designator/geometry/validation을 담습니다. OCR 23,218행은 문자 관련, VTP 3,954행은 connection/solder 상태입니다. component detector의 클래스 라벨로 바로 대체할 수 없습니다.
+## Kaggle and WACV checks
 
-## 평가 오류 수정
+Kaggle/DatasetNinja contains 1,410 unique exact image hashes and 11,119 boxes. pHash found 19 candidate pairs at distance ≤2 and 74 at ≤4; these were not auto-deleted. There are 433 stem groups, 37 crossing source splits. Against Phase A there are 0 exact and 0 pHash≤4 matches. Its 114 empty annotation files are not reviewed negatives.
 
-`evaluate_component_domain.py`는 이제 `INFERENCE_COMPLETE` 상태, 준비된 모델, `detections` 배열을 확인한 결과만 평가 분모에 넣습니다. 실패 dict나 예외를 빈 검출로 세지 않고 실패 수 및 partial/no-success 상태를 보고합니다. 검토되지 않은 빈 이미지도 평가 음성으로 자동 승격하지 않습니다. 분리할 지표는 populated PCB detection Precision/Recall/mAP, 검토된 빈 PCB image-level FPR와 image당 평균 FP, 브레드보드 FPR입니다. 현재 검토된 negative/board-level 평가셋이 없어 수치는 계산하지 않습니다.
+WACV has 53 image files, 47 XML-paired, 6 unmatched alternate encodings, and 18,201 XML objects including text and board artifacts. Rights and class coverage remain unresolved. FPIC's SMD rows lack component classes; OCR/VTP are different annotation tasks.
 
-## 파이프라인 보호
+## Loader/inference and evaluation
 
-`acquire_component_dataset.py`는 예상 크기 사전조건, 여유 공간 검사, HTTP Range 재개, `.part` 보존, SHA-256 검증 후 원자적 이동을 지원합니다. TAR 추출 전에 경로 traversal·링크·파일 타입·파일 수·확장 크기를 거부합니다. 원본 archive 및 추출물을 지우거나 수정하지 않습니다.
+Ultralytics 8.4.203 parsed the single-class YAML and loaded a batch from each split: train 59 images, validation 14, test 14; each first batch had shape `(2, 3, 320, 320)`. Existing Phase A 10-class YAML also loaded train 77 / validation 24 images.
+
+A Phase A ONNX model successfully ran CPU inference on a PCB-DSLR 4928×3280 image (~314 ms). This confirms runtime compatibility only; it is not an accuracy comparison. No training or benchmark was run.
+
+`scripts/evaluate_component_domain.py` now counts only completed detector inferences. Failures are separate from the false-positive denominator. Reviewed bare-PCB and breadboard evaluation sets are still empty, so those rates are not reported.
+
+
+저장소의 기본 비통합 pytest 선택 조건은 365 passed / 1 skipped / 48 deselected로 통과했습니다. 48개 deselected 테스트는 integration, stress, crash-injection mark가 붙은 별도 CI jobs 대상입니다.

@@ -1,25 +1,42 @@
 # Phase 21.3.2-B — 학습 준비도 결정
 
-## 결정: 신규 데이터 학습에 미포함
+## 결정
 
-주요 목적은 실제 PCB에 실장된 전자 부품 객체 검출입니다. 현 시점에 새 후보에서 canonical 10-class 학습 목록으로 승인된 이미지는 **0장**입니다. 원본 Phase A 목록은 보존됩니다. 이는 최종 데이터셋 전체가 부적합하다는 결론이 아니라, 발견된 파일을 현재 label contract, 권리, 보드 분할 요건에 맞게 승인할 근거가 부족하다는 뜻입니다.
+새로운 PCB 데이터와 annotation을 실제로 확보했습니다. PCB-DSLR archive part 1은 **비상업 연구용 단일 `integrated_circuit` detection 실험에 대해 `TRAINING_READY`**입니다. canonical 10-class detector용으로 승인된 신규 이미지 수는 0입니다. 부분 라벨을 전체 10개 class의 학습 배경으로 오인하지 않도록 이 dataset은 one-class 실험에만 연결했습니다.
 
-| 항목 | 결과 |
+| 지표 | 결과 |
 |---|---:|
-| 신규 취득 후보 | 1,457장 (Kaggle 변환본 1,410 + WACV 47) |
-| 신규 canonical 학습 포함 | 0장 |
-| 신규 검증된 고유 PCB board | 0 (실제 수는 미검증) |
-| 원본 Phase A 유지 | 130장 / 3,300 box |
-| 검토 승인된 negative / breadboard 평가 이미지 | 0장 |
-| Kaggle stem split leakage | 37 / 433 stem groups; FAIL |
+| 신규 다운로드 image files | Kaggle 1,410 + WACV 53 + PCB-DSLR 87 = **1,550** |
+| annotation-paired images | 1,410 + WACV 47 + PCB-DSLR 87 = **1,544**; WACV 6장은 annotation 미매칭 |
+| PCB-DSLR part 1 | 87 images, 2,132 IC boxes, 20 source PCB IDs |
+| one-class train / validation / sealed test | 59 / 14 / 14 images; 14 / 3 / 3 board IDs |
+| PCB-DSLR board-level split leakage | 0 (PASS) |
+| PCB-DSLR exact / pHash≤4 duplicates | 0 / 0; Phase A와 cross overlap 0 / 0 |
+| canonical 10-class 신규 추가 | 0 images |
+| Kaggle empty labels | 114 `EMPTY_UNREVIEWED`, export/negative에서 제외 |
+| WACV unpaired image files | 6; 라이선스도 unresolved |
+| 기존 Phase A 유지 | 130 images / 3,300 boxes; filtered train 77 / validation 24 |
+| ONNX compatibility | Phase A ONNX로 신규 DSLR image CPU inference 성공; accuracy claim 없음 |
+| Mac storage | raw/external 약 2.4 GiB, 마지막 free space 약 136 GiB |
 
-## 다음 승인 조건
+## `TRAINING_READY` scope
 
-1. WACV 및 FPIC 사용 조건을 권리자가 명시한 문서로 확인.
-2. 이미지별 PCB 도메인 분류와 제외 오류를 사람이 확인하고 검토 기록을 manifest에 추가.
-3. 촬영 세션/실물 보드 기준 ID를 확인하고 동일 보드의 close-up을 같은 그룹에 둔 뒤 group split 재생성.
-4. 각 클래스의 mapping 및 annotation completeness를 승인. 빈 라벨은 실제 검토된 경우에만 negative로 표시.
-5. 같은 board group이 split 경계를 넘지 않는지 다시 검사.
-6. 위 조건을 통과한 이미지 ID만 학습 inclusion list에 추가하고 필터링 전후 카운트를 재산출.
+`configs/component_training/pcb-dslr-part1-ic.yaml`은 deployed 10-class 순서를 바꾸지 않는 isolated 1-class experiment입니다. PCB-DSLR 이용 조건은 non-commercial research only이며, 상업적 이용 및 raw redistribution은 허용된 것으로 간주하지 않습니다. 87장의 image/annotation/mask pair와 integrity를 확인했고, 도메인 contact-sheet review와 source-provided board ID를 기록했습니다. 모든 IC source box를 단일 canonical experiment class로 변환했으며 board-level split은 통과했습니다. 따라서 **1-class 연구 목적에 한해** 학습 가능한 YOLO YAML과 DataLoader가 준비됐습니다.
 
-이번 작업에서는 모델 재학습을 실행하지 않았으며, 검토/추적 가능한 manifest와 조사 보고서만 저장했습니다.
+## 범위 한계
+
+Kaggle의 1,410 images와 WACV의 47 XML-paired images는 확보됐지만 canonical 10-class 학습에 넣지 않습니다. Kaggle은 board identity와 source split leakage가 미해결이며, WACV는 라이선스·미매핑 class가 있습니다. PCB-DSLR에는 IC 외 부품 라벨이 없으므로 10-class dataset의 빈 배경처럼 혼합하지 않습니다. 이 확장은 전체 배포 모델을 비교할 완전한 10-class 데이터 증대를 제공하지 않으며, IC one-class 연구와 향후 IC class 성능 개선에 쓸 수 있습니다.
+
+검토된 bare PCB 및 breadboard hard-negative set은 신규 출처에 없습니다. Phase A 수동 domain review에는 breadboard 10장, loose component collection 19장이 있었고 bare PCB hard negative는 0장입니다. Kaggle의 114 empty labels는 “빈 PCB” 이미지 수가 아닙니다.
+
+## Smoke / 검증 결과
+
+- PCB-DSLR train/validation/test DataLoader: 59/14/14 images, batch `(2, 3, 320, 320)` 성공.
+- 기존 Phase A 10-class DataLoader: train 77 / validation 24 성공.
+- Phase A ONNX의 신규 PCB image inference 성공; accuracy 지표 산출 안 함.
+- 모델 재학습 및 성능 비교는 실행하지 않았습니다.
+- 저장소 CI의 기본 Python job과 같은 비통합 pytest 선택 조건: **365 passed, 1 skipped, 48 deselected**. 경고는 기존 zip duplicate-path fixture에서 발생했으며 테스트는 통과했습니다.
+- 신규 PCB-DSLR source manifest: [pcb-dslr-part1-ic-manifest.json](../data/component_training/manifests/pcb-dslr-part1-ic-manifest.json).
+- 검토용 4페이지 contact sheet 및 review index: 로컬 ignored 경로 `data/component_training/processed/pcb-dslr-part1-ic-v3/contact-sheets/`.
+
+전체 학습랩과 결과는 [Phase 21.3.2 학습랩](PHASE21_3_2_TRAINING_LAB.md)에 연결되어 있습니다.

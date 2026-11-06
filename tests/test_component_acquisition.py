@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import io
 import tarfile
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,35 @@ def test_download_keeps_partial_on_interrupted_size(tmp_path, monkeypatch):
     assert (tmp_path / "x.bin.part").read_bytes() == b"short"
 
 
+def test_download_rejects_checksum_mismatch_and_preserves_partial(tmp_path, monkeypatch):
+    monkeypatch.setattr(acquire.urllib.request, "urlopen", lambda *a, **k: FakeResponse(b"wrong"))
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        acquire.download_file("https://example.invalid/dataset", tmp_path / "x.bin",
+                              expected_size=5, expected_sha256="0" * 64)
+    assert (tmp_path / "x.bin.part").read_bytes() == b"wrong"
+    assert not (tmp_path / "x.bin").exists()
+
+
+def test_download_surfaces_url_failure_without_publishing(tmp_path, monkeypatch):
+    def fail(*_args, **_kwargs):
+        raise OSError("connection refused")
+    monkeypatch.setattr(acquire.urllib.request, "urlopen", fail)
+    with pytest.raises(OSError, match="connection refused"):
+        acquire.download_file("https://example.invalid/dataset", tmp_path / "x.bin", expected_size=5)
+    assert not (tmp_path / "x.bin").exists()
+
+
+def test_resume_rejects_wrong_content_range(tmp_path, monkeypatch):
+    target = tmp_path / "x.bin"
+    target.with_name("x.bin.part").write_bytes(b"ab")
+    response = FakeResponse(b"cdef", status=206)
+    response.headers["Content-Range"] = "bytes 0-3/6"
+    monkeypatch.setattr(acquire.urllib.request, "urlopen", lambda *a, **k: response)
+    with pytest.raises(OSError, match="invalid Content-Range"):
+        acquire.download_file("https://example.invalid/dataset", target, expected_size=6)
+    assert target.with_name("x.bin.part").read_bytes() == b"ab"
+
+
 def test_tar_preflight_rejects_path_traversal(tmp_path):
     archive_path = tmp_path / "unsafe.tar"
     with tarfile.open(archive_path, "w") as archive:
@@ -76,3 +106,32 @@ def test_tar_preflight_reports_expanded_size_and_safe_extract(tmp_path):
     out = tmp_path / "out"
     acquire.safe_extract_tar(archive_path, out)
     assert (out / "folder/file.txt").read_bytes() == b"ok"
+
+
+def test_zip_preflight_and_safe_extract(tmp_path):
+    archive_path = tmp_path / "safe.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("folder/file.txt", "ok")
+    assert acquire.inspect_zip(archive_path)["uncompressed_bytes"] == 2
+    out = tmp_path / "out"
+    acquire.safe_extract_zip(archive_path, out)
+    assert (out / "folder/file.txt").read_text() == "ok"
+
+
+def test_zip_preflight_rejects_path_traversal(tmp_path):
+    archive_path = tmp_path / "unsafe.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("../outside.txt", "bad")
+    with pytest.raises(ValueError, match="unsafe archive path"):
+        acquire.inspect_zip(archive_path)
+
+
+def test_zip_preflight_rejects_symlink_member(tmp_path):
+    archive_path = tmp_path / "link.zip"
+    info = zipfile.ZipInfo("shortcut")
+    info.create_system = 3
+    info.external_attr = (0o120777 << 16)
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(info, "../outside")
+    with pytest.raises(ValueError, match="unsupported archive member type"):
+        acquire.inspect_zip(archive_path)

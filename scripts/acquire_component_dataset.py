@@ -7,8 +7,10 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import tarfile
 import urllib.request
+import zipfile
 from pathlib import Path, PurePosixPath
 
 
@@ -52,6 +54,11 @@ def download_file(url: str, destination: Path, *, expected_size: int,
             offset = 0  # Server ignored Range; restart the partial file safely.
         elif offset and status != 206:
             raise OSError(f"server rejected resume with HTTP {status}")
+        elif offset:
+            content_range = response.headers.get("Content-Range", "")
+            expected_prefix = f"bytes {offset}-"
+            if not content_range.startswith(expected_prefix) or not content_range.endswith(f"/{expected_size}"):
+                raise OSError(f"invalid Content-Range for resume: {content_range!r}")
         mode = "ab" if append else "wb"
         with part.open(mode) as output:
             shutil.copyfileobj(response, output, length=1024 * 1024)
@@ -112,6 +119,60 @@ def safe_extract_tar(path: Path, output_dir: Path, *, max_members: int = 100_000
     return summary
 
 
+def inspect_zip(path: Path, *, max_members: int = 100_000,
+                max_uncompressed_bytes: int = 100_000_000_000) -> dict:
+    """Preflight ZIP paths/types/expanded size; reject links and traversal."""
+    with zipfile.ZipFile(path) as archive:
+        members = archive.infolist()
+    if len(members) > max_members:
+        raise ValueError(f"archive member count exceeds limit: {len(members)}")
+    total, seen = 0, set()
+    for member in members:
+        raw_name = member.filename
+        name = PurePosixPath(raw_name)
+        if "\\" in raw_name or name.is_absolute() or ".." in name.parts:
+            raise ValueError(f"unsafe archive path: {raw_name}")
+        normalized = str(name)
+        if normalized in seen:
+            raise ValueError(f"duplicate archive member path: {raw_name}")
+        seen.add(normalized)
+        mode = member.external_attr >> 16
+        file_type = stat.S_IFMT(mode)
+        if file_type not in (0, stat.S_IFREG, stat.S_IFDIR):
+            raise ValueError(f"unsupported archive member type: {raw_name}")
+        total += 0 if member.is_dir() else member.file_size
+        if total > max_uncompressed_bytes:
+            raise ValueError(f"archive expanded bytes exceed limit: {total}")
+    return {"member_count": len(members), "file_count": sum(not m.is_dir() for m in members),
+            "uncompressed_bytes": total}
+
+
+def safe_extract_zip(path: Path, output_dir: Path, *, max_members: int = 100_000,
+                     max_uncompressed_bytes: int = 100_000_000_000) -> dict:
+    """Extract validated regular files only, after checking free disk space."""
+    summary = inspect_zip(path, max_members=max_members,
+                          max_uncompressed_bytes=max_uncompressed_bytes)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(output_dir).free
+    if free < summary["uncompressed_bytes"]:
+        raise OSError(f"insufficient disk space for extraction: need {summary['uncompressed_bytes']}, have {free}")
+    root = output_dir.resolve()
+    with zipfile.ZipFile(path) as archive:
+        for member in archive.infolist():
+            target = (root / PurePosixPath(member.filename)).resolve()
+            if root not in target.parents and target != root:
+                raise ValueError(f"archive path escapes extraction root: {member.filename}")
+            if member.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                raise FileExistsError(target)
+            with archive.open(member) as source, target.open("xb") as destination:
+                shutil.copyfileobj(source, destination, length=1024 * 1024)
+    return summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -125,14 +186,23 @@ def main() -> int:
     extract = sub.add_parser("extract-tar", help="safely extract a preflighted tar archive")
     extract.add_argument("archive", type=Path)
     extract.add_argument("--output-dir", type=Path, required=True)
+    inspect_zip_parser = sub.add_parser("inspect-zip", help="preflight ZIP expansion before extracting")
+    inspect_zip_parser.add_argument("archive", type=Path)
+    extract_zip = sub.add_parser("extract-zip", help="safely extract a preflighted ZIP archive")
+    extract_zip.add_argument("archive", type=Path)
+    extract_zip.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "fetch":
         result = download_file(args.url, args.output, expected_size=args.expected_size,
                                expected_sha256=args.sha256)
     elif args.command == "inspect-tar":
         result = inspect_tar(args.archive)
-    else:
+    elif args.command == "extract-tar":
         result = safe_extract_tar(args.archive, args.output_dir)
+    elif args.command == "inspect-zip":
+        result = inspect_zip(args.archive)
+    else:
+        result = safe_extract_zip(args.archive, args.output_dir)
     print(json.dumps(result, indent=2))
     return 0
 

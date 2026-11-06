@@ -34,3 +34,7 @@ The dataset has zero source-verified physical board IDs. The “board” numbers
 Do not mix partially labeled images into ordinary YOLO object-detection training: unlabeled real parts become false background. Retain source class and canonical class separately; map `integrated_circuit` to `ic` or existing class contract only with an explicit mapping. Keep original board identity and source split in a manifest. Group all same-board sides, captures, crops, and augmentations together. Exact SHA-256 duplicates must be removed and perceptual near-duplicates reviewed. Split by physical board before augmentation. Any board with unresolved identity is excluded from locked test claims.
 
 Suggested target classes should first respect the existing deployed ten-class contract. New component classes require re-evaluation of the ONNX output contract and existing caller mappings; adding broad classes such as mosfet or fuse is not a simple class-name rename. The lab config currently matches the deployment detector's ten classes.
+
+## Phase 21.3.2-B 후속 수집
+
+실제 공개 데이터 다운로드, 라이선스/access audit, image-by-image manifest, source class mapping 및 loader/ONNX smoke 결과는 [Phase 21.3.2-B dataset acquisition report](PHASE21_3_2_B_DATASET_ACQUISITION.md)를 참조한다. 신규 source data는 현재 학습 준비 상태가 아니며, 이 보고서의 `DATASET_EXPANSION_BLOCKED` 판정을 유지한다.

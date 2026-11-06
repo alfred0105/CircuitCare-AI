@@ -41,3 +41,7 @@ An empty label file never qualifies an image as empty. The manifest requires exp
 ## Verification state
 
 MPS doctor and a synthetic 1-epoch smoke passed. A fresh YOLOv8n run trained 40 epochs on the filtered dataset at 640px, batch 2, workers 0, FP32 on MPS. It underperformed the pinned baseline on the same 24-image board-group development validation and is not a replacement. ONNX export and raw PyTorch/ONNX parity passed (max absolute error 0.00214). Source labels remain unadjudicated, so reported metrics are development source-label comparisons. Refer to `PHASE21_3_2_DATASET_EXPANSION.md`, `PHASE21_3_2_MAC_MPS_TRAINING.md`, `PHASE21_3_2_MODEL_BENCHMARK.md`, and `PHASE21_3_2_ONNX_EXPORT.md` for details.
+
+## Phase 21.3.2-B 확장 상태
+
+후속 수집 및 품질 검증 결과는 [Phase 21.3.2-B acquisition report](PHASE21_3_2_B_DATASET_ACQUISITION.md)에서 확인한다. PCB-DSLR part 1로 비상업 연구 전용 `integrated_circuit` 1-class 데이터셋(87 images / 20 source PCB IDs)을 준비했다. canonical 10-class용 데이터 확장은 아직 승인되지 않았다.

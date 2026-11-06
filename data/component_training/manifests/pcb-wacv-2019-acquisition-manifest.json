@@ -1,7 +1,10 @@
 {
-  "manifest_version": "1.0",
+  "manifest_version": "1.1",
   "source_license": "UNSPECIFIED_LICENSE_REVIEW_REQUIRED",
-  "image_count": 47,
+  "image_file_count": 53,
+  "annotation_paired_image_count": 47,
+  "missing_annotation_image_count": 6,
+  "source_objects": 18201,
   "policy": "Source labels include non-component categories; no training use until rights and class coverage are reviewed.",
   "images": [
     {
@@ -1027,6 +1030,40 @@
       "canonical_10_class_coverage": "INCOMPLETE",
       "training_include": false,
       "exclusion_reason": "LICENSE_REVIEW_REQUIRED_AND_PARTIAL_CLASS_COVERAGE"
+    },
+    {
+      "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/ArduinoMega_Bottom/ArduinoMega_Bottom.png",
+      "annotation": null,
+      "image_sha256": "3becc31d4a2b47a0f90829015a8d3926260fb2163c092b173a1b5525b590989a",
+      "annotation_sha256": null,
+      "image_type": "POPULATED_PCB",
+      "classification_status": "AUTO_CLASSIFIED",
+      "classification_confidence": "MEDIUM",
+      "review_status": "LICENSE_REVIEW_REQUIRED",
+      "board_group": null,
+      "board_group_review_status": "BOARD_ID_UNRESOLVED",
+      "annotation_count": null,
+      "source_classes": {},
+      "canonical_10_class_coverage": "UNKNOWN",
+      "training_include": false,
+      "exclusion_reason": "MISSING_ANNOTATION_AND_LICENSE_REVIEW_REQUIRED"
+    },
+    {
+      "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/ArduinoMega_Top/ArduinoMega_Top.jpg",
+      "annotation": null,
+      "image_sha256": "ea8176d25fe97237b3dbef6327772662a55146604e91f4ab7bf43c8f52fe845d",
+      "annotation_sha256": null,
+      "image_type": "POPULATED_PCB",
+      "classification_status": "AUTO_CLASSIFIED",
+      "classification_confidence": "MEDIUM",
+      "review_status": "LICENSE_REVIEW_REQUIRED",
+      "board_group": null,
+      "board_group_review_status": "BOARD_ID_UNRESOLVED",
+      "annotation_count": null,
+      "source_classes": {},
+      "canonical_10_class_coverage": "UNKNOWN",
+      "training_include": false,
+      "exclusion_reason": "MISSING_ANNOTATION_AND_LICENSE_REVIEW_REQUIRED"
     },
     {
       "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/ArduinoMega_Top/ArduinoMega_Top.png",
@@ -2931,6 +2968,23 @@
       "exclusion_reason": "LICENSE_REVIEW_REQUIRED_AND_PARTIAL_CLASS_COVERAGE"
     },
     {
+      "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/DuetWIFI_Bottom/DuetWIFI_Bottom.png",
+      "annotation": null,
+      "image_sha256": "feed08632737d2f653321f06e9aeeb0382e6a7762b42051f1be692d6b1409f1e",
+      "annotation_sha256": null,
+      "image_type": "POPULATED_PCB",
+      "classification_status": "AUTO_CLASSIFIED",
+      "classification_confidence": "MEDIUM",
+      "review_status": "LICENSE_REVIEW_REQUIRED",
+      "board_group": null,
+      "board_group_review_status": "BOARD_ID_UNRESOLVED",
+      "annotation_count": null,
+      "source_classes": {},
+      "canonical_10_class_coverage": "UNKNOWN",
+      "training_include": false,
+      "exclusion_reason": "MISSING_ANNOTATION_AND_LICENSE_REVIEW_REQUIRED"
+    },
+    {
       "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/DuetWIFI_Top/DuetWIFI_Top.jpg",
       "annotation": "pcb-wacv-2019/extracted/pcb_wacv_2019/DuetWIFI_Top/DuetWIFI_Top.xml",
       "image_sha256": "712c5e91d00fadd1db69d3828ddcbf4ee7b94e02e766f3d6ccaa35b527e10678",
@@ -3585,6 +3639,23 @@
       "canonical_10_class_coverage": "INCOMPLETE",
       "training_include": false,
       "exclusion_reason": "LICENSE_REVIEW_REQUIRED_AND_PARTIAL_CLASS_COVERAGE"
+    },
+    {
+      "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/DuetWIFI_Top/DuetWIFI_Top.png",
+      "annotation": null,
+      "image_sha256": "2ee74b8b7f3632ad9ce9d1919c3d67dd10b866d352eccbd7355901f114055962",
+      "annotation_sha256": null,
+      "image_type": "POPULATED_PCB",
+      "classification_status": "AUTO_CLASSIFIED",
+      "classification_confidence": "MEDIUM",
+      "review_status": "LICENSE_REVIEW_REQUIRED",
+      "board_group": null,
+      "board_group_review_status": "BOARD_ID_UNRESOLVED",
+      "annotation_count": null,
+      "source_classes": {},
+      "canonical_10_class_coverage": "UNKNOWN",
+      "training_include": false,
+      "exclusion_reason": "MISSING_ANNOTATION_AND_LICENSE_REVIEW_REQUIRED"
     },
     {
       "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/EDA-008_Bottom/EDA-008_Bottom.jpg",
@@ -9008,6 +9079,23 @@
       "exclusion_reason": "LICENSE_REVIEW_REQUIRED_AND_PARTIAL_CLASS_COVERAGE"
     },
     {
+      "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/OlimexRed/OlimexRed.png",
+      "annotation": null,
+      "image_sha256": "60f4f57d2d0138105fe355a3385ee6e730313e66e6038390ce43f67cc424bae2",
+      "annotation_sha256": null,
+      "image_type": "POPULATED_PCB",
+      "classification_status": "AUTO_CLASSIFIED",
+      "classification_confidence": "MEDIUM",
+      "review_status": "LICENSE_REVIEW_REQUIRED",
+      "board_group": null,
+      "board_group_review_status": "BOARD_ID_UNRESOLVED",
+      "annotation_count": null,
+      "source_classes": {},
+      "canonical_10_class_coverage": "UNKNOWN",
+      "training_include": false,
+      "exclusion_reason": "MISSING_ANNOTATION_AND_LICENSE_REVIEW_REQUIRED"
+    },
+    {
       "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/RPI3B_Bottom/RPI3B_Bottom.jpg",
       "annotation": "pcb-wacv-2019/extracted/pcb_wacv_2019/RPI3B_Bottom/RPI3B_Bottom.xml",
       "image_sha256": "b9e6c2f55a556a51037a16010a0282e93acd7ba1c9773c6b6c6eac7ef73e112c",
@@ -11415,6 +11503,23 @@
       "canonical_10_class_coverage": "INCOMPLETE",
       "training_include": false,
       "exclusion_reason": "LICENSE_REVIEW_REQUIRED_AND_PARTIAL_CLASS_COVERAGE"
+    },
+    {
+      "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/ThingMagicM6e/ThingMagicM6e.png",
+      "annotation": null,
+      "image_sha256": "01a835e98bdac37719e6b0058e56301ef7a365577367e23183815184a39807e5",
+      "annotation_sha256": null,
+      "image_type": "POPULATED_PCB",
+      "classification_status": "AUTO_CLASSIFIED",
+      "classification_confidence": "MEDIUM",
+      "review_status": "LICENSE_REVIEW_REQUIRED",
+      "board_group": null,
+      "board_group_review_status": "BOARD_ID_UNRESOLVED",
+      "annotation_count": null,
+      "source_classes": {},
+      "canonical_10_class_coverage": "UNKNOWN",
+      "training_include": false,
+      "exclusion_reason": "MISSING_ANNOTATION_AND_LICENSE_REVIEW_REQUIRED"
     },
     {
       "image": "pcb-wacv-2019/extracted/pcb_wacv_2019/UTL-016/UTL-016.jpg",
