@@ -1,0 +1,92 @@
+{
+  "Cap1": {
+    "source_annotation_count": 1295,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 431,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Cap2": {
+    "source_annotation_count": 1264,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 430,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Cap3": {
+    "source_annotation_count": 1199,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 429,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Cap4": {
+    "source_annotation_count": 1074,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 378,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "MOSFET": {
+    "source_annotation_count": 1295,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 430,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Mov": {
+    "source_annotation_count": 1291,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 430,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Resestor": {
+    "source_annotation_count": 3,
+    "gallery_sample_count": 1,
+    "unique_filename_groups": 1,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Resistor": {
+    "source_annotation_count": 1151,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 412,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  },
+  "Transformer": {
+    "source_annotation_count": 2547,
+    "gallery_sample_count": 40,
+    "unique_filename_groups": 431,
+    "confirmed_meaning": null,
+    "confirmed_mislabels": null,
+    "mapping_decision": "MAPPING_PENDING",
+    "reviewer": null,
+    "evidence": "NOT_HUMAN_VERIFIED"
+  }
+}

@@ -82,5 +82,58 @@
     "images": 1410,
     "reviewed": 0,
     "path": "data/component_training/manifests/kaggle-component-review-queue/review-queue.csv"
+  },
+  "phase_21_3_2_c1": {
+    "status": "AUTOMATED_CANDIDATE_ANALYSIS_COMPLETE_HUMAN_REVIEW_PENDING",
+    "identity_report": "data/component_training/manifests/pcb-component-detection-c1-identity-annotation-report.json",
+    "filename_groups_analyzed": 433,
+    "cross_split_filename_groups": 37,
+    "feature_match_candidate_pairs": 660,
+    "match_overlays_generated_max": 100,
+    "class_gallery_sample_counts": {
+      "Cap1": 40,
+      "Cap2": 40,
+      "Cap3": 40,
+      "Cap4": 40,
+      "MOSFET": 40,
+      "Mov": 40,
+      "Resestor": 1,
+      "Resistor": 40,
+      "Transformer": 40
+    },
+    "empty_annotation_review_queue": 114,
+    "empty_reviewed": 0,
+    "physical_board_ids_human_confirmed": 0,
+    "class_mappings_human_confirmed": 0,
+    "annotation_boxes_human_verified": 0,
+    "source_annotations_modified": 0,
+    "pseudo_labels_promoted": 0,
+    "canonical_10_class_images": 0,
+    "source_only_images": 0,
+    "board_level_train_val_test_created": false,
+    "dataloader_smoke_test": "NOT_RUN_NO_APPROVED_TRAINING_DATA",
+    "training": "NOT_RUN",
+    "automated_review_method": "Filename group representatives; pHash cutoff 14 plus ORB ratio matches and RANSAC homography; class box galleries",
+    "limitations": [
+      "ORB and pHash matches are review candidates, not physical board identity proof.",
+      "No deployed pcb_component_detector.onnx was available in the workspace; other local experiment checkpoints are ineligible for label verification.",
+      "All source annotations remain unadjudicated and the 114 empty labels remain EMPTY_UNREVIEWED."
+    ],
+    "strong_orb_review_candidates_inliers_ge_20_ratio_ge_0_7": 425,
+    "feature_match_overlays_generated": 100,
+    "annotation_geometry_review_candidate_rows": 1430,
+    "annotation_geometry_candidate_reasons": {
+      "BOX_TOUCHES_IMAGE_EDGE_REVIEW_CANDIDATE": 1427,
+      "VERY_SMALL_RELATIVE_AREA_REVIEW_CANDIDATE": 3
+    },
+    "annotation_candidate_queue": "data/component_training/manifests/pcb-component-detection-c1-annotation-review-candidates.csv",
+    "feature_candidate_pairs_with_different_source_split_membership": 228,
+    "local_ci_python_3_12": {
+      "standard_suite": "392 passed, 1 skipped, 48 deselected",
+      "integration": "33 passed, 1 skipped (deployment ONNX unavailable)",
+      "stress": "11 passed",
+      "crash_injection": "3 passed",
+      "native_ocr_required": "1 passed"
+    }
   }
 }

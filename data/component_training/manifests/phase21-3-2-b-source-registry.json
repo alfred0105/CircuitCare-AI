@@ -321,5 +321,59 @@
     "ai_domain_candidates": 1410,
     "human_domain_review_pending": 1410,
     "review_queue": "data/component_training/manifests/kaggle-component-review-queue/review-queue.csv"
+  },
+  "phase_21_3_2_c1_identity_annotation_recovery": {
+    "identity_report": "data/component_training/manifests/pcb-component-detection-c1-identity-annotation-report.json",
+    "class_review": "data/component_training/manifests/pcb-component-detection-c1-class-review.json",
+    "empty_review_queue": "data/component_training/manifests/pcb-component-detection-c1-empty-review-queue.csv",
+    "docs": [
+      "docs/PHASE21_3_2_C1_BOARD_IDENTIFICATION.md",
+      "docs/PHASE21_3_2_C1_CLASS_VERIFICATION.md",
+      "docs/PHASE21_3_2_C1_ANNOTATION_RECOVERY.md",
+      "docs/PHASE21_3_2_C1_TRAINING_DATASET.md",
+      "docs/PHASE21_3_2_C1_VALIDATION.md"
+    ],
+    "analyzer": "scripts/analyze_kaggle_component_c1.py",
+    "images_analyzed": 1410,
+    "filename_stem_groups_analyzed": 433,
+    "source_split_collision_groups": 37,
+    "images_in_collision_groups": 219,
+    "phash_orb_ransac_candidate_pairs": 660,
+    "feature_match_overlay_maximum": 100,
+    "empty_annotation_review_queue_images": 114,
+    "class_gallery_samples": {
+      "Cap1": 40,
+      "Cap2": 40,
+      "Cap3": 40,
+      "Cap4": 40,
+      "MOSFET": 40,
+      "Mov": 40,
+      "Resestor": 1,
+      "Resistor": 40,
+      "Transformer": 40
+    },
+    "human_confirmed_physical_board_ids": 0,
+    "human_confirmed_class_mappings": 0,
+    "human_verified_annotations": 0,
+    "source_labels_modified": false,
+    "canonical_10_class_training_images": 0,
+    "source_only_training_images": 0,
+    "dataset_split": "NOT_CREATED_NO_VERIFIED_BOARD_IDENTITIES",
+    "training_status": "BLOCKED_PENDING_HUMAN_IDENTITY_CLASS_AND_ANNOTATION_REVIEW",
+    "deployed_onnx_available_for_annotation_review": false,
+    "pseudo_label_candidates_promoted": 0,
+    "raw_data_changed": false,
+    "strong_orb_candidates_inliers_ge_20_ratio_ge_0_7": 425,
+    "feature_match_overlays_generated": 100,
+    "geometry_review_candidate_rows": 1430,
+    "geometry_review_queue": "data/component_training/manifests/pcb-component-detection-c1-annotation-review-candidates.csv",
+    "feature_candidate_pairs_with_different_source_split_membership": 228,
+    "local_ci_python_3_12": {
+      "standard_suite": "392 passed, 1 skipped, 48 deselected",
+      "integration": "33 passed, 1 skipped (deployment ONNX unavailable)",
+      "stress": "11 passed",
+      "crash_injection": "3 passed",
+      "native_ocr_required": "1 passed"
+    }
   }
 }
