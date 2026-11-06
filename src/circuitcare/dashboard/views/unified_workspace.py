@@ -8,6 +8,11 @@ import tempfile
 from typing import Any
 
 from circuitcare.frontend.models import ProjectContext
+from circuitcare.frontend.component_map_adapter import (
+    REGISTRATION_LABELS, component_map_cache_key, decode_canonical_image,
+    map_backend_photo_ids, optional_backend_provider, validate_component_map,
+)
+from circuitcare.frontend.photo_adapter import adapt_component_map_input
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY, clear_intake_draft,
     reset_intake_for_new_project,
@@ -56,7 +61,62 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
             st.session_state.pop(VIEW_ZOOM_KEY, None)
             st.rerun()
         return
-    ids = [item["image_id"] for item in valid]
+    sides = {records[item["image_id"]].side for item in valid}
+    available_sides = [side for side in ("front", "back") if side in sides]
+    if len(available_sides) > 1:
+        active_side = st.selectbox("면", available_sides,
+                                   format_func=lambda side: "앞면" if side == "front" else "뒷면",
+                                   key="circuitcare_v3_active_side")
+    else:
+        active_side = available_sides[0] if available_sides else "unknown"
+    side_valid = [item for item in valid if records[item["image_id"]].side == active_side]
+    ids = [item["image_id"] for item in side_valid]
+    # Keep backend work behind an explicit button; browsing and tab changes never rerun it.
+    ready_inputs = []
+    if project.board_id:
+        for item in side_valid:
+            result = adapt_component_map_input(records[item["image_id"]], board_id=project.board_id, data=item["data"])
+            if result.request is not None:
+                ready_inputs.append(result.request)
+    provider = optional_backend_provider()
+    if provider is None:
+        st.caption("백엔드 미연결 · 원본 사진 보기")
+    elif not ready_inputs:
+        st.caption("사진 정보 부족 · 원본 사진 보기")
+    else:
+        cache_key = component_map_cache_key(project_id=project.project_id, board_id=project.board_id or "", inputs=ready_inputs)
+        result_key = "circuitcare_v3_component_map_result"
+        key_key = "circuitcare_v3_component_map_cache_key"
+        if st.session_state.get(key_key) != cache_key:
+            st.session_state.pop(result_key, None)
+            st.session_state[key_key] = cache_key
+        if st.button("사진 정합 실행", key="circuitcare_v3_build_map"):
+            try:
+                raw_map = provider.build_component_map(
+                    board_id=project.board_id,
+                    photos=[{"data": p.data, "side": p.side, "role": p.role, "name": p.name} for p in ready_inputs],
+                )
+                st.session_state[result_key] = validate_component_map(raw_map, board_id=project.board_id)
+                st.session_state["circuitcare_v3_photo_map"] = map_backend_photo_ids(
+                    project_id=project.project_id, board_id=project.board_id,
+                    inputs=ready_inputs, result=raw_map,
+                )
+            except Exception:
+                st.session_state.pop(result_key, None)
+                st.warning("정합 불가 · 원본 사진 보기")
+        if st.session_state.get(result_key):
+            st.caption("정합 결과 후보 · 정확도 미검증")
+    component_map = st.session_state.get("circuitcare_v3_component_map_result")
+    canonical = None
+    side_enum = {"front": "TOP", "back": "BOTTOM"}.get(active_side)
+    if component_map and side_enum:
+        canonical = component_map.get("sides", {}).get(side_enum, {}).get("canonical_image")
+    mode_options = ["원본 사진"] + (["통합 이미지"] if canonical else [])
+    mode = st.radio("보기", mode_options, horizontal=True, key="circuitcare_v3_view_mode")
+    ids = [item["image_id"] for item in side_valid]
+    if not ids:
+        st.info("선택한 면의 원본 사진 없음")
+        return
     selected_id = st.session_state.get(ACTIVE_PHOTO_KEY)
     if selected_id not in ids:
         selected_id = ids[0]
@@ -68,7 +128,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     if selected != selected_id:
         update_selection(st.session_state, active_photo_id=selected)
     record = records[selected]
-    image_data = next(item["data"] for item in valid if item["image_id"] == selected)
+    image_data = next(item["data"] for item in side_valid if item["image_id"] == selected)
     size = record.image_dimensions
     if size:
         st.caption(f"{record.filename or 'PCB 사진'} · {record.side} / {record.capture_type} · {size[0]}×{size[1]} px")
@@ -77,20 +137,45 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     zoom = st.slider("확대", min_value=1.0, max_value=2.5, step=0.1,
                      key=VIEW_ZOOM_KEY, label_visibility="collapsed")
     try:
-        loaded = load_board_image(image_data)
-        image = loaded.image
-    except ImageLoadError:
-        st.error("사진을 표시할 수 없습니다.")
+        if mode == "통합 이미지" and canonical:
+            decoded = decode_canonical_image(canonical)
+            image = decoded.image
+            source_size = (decoded.width, decoded.height)
+            active_image_id = decoded.frame_id
+            st.caption(f"MOSAIC_PIXEL · 기준 사진 {decoded.reference_backend_photo_id or '미지정'} · 정합 후보 · 미검증")
+        else:
+            loaded = load_board_image(image_data)
+            image = loaded.image
+            source_size = loaded.original_size
+            active_image_id = selected
+    except (ImageLoadError, ValueError):
+        st.warning("이미지 표시 실패 · 원본 사진 보기")
         return
     width = min(1600, max(320, int(720 * zoom)))
-    st.session_state[VIEW_TRANSFORM_KEY] = requested_view_transform(
-        source_size=loaded.original_size,
+    transform = requested_view_transform(
+        source_size=source_size,
         display_size=(width, max(1, round(width * image.height / image.width))),
-        active_photo_id=selected,
+        active_photo_id=active_image_id,
     )
+    transform.update({
+        "project_id": project.project_id,
+        "board_id": project.board_id,
+        "active_board_side": side_enum or active_side,
+        "active_view_mode": mode,
+        "source_frame_id": active_image_id,
+        "canonical_frame_id": canonical.get("image_id") if canonical else None,
+        "source_dimensions": list(source_size),
+        "canonical_dimensions": canonical.get("image_size_px") if canonical else None,
+        "registration_status": "CANDIDATE_GEOMETRY_ONLY" if mode == "통합 이미지" else "SOURCE_PHOTO",
+        "coordinate_status": "UNVERIFIED_RESPONSIVE_CSS",
+    })
+    st.session_state[VIEW_TRANSFORM_KEY] = transform
     with st.container(key="cc_viewer_canvas"):
         st.image(image, width=width)
-    st.caption("사진별 보기 · 다중 사진 정합은 미실행")
+    if mode == "원본 사진":
+        mapped = st.session_state.get("circuitcare_v3_photo_map", [])
+        entry = next((row for row in mapped if row.frontend_photo_id == selected and row.project_id == project.project_id), None)
+        st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(entry.registration_status, '상태 미확인') if entry else '정합 결과 없음'}")
 
 
 def _photo_label(record: Any, number: int) -> str:
