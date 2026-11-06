@@ -11,6 +11,8 @@ from circuitcare.frontend.measurement_models import (
 
 MEASUREMENTS_KEY = "circuitcare_v5_measurements"
 DIAGNOSIS_STATE_KEY = "circuitcare_v5_diagnosis_state"
+DIAGNOSIS_PROVIDER_KEY = "circuitcare_v5_diagnosis_provider"
+DIAGNOSIS_CONTEXT_KEY = "circuitcare_v5_diagnosis_context"
 
 
 def owner_key(project_id: str, board_id: str) -> str:
@@ -53,6 +55,9 @@ def update_measurement(state: dict[str, Any], updated: MeasurementRecord) -> Non
     original = records[index]
     if original.component_id != updated.component_id:
         raise ValueError("측정 기록의 부품 연결을 임의로 변경할 수 없습니다.")
+    if (original.component_map_version != updated.component_map_version
+            or original.component_identity_status != updated.component_identity_status):
+        raise ValueError("측정 기록의 Component Map 또는 Identity를 수정할 수 없습니다.")
     records[index] = replace(updated, probe_id=original.probe_id, node_id=original.node_id,
                              mapping_status=original.mapping_status,
                              changed_at=updated.changed_at or updated.timestamp,
@@ -90,3 +95,13 @@ def diagnosis_state(state: dict[str, Any], *, project_id: str, board_id: str) ->
     if not isinstance(scoped, dict):
         return {}
     return dict(scoped.get(owner_key(project_id, board_id), {}))
+
+
+def clear_measurement_workspace_state(state: Any) -> None:
+    """Retire temporary measurement, diagnosis, and injected test-provider state."""
+    for key in (MEASUREMENTS_KEY, DIAGNOSIS_STATE_KEY, DIAGNOSIS_PROVIDER_KEY,
+                DIAGNOSIS_CONTEXT_KEY):
+        state.pop(key, None)
+    for key in tuple(state):
+        if str(key).startswith("cc_v5_"):
+            state.pop(key, None)

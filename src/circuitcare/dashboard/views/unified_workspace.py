@@ -14,7 +14,10 @@ from circuitcare.frontend.component_overlay_adapter import (
     adapt_component_map_components, adapt_original_photo_components,
 )
 from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
-from circuitcare.frontend.diagnosis_adapter import DiagnosisContext, adapt_fault_overlay
+from circuitcare.frontend.diagnosis_adapter import (
+    DiagnosisStatus, adapt_fault_overlay, assess_diagnosis_readiness,
+    current_diagnosis_context, is_diagnosis_result_current,
+)
 from circuitcare.frontend.measurement_models import measurement_set_sha256
 from circuitcare.frontend.measurement_state import diagnosis_state, get_measurements
 from circuitcare.frontend.component_map_adapter import (
@@ -28,7 +31,7 @@ from circuitcare.frontend.photo_adapter import adapt_component_map_input
 from circuitcare.dashboard.components.pcb_workspace import (
     SELECTED_MAP_KEY, render_component_viewer, scale_overlay_to_display,
 )
-from circuitcare.dashboard.views.inspection_panel import render_inspection_panel
+from circuitcare.dashboard.views.inspection_panel import MAP_VERSION_KEY, render_inspection_panel
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY, clear_intake_draft,
     reset_intake_for_new_project,
@@ -168,6 +171,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     ):
         entry = None
     component_map = entry["component_map"] if entry else None
+    st.session_state[MAP_VERSION_KEY] = cache_key if component_map else None
     side_enum = {"front": "TOP", "back": "BOTTOM"}.get(active_side)
     side_result = component_map.get("sides", {}).get(side_enum, {}) if component_map and side_enum else {}
     canonical = side_result.get("canonical_image")
@@ -269,21 +273,45 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
                 )
     if overlay_result and overlay_result.status == "INVALID_DATA":
         st.warning("일부 부품 좌표를 검증할 수 없어 표시하지 않았습니다.")
+    selection_context = st.session_state.get(SELECTION_KEY)
+    live_context = current_diagnosis_context(
+        st.session_state, project_id=project.project_id, board_id=project.board_id or "",
+        analysis_context_id=getattr(selection_context, "analysis_context_id", None),
+        component_map_version=cache_key if component_map else None,
+    )
+    scoped_diagnosis = diagnosis_state(
+        st.session_state, project_id=project.project_id, board_id=project.board_id or "",
+    )
+    board_measurements = get_measurements(
+        st.session_state, project_id=project.project_id, board_id=project.board_id or "",
+    )
+    current_measurement_set = measurement_set_sha256(
+        board_measurements, project_id=project.project_id, board_id=project.board_id or "",
+    )
+    live_readiness = assess_diagnosis_readiness(
+        context=live_context, measurements=board_measurements,
+        provider_available=st.session_state.get("circuitcare_v5_diagnosis_provider") is not None,
+    )
+    result_is_current = (
+        scoped_diagnosis.get("status") in {DiagnosisStatus.DIAGNOSIS_COMPLETE, DiagnosisStatus.MODEL_MISMATCH}
+        and is_diagnosis_result_current(
+            stored_result=scoped_diagnosis, current_context=live_context,
+            current_measurement_set=current_measurement_set,
+        )
+    )
+    if result_is_current:
+        result_status = scoped_diagnosis.get("status")
+        display_status = "MODEL_MISMATCH" if result_status == DiagnosisStatus.MODEL_MISMATCH else "DIAGNOSIS_RESULT_NONE"
+    elif scoped_diagnosis.get("result") is not None:
+        display_status = "DIAGNOSIS_UNAVAILABLE"
+    elif live_readiness.status not in {DiagnosisStatus.NO_MEASUREMENT, DiagnosisStatus.DIAGNOSIS_READY}:
+        display_status = "DIAGNOSIS_UNAVAILABLE"
+    else:
+        display_status = "DIAGNOSIS_NOT_RUN"
+    component_models = tuple(replace(item, diagnosis_display_status=display_status) for item in component_models)
     if mode == "통합 이미지" and component_map and side_enum and canonical and decoded_canonical:
-        scoped_diagnosis = diagnosis_state(
-            st.session_state, project_id=project.project_id, board_id=project.board_id or "",
-        )
         stored_diagnosis = scoped_diagnosis.get("result")
-        diagnosis_context = scoped_diagnosis.get("context")
-        board_measurements = get_measurements(
-            st.session_state, project_id=project.project_id, board_id=project.board_id or "",
-        )
-        current_measurement_set = measurement_set_sha256(
-            board_measurements, project_id=project.project_id, board_id=project.board_id or "",
-        )
-        if (scoped_diagnosis.get("status") in {"DIAGNOSIS_COMPLETE", "MODEL_MISMATCH"}
-                and scoped_diagnosis.get("measurement_set_sha256") == current_measurement_set
-                and isinstance(diagnosis_context, DiagnosisContext) and isinstance(stored_diagnosis, dict)):
+        if (result_is_current and isinstance(stored_diagnosis, dict)):
             overlay_rows, overlay_error = adapt_fault_overlay(
                 {
                     "diagnosis": stored_diagnosis,
@@ -292,7 +320,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
                     "component_map_version": stored_diagnosis.get("component_map_version"),
                     "confirmed_component_ids": stored_diagnosis.get("confirmed_component_ids", []),
                 },
-                context=diagnosis_context,
+                context=live_context,
                 measurement_set_sha256=current_measurement_set,
                 board_side=side_enum, canonical_frame_id=decoded_canonical.frame_id,
                 component_ids={item.component_id for item in component_models},
@@ -302,6 +330,10 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
             elif overlay_rows:
                 component_models = tuple(replace(
                     item, fault_candidate_status=overlay_rows[item.component_id]["fault_candidate_status"],
+                    diagnosis_display_status=(
+                        "MODEL_MISMATCH" if scoped_diagnosis.get("status") == DiagnosisStatus.MODEL_MISMATCH
+                        else overlay_rows[item.component_id]["fault_candidate_status"]
+                    ),
                 ) if item.component_id in overlay_rows else item for item in component_models)
     st.session_state["circuitcare_v4_current_components"] = tuple(component_models)
     st.session_state["circuitcare_v4_detection_status"] = detection_status

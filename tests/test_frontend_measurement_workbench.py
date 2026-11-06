@@ -8,6 +8,7 @@ from circuitcare.frontend.measurement_state import (
     diagnosis_state, get_measurements, save_measurement, update_measurement,
     delete_measurement, current_measurement_set_sha256,
 )
+from circuitcare.dashboard.views.measurement_panel import _sigma_for_input_unit
 
 
 def _measurement(**overrides):
@@ -80,3 +81,18 @@ def test_measurement_cannot_be_relinked_to_another_component_on_edit():
     save_measurement(state, row)
     with pytest.raises(ValueError, match="부품 연결"):
         update_measurement(state, replace(row, component_id="c2"))
+
+
+def test_measurement_cannot_be_relinked_to_a_new_map_or_identity_on_edit():
+    state = {}
+    row = _measurement()
+    save_measurement(state, row)
+    with pytest.raises(ValueError, match="Component Map"):
+        update_measurement(state, replace(row, component_map_version="map-v2"))
+    with pytest.raises(ValueError, match="Component Map"):
+        update_measurement(state, replace(row, component_identity_status="USER_CONFIRMED"))
+
+
+def test_ui_uncertainty_stays_in_base_unit_when_measurement_unit_changes():
+    assert float(_sigma_for_input_unit("0.1", "voltage", "mV")) == pytest.approx(100.0)
+    assert float(_sigma_for_input_unit("5", "resistance", "kΩ")) == pytest.approx(0.005)

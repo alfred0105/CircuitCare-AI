@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from circuitcare.frontend.diagnosis_adapter import (
-    DiagnosisContext, DiagnosisStatus, assess_diagnosis_readiness, refresh_diagnosis,
+    DiagnosisContext, DiagnosisStatus, assess_diagnosis_readiness,
+    current_diagnosis_context, is_diagnosis_result_current, refresh_diagnosis,
 )
 from circuitcare.frontend.measurement_models import MeasurementRecord, measurement_set_sha256
 from circuitcare.frontend.measurement_state import (
@@ -34,10 +35,9 @@ def render_diagnosis_panel(
 ) -> None:
     st.markdown("### 진단")
     board_id = project.board_id or ""
-    context = DiagnosisContext(
-        project_id=project.project_id, board_id=board_id,
-        analysis_context_id=analysis_context_id,
-        component_map_version=component_map_version,
+    context = current_diagnosis_context(
+        st.session_state, project_id=project.project_id, board_id=board_id,
+        analysis_context_id=analysis_context_id, component_map_version=component_map_version,
     )
     provider = st.session_state.get("circuitcare_v5_diagnosis_provider")
     readiness = assess_diagnosis_readiness(
@@ -45,11 +45,18 @@ def render_diagnosis_panel(
     )
     stored = diagnosis_state(st.session_state, project_id=project.project_id, board_id=board_id)
     current_set = measurement_set_sha256(measurements, project_id=project.project_id, board_id=board_id)
-    status = stored.get("status") if stored.get("measurement_set_sha256") == current_set else readiness.status
+    result_is_current = is_diagnosis_result_current(
+        stored_result=stored, current_context=context, current_measurement_set=current_set,
+    )
+    status = stored.get("status") if result_is_current else (
+        DiagnosisStatus.STALE_RESULT if stored.get("result") is not None else readiness.status
+    )
     st.markdown(f"**상태** · {STATUS_LABELS.get(status, status)}")
+    if status == DiagnosisStatus.STALE_RESULT:
+        st.warning("분석 조건이 변경되어 기존 진단 결과를 사용할 수 없습니다.")
     for blocker in readiness.blockers:
         st.caption(f"· {blocker}")
-    if status in {DiagnosisStatus.DIAGNOSIS_COMPLETE, DiagnosisStatus.MODEL_MISMATCH}:
+    if result_is_current and status in {DiagnosisStatus.DIAGNOSIS_COMPLETE, DiagnosisStatus.MODEL_MISMATCH}:
         result = stored.get("result")
         if isinstance(result, dict):
             if status == DiagnosisStatus.MODEL_MISMATCH:

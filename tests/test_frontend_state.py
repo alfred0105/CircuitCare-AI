@@ -38,3 +38,29 @@ def test_new_project_reset_clears_multiview_owner_and_viewer_state():
     assert "circuitcare_v3_active_side" not in state
     assert "circuitcare_v3_view_mode" not in state
     assert "circuitcare_v2_view_transform" not in state
+
+
+def test_new_project_reset_clears_f5_measurement_diagnosis_provider_and_selection():
+    from circuitcare.frontend.measurement_state import MEASUREMENTS_KEY, DIAGNOSIS_STATE_KEY
+
+    state = {
+        "circuitcare_v2_selection": "project-a-selection",
+        MEASUREMENTS_KEY: {"project-a": ["measurement"]},
+        DIAGNOSIS_STATE_KEY: {"project-a": {"result": "old-result"}},
+        "circuitcare_v5_diagnosis_provider": object(),
+        "circuitcare_v5_diagnosis_context": {"project-a": "old-context"},
+        "cc_v5_value_project-a-board-a-c1": "3.3",
+    }
+    reset_intake_for_new_project(state)
+    for key in ("circuitcare_v2_selection", MEASUREMENTS_KEY, DIAGNOSIS_STATE_KEY,
+                "circuitcare_v5_diagnosis_provider", "circuitcare_v5_diagnosis_context",
+                "cc_v5_value_project-a-board-a-c1"):
+        assert key not in state
+
+
+def test_editing_intake_keeps_f5_measurement_history():
+    from circuitcare.frontend.measurement_state import MEASUREMENTS_KEY
+
+    state = {MEASUREMENTS_KEY: {"project-a": ["measurement"]}, "symptom": "unknown"}
+    clear_intake_draft(state)
+    assert state[MEASUREMENTS_KEY] == {"project-a": ["measurement"]}

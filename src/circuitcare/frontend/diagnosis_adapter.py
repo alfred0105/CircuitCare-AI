@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from circuitcare.frontend.measurement_models import MeasurementRecord
 from circuitcare.frontend.measurement_adapter import to_diagnosis_measurement
 from circuitcare.frontend.measurement_models import measurement_set_sha256
+from circuitcare.frontend.measurement_state import DIAGNOSIS_CONTEXT_KEY, owner_key
 
 
 class DiagnosisStatus:
@@ -33,6 +34,63 @@ class DiagnosisContext:
     hypothesis_set_id: str | None = None
     component_map_version: str | None = None
     mapping_status: str = "UNAVAILABLE"
+
+
+_CONTEXT_FIELDS = (
+    "project_id", "board_id", "analysis_context_id", "circuit_model_id",
+    "circuit_model_version", "hypothesis_set_id", "component_map_version",
+)
+
+
+def current_diagnosis_context(
+    state: Any, *, project_id: str, board_id: str,
+    analysis_context_id: str | None, component_map_version: str | None,
+) -> DiagnosisContext:
+    """Build the live context from current selection/map and explicitly configured model data."""
+    configured = state.get(DIAGNOSIS_CONTEXT_KEY, {})
+    if isinstance(configured, dict) and owner_key(project_id, board_id) in configured:
+        configured = configured[owner_key(project_id, board_id)]
+    if isinstance(configured, DiagnosisContext):
+        configured = {name: getattr(configured, name) for name in DiagnosisContext.__dataclass_fields__}
+    if not isinstance(configured, dict):
+        configured = {}
+    return DiagnosisContext(
+        project_id=project_id,
+        board_id=board_id,
+        analysis_context_id=analysis_context_id,
+        circuit_model_id=configured.get("circuit_model_id"),
+        circuit_model_version=configured.get("circuit_model_version"),
+        hypothesis_set_id=configured.get("hypothesis_set_id"),
+        component_map_version=component_map_version,
+        mapping_status=configured.get("mapping_status", "UNAVAILABLE"),
+    )
+
+
+def is_diagnosis_result_current(
+    *, stored_result: Any, current_context: DiagnosisContext,
+    current_measurement_set: str,
+) -> bool:
+    """Use one strict predicate for both the diagnosis panel and PCB fault overlay."""
+    if not isinstance(stored_result, dict):
+        return False
+    result = stored_result.get("result", stored_result)
+    if not isinstance(result, dict):
+        return False
+    if any(not getattr(current_context, field) for field in _CONTEXT_FIELDS):
+        return False
+    if result.get("status") not in {DiagnosisStatus.DIAGNOSIS_COMPLETE, DiagnosisStatus.MODEL_MISMATCH}:
+        return False
+    if any(result.get(field) != getattr(current_context, field) for field in _CONTEXT_FIELDS):
+        return False
+    stored_set = stored_result.get("measurement_set_sha256", result.get("measurement_set_sha256"))
+    if stored_set != current_measurement_set or result.get("measurement_set_sha256") != current_measurement_set:
+        return False
+    stored_context = stored_result.get("context")
+    if isinstance(stored_context, DiagnosisContext) and any(
+        getattr(stored_context, field) != getattr(current_context, field) for field in _CONTEXT_FIELDS
+    ):
+        return False
+    return isinstance(result.get("candidates"), list)
 
 
 @dataclass(frozen=True)

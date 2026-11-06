@@ -2,7 +2,8 @@ from dataclasses import replace
 
 from circuitcare.frontend.diagnosis_adapter import (
     DiagnosisContext, DiagnosisStatus, adapt_fault_overlay, assess_diagnosis_readiness,
-    refresh_diagnosis, validate_diagnosis_result,
+    current_diagnosis_context, is_diagnosis_result_current, refresh_diagnosis,
+    validate_diagnosis_result,
 )
 from circuitcare.frontend.measurement_models import create_measurement_record, measurement_set_sha256
 
@@ -155,3 +156,51 @@ def test_unverified_confirmed_fault_is_not_shown_and_model_mismatch_overlay_is_s
     mapped, _ = adapt_fault_overlay(envelope, context=context, measurement_set_sha256=set_sha,
                                     board_side="TOP", canonical_frame_id="frame-1", component_ids={"c1"})
     assert mapped == {}
+
+
+def test_current_diagnosis_result_requires_full_live_context_and_measurement_set():
+    context = _context()
+    row = _mapped_record()
+    set_sha = measurement_set_sha256([row], project_id="p1", board_id="b1")
+    diagnosis = {
+        "status": "DIAGNOSIS_COMPLETE", "project_id": "p1", "board_id": "b1",
+        "analysis_context_id": "ctx-1", "circuit_model_id": "circuit-1",
+        "circuit_model_version": "v1", "hypothesis_set_id": "hyp-1",
+        "component_map_version": "map-v1", "measurement_set_sha256": set_sha,
+        "candidates": [],
+    }
+    stored = {"result": diagnosis, "context": context, "measurement_set_sha256": set_sha}
+    assert is_diagnosis_result_current(
+        stored_result=stored, current_context=context, current_measurement_set=set_sha,
+    )
+    for changed in (
+        replace(context, analysis_context_id="ctx-2"),
+        replace(context, circuit_model_id="circuit-2"),
+        replace(context, circuit_model_version="v2"),
+        replace(context, hypothesis_set_id="hyp-2"),
+        replace(context, component_map_version="map-v2"),
+        replace(context, board_id="board-2"),
+        replace(context, project_id="project-2"),
+    ):
+        assert not is_diagnosis_result_current(
+            stored_result=stored, current_context=changed, current_measurement_set=set_sha,
+        )
+    assert not is_diagnosis_result_current(
+        stored_result=stored, current_context=context, current_measurement_set="new-set",
+    )
+
+
+def test_live_context_uses_current_project_and_map_not_stored_result_owner():
+    from circuitcare.frontend.measurement_state import DIAGNOSIS_CONTEXT_KEY, owner_key
+
+    state = {DIAGNOSIS_CONTEXT_KEY: {owner_key("p1", "b1"): {
+        "circuit_model_id": "circuit-1", "circuit_model_version": "v1",
+        "hypothesis_set_id": "hyp-1", "mapping_status": "MAPPED",
+    }}}
+    current = current_diagnosis_context(
+        state, project_id="p1", board_id="b1", analysis_context_id="ctx-new",
+        component_map_version="map-new",
+    )
+    assert current.analysis_context_id == "ctx-new"
+    assert current.component_map_version == "map-new"
+    assert current.circuit_model_id == "circuit-1"

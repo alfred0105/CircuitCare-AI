@@ -9,14 +9,16 @@ import streamlit as st
 from PIL import Image, ImageDraw
 
 from circuitcare.dashboard.components.pcb_workspace import render_component_viewer
-from circuitcare.dashboard.views.inspection_panel import render_inspection_panel
+from circuitcare.dashboard.views.inspection_panel import MAP_VERSION_KEY, render_inspection_panel
 from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
 from circuitcare.frontend.models import ImageRecord, ProjectContext, SelectionState
+from circuitcare.frontend.state import reset_intake_for_new_project
 from circuitcare.frontend.workbench_state import SELECTION_KEY, enter_workbench
 
 st.set_page_config(page_title="F5 측정 UI 브라우저 테스트", layout="wide")
+project_id = st.session_state.get("f5_fixture_project_id", "f5-e2e-project-a")
 project = ProjectContext(
-    project_id="f5-e2e-project", board_id="f5-e2e-board",
+    project_id=project_id, board_id=f"{project_id}-board",
     image_records=(ImageRecord(image_id="f5-e2e-photo", side="front", filename="synthetic-test.png"),),
 )
 st.session_state["circuitcare_v2_project"] = project
@@ -24,6 +26,17 @@ if not isinstance(st.session_state.get(SELECTION_KEY), SelectionState):
     enter_workbench(st.session_state, project)
 
 st.warning("E2E TEST FIXTURE · 합성 이미지/부품 · 실제 PCB 분석 또는 진단 결과가 아닙니다")
+st.session_state[MAP_VERSION_KEY] = "f5-fixture-map-v1"
+if st.button("테스트 전용 · 새 프로젝트", key="f5_fixture_new_project"):
+    reset_intake_for_new_project(st.session_state)
+    st.session_state["f5_fixture_project_id"] = "f5-e2e-project-b"
+    next_project = ProjectContext(
+        project_id="f5-e2e-project-b", board_id="f5-e2e-project-b-board",
+        image_records=(ImageRecord(image_id="f5-e2e-photo-b", side="front", filename="synthetic-test-b.png"),),
+    )
+    st.session_state["circuitcare_v2_project"] = next_project
+    enter_workbench(st.session_state, next_project)
+    st.rerun()
 st.title("F5 측정 입력 브라우저 검증")
 left, right = st.columns([3, 1.4], gap="medium")
 
@@ -45,6 +58,7 @@ components = (
         detection_confidence=.87, identification_status="SUGGESTED_UNCONFIRMED",
         identity_match_status="NEW_COMPONENT", ocr_marking="103", possible_part_number=None,
         evidence=("SYNTHETIC_TEST_FIXTURE",), overlay_status="DETECTION_CANDIDATE",
+        diagnosis_display_status="DIAGNOSIS_NOT_RUN",
     ),
     ComponentOverlayViewModel(
         project_id=project.project_id, board_id=project.board_id, board_side="TOP",
@@ -55,6 +69,7 @@ components = (
         detection_confidence=.91, identification_status="SUGGESTED_UNCONFIRMED",
         identity_match_status="NEW_COMPONENT", ocr_marking=None, possible_part_number=None,
         evidence=("SYNTHETIC_TEST_FIXTURE",), overlay_status="DETECTION_CANDIDATE",
+        diagnosis_display_status="DIAGNOSIS_NOT_RUN",
     ),
 )
 

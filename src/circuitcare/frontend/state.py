@@ -27,8 +27,10 @@ def reset_intake_for_new_project(state: MutableMapping[str, Any]) -> None:
     """Forget current project inputs/results and retire its Streamlit uploader keys."""
     # Imported lazily to keep intake-state helpers independent of image/PIL startup.
     from circuitcare.frontend.component_map_adapter import clear_component_map_state
+    from circuitcare.frontend.measurement_state import clear_measurement_workspace_state
 
     clear_component_map_state(state)
+    clear_measurement_workspace_state(state)
     next_batch = int(state.get(INTAKE_UPLOAD_BATCH_KEY, 0)) + 1
     for key in tuple(state):
         if key.startswith(("circuitcare_v2_", "cc_v2_")):

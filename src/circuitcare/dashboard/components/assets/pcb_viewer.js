@@ -90,8 +90,18 @@ export default function(component) {
     if (item.ocr_marking) rows.push(`표기 ${item.ocr_marking}`);
     const faultLabels = { SUSPECTED_FAULT:"고장 의심 후보", RELATED_COMPONENT:"관련 점검 후보",
       CONFIRMED_FAULT:"검사 근거 확인" };
-    if (faultLabels[item.fault_candidate_status]) rows.push(faultLabels[item.fault_candidate_status]);
-    rows.push("고장 진단 미실행");
+    if (faultLabels[item.fault_candidate_status]) {
+      rows.push(faultLabels[item.fault_candidate_status]);
+    } else {
+      const diagnosisLabels = {
+        DIAGNOSIS_NOT_RUN:"고장 진단 미실행",
+        DIAGNOSIS_UNAVAILABLE:"진단 불가 · 분석 조건을 확인하세요",
+        DIAGNOSIS_RESULT_NONE:"진단 결과 없음",
+        UNDETERMINED:"고장 여부 판단 불가",
+        MODEL_MISMATCH:"진단 모델과 측정값 불일치\n고장 여부 판단 불가",
+      };
+      rows.push(diagnosisLabels[item.diagnosis_display_status] || "고장 진단 미실행");
+    }
     tooltip.textContent = rows.join("\n"); tooltip.hidden = false;
     const rect = viewport.getBoundingClientRect();
     tooltip.style.left = `${Math.min(Math.max(8, event.clientX - rect.left + 12), rect.width - 220)}px`;
