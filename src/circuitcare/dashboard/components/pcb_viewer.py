@@ -13,7 +13,8 @@ def render_pcb_viewer(
     st: Any, *, image_png_base64: str, image_size_px: tuple[int, int],
     components: list[dict[str, Any]], project_id: str, board_id: str,
     board_side: str, frame_id: str, selected_component_id: str | None,
-    asset_key: str, event_sequence_seed: int, key: str, on_selection_change: Any,
+    asset_key: str, event_sequence_seed: int, key: str,
+    on_selection_change: Any, on_viewer_status_change: Any,
 ) -> Any | None:
     """Render image and vector overlays under one SVG camera transform."""
     if not hasattr(st, "components") or not hasattr(st.components, "v2"):
@@ -39,7 +40,8 @@ def render_pcb_viewer(
             "selected_component_id": selected_component_id,
             "event_sequence_seed": event_sequence_seed,
         },
-        default={"selection": None},
+        default={"selection": None, "viewer_status": None},
         on_selection_change=on_selection_change,
+        on_viewer_status_change=on_viewer_status_change,
         key=key, width="stretch", height=600,
     )

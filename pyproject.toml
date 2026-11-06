@@ -30,7 +30,9 @@ circuitcare-advise = "circuitcare.repair_cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-circuitcare = ["schematic/assets/*.html", "schematic/assets/*.css", "schematic/assets/*.js"]
+circuitcare = ["schematic/assets/*.html", "schematic/assets/*.css", "schematic/assets/*.js",
+              "dashboard/components/assets/*.html", "dashboard/components/assets/*.css",
+              "dashboard/components/assets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

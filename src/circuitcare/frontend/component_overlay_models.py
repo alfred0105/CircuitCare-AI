@@ -40,3 +40,23 @@ class ComponentOverlayResult:
     detection_status: str
     rejected_count: int = 0
     reason: str | None = None
+
+
+IDENTITY_STATUS_LABELS = {
+    "SUGGESTED_UNCONFIRMED": "미확인 후보",
+    "SUGGESTED_CLASS_ONLY": "종류 후보",
+    "NEW_COMPONENT": "신규 후보",
+    "IDENTITY_MATCHED": "동일 부품 후보",
+    "IDENTITY_AMBIGUOUS": "식별 모호",
+    "IDENTITY_CONFLICT": "식별 충돌",
+    "USER_CONFIRMED": "사용자 확인",
+    "user_confirmed": "사용자 확인",
+    "suggested": "미확인 후보",
+    "unmatched": "미확인",
+    "class_candidate": "종류 후보",
+}
+
+
+def display_identity_status(value: str | None) -> str:
+    """Translate known internal identity codes while preserving unknown values."""
+    return IDENTITY_STATUS_LABELS.get(value or "", value or "미확인")

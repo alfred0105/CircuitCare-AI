@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
+from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel, display_identity_status
 from circuitcare.frontend.models import ProjectContext
 
 
@@ -15,17 +15,6 @@ def _component_label(value: str) -> str:
         "ic": "IC", "connector": "커넥터", "unknown_component": "부품 후보",
     }
     return types.get(value.lower(), value)
-
-
-def _status_label(value: str | None) -> str:
-    labels = {
-        "SUGGESTED_UNCONFIRMED": "미확인 후보", "SUGGESTED_CLASS_ONLY": "종류 후보",
-        "NEW_COMPONENT": "신규 후보", "IDENTITY_MATCHED": "연속성 후보 · 미검증",
-        "USER_CONFIRMED": "사용자 확인", "IDENTITY_AMBIGUOUS": "식별 모호",
-        "IDENTITY_CONFLICT": "식별 충돌", "user_confirmed": "사용자 확인",
-        "suggested": "미확인 후보", "unmatched": "미확인", "class_candidate": "종류 후보",
-    }
-    return labels.get(value or "", value or "미확인")
 
 
 def render_inspection_panel(
@@ -72,9 +61,9 @@ def render_inspection_panel(
                 st.caption(f"OCR 표기 · {selected_component.ocr_marking}")
             if selected_component.possible_part_number:
                 st.caption(f"가능 부품 번호 · {selected_component.possible_part_number}")
-            st.caption(f"식별 상태 · {_status_label(selected_component.identification_status)}")
+            st.caption(f"식별 상태 · {display_identity_status(selected_component.identification_status)}")
             if selected_component.identity_match_status:
-                st.caption(f"이전 식별 연속성 · {_status_label(selected_component.identity_match_status)}")
+                st.caption(f"이전 식별 연속성 · {display_identity_status(selected_component.identity_match_status)}")
             st.caption(f"관측 사진 · {len(selected_component.source_backend_photo_ids)}장")
             st.caption("정합 · 후보 · 미검증")
             if selected_component.evidence:

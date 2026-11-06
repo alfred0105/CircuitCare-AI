@@ -1,4 +1,5 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
+const DRAG_THRESHOLD_PX = 5;
 const instances = new WeakMap();
 
 function svgElement(name, attrs = {}) {
@@ -20,11 +21,12 @@ export default function(component) {
   const zoomLabel = root.querySelector("[data-zoom-label]");
   let state = instances.get(root);
   if (!state) {
-    state = { scale:1, x:0, y:0, assetKey:"", selected:null, hover:null, drag:null,
-      listeners:[], observer:null, sequence:0, userAdjusted:false };
+    state = { scale:1, x:0, y:0, assetKey:"", hover:null, drag:null,
+      listeners:[], observer:null, sequence:0, userAdjusted:false, mountedAssetKey:"" };
     instances.set(root, state);
   }
   state.data = data;
+  state.setStateValue = setStateValue;
   state.sequence = Math.max(state.sequence, Number(data.event_sequence_seed) || 0);
   const listen = (target, event, callback, options) => {
     target.addEventListener(event, callback, options);
@@ -69,9 +71,9 @@ export default function(component) {
   };
   const sendSelection = (componentId) => {
     state.sequence += 1;
-    setStateValue("selection", {
-      project_id:data.project_id, board_id:data.board_id, board_side:data.board_side,
-      component_id:componentId, canonical_frame_id:data.frame_id,
+    state.setStateValue("selection", {
+      project_id:state.data.project_id, board_id:state.data.board_id, board_side:state.data.board_side,
+      component_id:componentId, canonical_frame_id:state.data.frame_id,
       selection_action:componentId ? "select" : "clear", event_seq:state.sequence,
       event_id:`${Date.now()}-${state.sequence}`,
     });
@@ -84,7 +86,7 @@ export default function(component) {
     if (item.display_label) rows.push(`Reference ${item.display_label}`);
     if (item.detection_confidence !== null && item.detection_confidence !== undefined)
       rows.push(`검출 신뢰도 ${(item.detection_confidence * 100).toFixed(0)}%`);
-    rows.push(`식별 ${item.identification_status || "미확인"}`);
+    rows.push(`식별 ${item.display_status || "미확인"}`);
     if (item.ocr_marking) rows.push(`표기 ${item.ocr_marking}`);
     rows.push("고장 진단 미실행");
     tooltip.textContent = rows.join("\n"); tooltip.hidden = false;
@@ -117,18 +119,36 @@ export default function(component) {
     image.setAttribute("x","0"); image.setAttribute("y","0");
     image.setAttribute("width",String(width)); image.setAttribute("height",String(height));
     const key = `${data.asset_key}|${data.project_id}|${data.board_id}|${data.board_side}|${data.frame_id}`;
+    const reportReady = () => {
+      if (state.assetKey !== key || state.mountedAssetKey === key) return;
+      const [expectedWidth, expectedHeight] = data.image_size_px;
+      if (!image.isConnected || image.width.baseVal.value !== expectedWidth
+          || image.height.baseVal.value !== expectedHeight) return;
+      state.mountedAssetKey=key;
+      setStateValue("viewer_status", { asset_key:key, status:"READY",
+        image_size_px:[expectedWidth,expectedHeight], event_id:`ready-${Date.now()}` });
+    };
     if (state.assetKey !== key) {
       state.assetKey=key;
+      state.hover=null; state.drag=null; tooltip.hidden=true; viewport.dataset.dragging="false";
+      state.mountedAssetKey="";
+      image.addEventListener("load", reportReady, { once:true });
       image.setAttribute("href", `data:image/png;base64,${data.image_png_base64}`);
       fit();
+    }
+    if (state.mountedAssetKey !== key) {
+      if (typeof image.decode === "function") image.decode().then(reportReady).catch(() => {});
+      if (image.complete) reportReady();
     }
   };
   if (state.listeners.length === 0) {
     listen(viewport,"wheel",(event)=>{ event.preventDefault(); zoomAt(event.deltaY<0?1.12:1/1.12,point(event.clientX,event.clientY)); },{passive:false});
     listen(viewport,"pointerdown",(event)=>{
-      if (event.button!==0 || event.target.closest("[data-component-id]")) return;
-      const p=point(event.clientX,event.clientY); state.drag={id:event.pointerId,x:p.x,y:p.y,tx:state.x,ty:state.y};
-      viewport.setPointerCapture(event.pointerId); viewport.dataset.dragging="true";
+      if (event.button!==0) return;
+      const p=point(event.clientX,event.clientY);
+      state.drag={id:event.pointerId,startClientX:event.clientX,startClientY:event.clientY,
+        x:p.x,y:p.y,tx:state.x,ty:state.y,moved:false};
+      try { viewport.setPointerCapture(event.pointerId); } catch (_) { state.drag=null; return; }
     });
     listen(viewport,"pointermove",(event)=>{
       const hit=hitComponent(event);
@@ -139,21 +159,40 @@ export default function(component) {
         if (hit) showTooltip(hit,event); else tooltip.hidden=true;
       } else if (hit) showTooltip(hit,event);
       if (!state.drag || state.drag.id!==event.pointerId) return;
+      const dx=event.clientX-state.drag.startClientX, dy=event.clientY-state.drag.startClientY;
+      if (!state.drag.moved && Math.hypot(dx,dy)<DRAG_THRESHOLD_PX) return;
+      state.drag.moved=true; viewport.dataset.dragging="true";
       const p=point(event.clientX,event.clientY); state.x=state.drag.tx+p.x-state.drag.x; state.y=state.drag.ty+p.y-state.drag.y;
       state.userAdjusted=true; drawCamera();
     });
     listen(viewport,"pointerleave",()=>{ tooltip.hidden=true; state.hover=null; });
-    const endDrag=(event)=>{ if(event?.pointerId!==undefined&&state.drag&&state.drag.id!==event.pointerId)return; state.drag=null; viewport.dataset.dragging="false"; };
-    listen(viewport,"pointerup",endDrag); listen(viewport,"pointercancel",endDrag); listen(viewport,"lostpointercapture",endDrag);
-    listen(layer,"click",(event)=>{ const shape=event.target.closest("[data-component-id]"); if(!shape)return; event.stopPropagation(); const hit=hitComponent(event); if(hit)sendSelection(hit.component_id); });
+    listen(viewport,"pointerup",(event)=>{
+      const drag=state.drag;
+      if (!drag || drag.id!==event.pointerId) return;
+      state.drag=null;
+      if (!drag.moved) {
+        const hit=hitComponent(event);
+        sendSelection(hit?.component_id || null);
+      }
+      viewport.dataset.dragging="false";
+      try { if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId); } catch (_) { /* already released */ }
+    });
+    const cancelDrag=(event)=>{
+      if (!state.drag || state.drag.id!==event.pointerId) return;
+      state.drag=null; viewport.dataset.dragging="false"; tooltip.hidden=true;
+      try { if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId); } catch (_) { /* already released */ }
+    };
+    listen(viewport,"pointercancel",cancelDrag); listen(viewport,"lostpointercapture",cancelDrag);
     listen(layer,"keydown",(event)=>{ if(event.key!=="Enter"&&event.key!==" ")return; const shape=event.target.closest("[data-component-id]"); if(!shape)return; event.preventDefault(); sendSelection(shape.dataset.componentId); });
-    listen(viewport,"click",(event)=>{ if(event.target.closest("[data-component-id]"))return; sendSelection(null); });
     for(const button of root.querySelectorAll("[data-action]")) listen(button,"click",()=>{
       const action=button.dataset.action; if(action==="clear-selection")sendSelection(null);
       else if(action==="fit"||action==="reset")fit();
       else { const r=canvas.getBoundingClientRect(); zoomAt(action==="zoom-in"?1.25:0.8,point(r.left+r.width/2,r.top+r.height/2)); }
     });
-    state.observer=new ResizeObserver(()=>{ if(!state.userAdjusted)fit(); }); state.observer.observe(viewport);
+    state.observer=new ResizeObserver(()=>{
+      tooltip.hidden=true; state.hover=null;
+      if(!state.userAdjusted)fit();
+    }); state.observer.observe(viewport);
   }
   setImage(); renderRegions(); drawCamera();
   return ()=>{ for(const remove of state.listeners.splice(0))remove(); state.observer?.disconnect(); };

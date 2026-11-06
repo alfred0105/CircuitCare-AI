@@ -235,10 +235,17 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     overlay_result = adapt_component_map_components(
         component_map, project_id=project.project_id, board_id=project.board_id or "", side=side_enum or "",
     ) if component_map and side_enum else None
+    coordinate_frame_valid = True
     if mode == "통합 이미지" and canonical:
         component_models = overlay_result.components if overlay_result and overlay_result.status == "READY" else ()
         frame_id = decoded_canonical.frame_id
         viewer_size = source_size
+        if (overlay_result and overlay_result.status not in {"READY", "NO_COMPONENTS"}) or (
+            overlay_result and (overlay_result.frame_id != frame_id or overlay_result.image_size != viewer_size
+                                or overlay_result.coordinate_frame != "MOSAIC_PIXEL")
+        ):
+            coordinate_frame_valid = False
+            component_models = ()
     else:
         component_models = ()
         frame_id = selected
@@ -281,10 +288,9 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         "source_dimensions": list(source_size),
         "canonical_dimensions": canonical.get("image_size_px") if canonical else None,
         "registration_status": "CANDIDATE_GEOMETRY_ONLY" if mode == "통합 이미지" else "SOURCE_PHOTO",
-        "coordinate_status": "VERIFIED_SHARED_SVG_VIEWBOX",
+        "coordinate_status": "UNVERIFIED_RESPONSIVE_CSS",
     })
-    st.session_state[VIEW_TRANSFORM_KEY] = transform
-    interactive, _viewer_key = render_component_viewer(
+    interactive, _viewer_key, viewer_coordinate_status = render_component_viewer(
         st, image=image, source_image_bytes=image_data, canonical_png_bytes=canonical_png_bytes,
         image_size_px=viewer_size, components=tuple(component_models), project=project,
         board_side=side_enum or active_side, frame_id=frame_id,
@@ -298,6 +304,10 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
             st.warning("인터랙티브 Viewer를 사용할 수 없습니다 · 부품 Overlay를 숨겼습니다.")
         else:
             st.caption("Zoom / Pan Viewer를 사용할 수 없어 정적 이미지로 표시합니다.")
+    if not coordinate_frame_valid:
+        viewer_coordinate_status = "INVALID_COORDINATE_FRAME"
+    transform["coordinate_status"] = viewer_coordinate_status
+    st.session_state[VIEW_TRANSFORM_KEY] = transform
     if overlay_result and overlay_result.status == "READY":
         st.caption(f"검출 결과 · {len(overlay_result.components)}개 · 후보 · 고장 진단 미실행")
     elif detection_status == "DETECTOR_NOT_CONFIGURED":
