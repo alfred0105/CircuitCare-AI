@@ -1,4 +1,6 @@
-# PCB AI evaluation record — Phase 12
+# PCB AI evaluation record — Phase 12 (historical)
+
+> **Historical result:** the Phase 12 mAP@0.5 value below used predictions truncated at the 0.25 operating threshold when constructing the PR curve. Phase 21.3 re-evaluated the same checkpoint with predictions retained down to confidence 0.001 for AP: mAP@0.5 = 0.585, mAP@0.5:0.95 = 0.334, while precision/recall at 0.25 remain 0.498/0.612. This is a metric-protocol correction, not a model change. See [Phase 21.3 benchmark results](PHASE21_3_BENCHMARK_RESULTS.md).
 
 ## Detector
 

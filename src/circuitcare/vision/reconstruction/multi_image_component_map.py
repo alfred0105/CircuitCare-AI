@@ -21,10 +21,10 @@ from typing import Any, Callable, Iterable
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from circuitcare.vision.board_detector import detect_board_candidates
-from circuitcare.vision.component_detector import detect_components
+from circuitcare.vision.component_detector import detect_components, detect_components_tiled
 from circuitcare.vision.detector_backend import DetectorUnavailable
 from circuitcare.vision.image_loader import ImageLoadError, load_board_image
 from circuitcare.vision.perspective import rectify_board
@@ -219,11 +219,16 @@ class MultiImageComponentMapService:
 
     def build_map(self, session: PCBPhotoSession, *, detector: Callable[[Any], dict[str, Any]] | None = None,
                   model_path: str | Path | None = None,
+                  inference_mode: str = "single",
+                  tile_size_px: int = 1536,
+                  tile_overlap_px: int = 320,
                   previous_component_map: dict[str, Any] | str | Path | None = None,
                   confirmed_identity_by_observation_id: dict[str, str] | None = None) -> dict[str, Any]:
         started = time.perf_counter()
         if not session.photos:
             raise MultiImageError("EMPTY_SESSION", "No photos are available")
+        if inference_mode not in {"single", "tiled"}:
+            raise MultiImageError("INVALID_INFERENCE_MODE", "inference_mode must be 'single' or 'tiled'")
         previous = _load_previous_map(previous_component_map)
         if previous and previous.get("board_id") != session.board_id:
             raise MultiImageError("PREVIOUS_MAP_BOARD_MISMATCH", "Previous component map belongs to another board")
@@ -238,7 +243,8 @@ class MultiImageComponentMapService:
                 if previous_side:
                     previous_side = {**previous_side, "_previous_photos": (previous or {}).get("photos", [])}
                 side_maps[side] = self._build_side(session.board_id, side, photos, detector, model_path,
-                    started, session.budget, previous_side=previous_side,
+                    started, session.budget, inference_mode=inference_mode, tile_size_px=tile_size_px,
+                    tile_overlap_px=tile_overlap_px, previous_side=previous_side,
                     confirmed_identity_by_observation_id=confirmed_identity_by_observation_id or {})
         registration_by_photo = {item["photo_id"]: item for side_map in side_maps.values()
                                  for item in side_map["registrations"]}
@@ -331,7 +337,8 @@ class MultiImageComponentMapService:
 
     def _build_side(self, board_id: str, side: str, photos: list[PhotoAsset],
                     detector: Callable[[Any], dict[str, Any]] | None, model_path: str | Path | None,
-                    started: float, budget: ImageBudget, *, previous_side: dict[str, Any],
+                    started: float, budget: ImageBudget, *, inference_mode: str,
+                    tile_size_px: int, tile_overlap_px: int, previous_side: dict[str, Any],
                     confirmed_identity_by_observation_id: dict[str, str]) -> dict[str, Any]:
         unique = []
         duplicate_records = {}
@@ -405,14 +412,59 @@ class MultiImageComponentMapService:
             if detector is None and model_path is None:
                 continue
             try:
-                detection_result = detector(photo.image) if detector else detect_components(photo.image, model_path)
+                if detector:
+                    detection_result = detector(photo.image)
+                elif inference_mode == "tiled":
+                    native_image, native_to_processed = _native_rectified_image(photo)
+                    remaining = max(0.001, budget.max_runtime_seconds - (time.perf_counter() - started))
+                    detection_result = detect_components_tiled(native_image, model_path,
+                        tile_size_px=tile_size_px, tile_overlap_px=tile_overlap_px,
+                        timeout_seconds=remaining)
+                else:
+                    detection_result = detect_components(photo.image, model_path)
                 detector_status = detection_result.get("status", "INFERENCE_COMPLETE")
                 transform = registrations[photo.photo_id].transform_moving_to_canonical
                 if transform is None or registrations[photo.photo_id].status not in {"REFERENCE", "REGISTERED_CANDIDATE"}:
                     continue
-                for detection in detection_result.get("detections", []):
-                    observations.append(_map_detection(detection, photo, np.asarray(transform), (0, 0),
-                                                        registrations[photo.photo_id]))
+                raw_detections = sorted(detection_result.get("detections", []), key=_detection_sort_key)
+                seen_detection_ids: set[str] = set()
+                seen_observation_ids: dict[str, int] = {}
+                for detection in raw_detections:
+                    if inference_mode == "tiled" and detector is None and model_path is not None:
+                        detection = _detection_to_processed_frame(detection, native_to_processed)
+                    observation = _map_detection(detection, photo, np.asarray(transform), (0, 0),
+                                                 registrations[photo.photo_id])
+                    raw_id = observation["detection_id"]
+                    if raw_id in seen_detection_ids:
+                        original_id = raw_id
+                        raw_id = f"{original_id}__{hashlib.sha256(observation['observation_id'].encode()).hexdigest()[:8]}"
+                        observation["source_detection_id"] = observation.get("source_detection_id") or original_id
+                        observation["detection_id"] = raw_id
+                        observation["observation_id"] = _stable_observation_id(photo.photo_id, raw_id,
+                            observation["class_name"], observation["processed_bbox_xyxy"], observation.get("ocr_marking"))
+                        if raw_id in seen_detection_ids:
+                            duplicate_count = 2
+                            candidate = raw_id
+                            while candidate in seen_detection_ids:
+                                candidate = f"{raw_id}_{duplicate_count}"
+                                duplicate_count += 1
+                            raw_id = candidate
+                            observation["detection_id"] = raw_id
+                            observation["observation_id"] = _stable_observation_id(photo.photo_id, raw_id,
+                                observation["class_name"], observation["processed_bbox_xyxy"], observation.get("ocr_marking"))
+                    seen_detection_ids.add(raw_id)
+                    observation_count = seen_observation_ids.get(observation["observation_id"], 0)
+                    seen_observation_ids[observation["observation_id"]] = observation_count + 1
+                    if observation_count:
+                        observation["observation_id"] = hashlib.sha256(
+                            f"{observation['observation_id']}|duplicate-instance:{observation_count + 1}".encode()
+                        ).hexdigest()[:24]
+                        observation["identity_review_status"] = "IDENTITY_AMBIGUOUS"
+                        observation["identity_review_reason"] = "DUPLICATE_DETECTION_SIGNATURE"
+                    observations.append(observation)
+            except TimeoutError as exc:
+                detector_status = "PARTIAL_TIMEOUT"
+                observations.append({"photo_id": photo.photo_id, "error": str(exc), "status": detector_status})
             except DetectorUnavailable as exc:
                 detector_status = "BLOCKED_MODEL_UNAVAILABLE" if model_path else "DETECTOR_ERROR"
                 observations.append({"photo_id": photo.photo_id, "error": str(exc), "status": detector_status})
@@ -462,7 +514,9 @@ class MultiImageComponentMapService:
                     "canonical_image": {"reference_photo_id": reference.photo_id,
                         "canvas_origin_in_reference_px": list(canvas_origin),
                         "reference_rectification_matrix": current_rectification}, "components": components},
-                "detection_status": detector_status,
+                "detection_status": detector_status, "inference_mode": inference_mode,
+                "tile_configuration": {"tile_size_px": tile_size_px, "tile_overlap_px": tile_overlap_px}
+                    if inference_mode == "tiled" else None,
                 "board_boundary_candidates": _board_boundary_records(unique, started, budget),
                 "functional_blocks": {"status": "NOT_EVALUATED", "candidates": []},
                 "warnings": ["Photo registration does not establish KiCad coordinate alignment or electrical connectivity."]}
@@ -679,10 +733,16 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
                 "status": "INVALID_DETECTION_BOX"}
     x1, y1, x2, y2 = map(float, bbox)
     if (not all(math.isfinite(value) for value in (x1, y1, x2, y2))
-            or not (0 <= x1 < x2 <= photo.image.width and 0 <= y1 < y2 <= photo.image.height)):
+            or not (x1 < x2 and y1 < y2)):
         return {"photo_id": photo.photo_id, "detection_id": detection.get("detection_id"),
                 "status": "INVALID_DETECTION_BOX"}
-    corners = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+    corners = np.asarray(detection.get("source_polygon_xy") or
+                         [[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32).reshape(-1, 2)
+    if (corners.shape[0] < 4 or not np.isfinite(corners).all()
+            or np.any(corners[:, 0] < 0) or np.any(corners[:, 0] > photo.image.width)
+            or np.any(corners[:, 1] < 0) or np.any(corners[:, 1] > photo.image.height)):
+        return {"photo_id": photo.photo_id, "detection_id": detection.get("detection_id"),
+                "status": "INVALID_DETECTION_BOX"}
     mapped = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), matrix).reshape(-1, 2)
     mapped[:, 0] -= canvas_origin[0]
     mapped[:, 1] -= canvas_origin[1]
@@ -707,15 +767,19 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
             confidence = None
         if confidence is not None and (not math.isfinite(confidence) or not 0 <= confidence <= 1):
             confidence = None
-    detection_id = str(detection.get("detection_id") or "detection")
-    observation_id = "observation_" + hashlib.sha256(
-        f"{photo.photo_id}|{detection_id}|{detection.get('class_name', detection.get('predicted_class', 'unknown_component'))}".encode()
-    ).hexdigest()[:16]
+    class_name = str(detection.get("class_name", detection.get("predicted_class", "unknown_component")))
+    source_detection_id = str(detection.get("detection_id") or "").strip() or None
+    detection_id = source_detection_id or _generated_detection_id(photo.photo_id, class_name, [x1, y1, x2, y2],
+        detection.get("model_id"), detection.get("ocr_text"))
+    observation_id = _stable_observation_id(photo.photo_id, detection_id, class_name,
+        [x1, y1, x2, y2], detection.get("ocr_text"))
     return {"observation_id": observation_id, "photo_id": photo.photo_id, "detection_id": detection_id,
-            "class_name": str(detection.get("class_name", detection.get("predicted_class", "unknown_component"))),
+            "source_detection_id": source_detection_id,
+            "class_name": class_name,
             "bbox_xyxy": [float(min_xy[0]), float(min_xy[1]), float(max_xy[0]), float(max_xy[1])],
             "polygon_xy": [[float(x), float(y)] for x, y in mapped],
-            "processed_bbox_xyxy": [x1, y1, x2, y2],
+            "processed_bbox_xyxy": [float(corners[:, 0].min()), float(corners[:, 1].min()),
+                                    float(corners[:, 0].max()), float(corners[:, 1].max())],
             "original_bbox_xyxy": [float(exif_min[0]), float(exif_min[1]),
                                    float(exif_max[0]), float(exif_max[1])],
             "exif_corrected_bbox_xyxy": [float(exif_min[0]), float(exif_min[1]),
@@ -732,7 +796,81 @@ def _map_detection(detection: dict[str, Any], photo: PhotoAsset,
             "registration_p95_px": registration.p95_reprojection_error_px,
             "registration_inlier_ratio": registration.inlier_ratio,
             "registration_uncertainty": "INFERRED_NOT_INDEPENDENTLY_VALIDATED",
-            "is_reference_photo": registration.status == "REFERENCE"}
+            "is_reference_photo": registration.status == "REFERENCE",
+            "inference_mode": detection.get("inference_mode", "single_image"),
+            "source_tile": detection.get("source_tile")}
+
+
+def _native_rectified_image(photo: PhotoAsset) -> tuple[Image.Image, np.ndarray]:
+    """Decode a bounded native-resolution frame and return native-to-processed mapping.
+
+    The normal path deliberately uses a reduced image for registration and maps.
+    Tiled inference can recover detail from the original bytes without changing
+    the canonical coordinate frame used by the rest of the component map.
+    """
+    with Image.open(io.BytesIO(photo.original_bytes)) as source:
+        native = ImageOps.exif_transpose(source).convert("RGB")
+    scale_matrix = photo.coordinate_transforms["exif_corrected_to_decoded"]
+    sx, sy = float(scale_matrix[0][0]), float(scale_matrix[1][1])
+    if sx <= 0 or sy <= 0 or not math.isfinite(sx + sy):
+        raise ValueError("Invalid native-to-decoded scale")
+    source_scale = np.diag([sx, sy, 1.0])
+    target_scale = np.diag([1.0 / sx, 1.0 / sy, 1.0])
+    decoded_to_processed = np.asarray(photo.coordinate_transforms["decoded_to_rectified"], dtype=np.float64)
+    native_to_high = target_scale @ decoded_to_processed @ source_scale
+    output_size = (max(1, int(round(photo.image.width / sx))),
+                   max(1, int(round(photo.image.height / sy))))
+    if output_size != native.size or not np.allclose(native_to_high, np.eye(3), atol=1e-6):
+        warped = cv2.warpPerspective(np.asarray(native), native_to_high, output_size,
+                                     flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        native = Image.fromarray(warped, mode="RGB")
+    return native, np.linalg.inv(target_scale)
+
+
+def _detection_to_processed_frame(detection: dict[str, Any], native_to_processed: np.ndarray) -> dict[str, Any]:
+    """Attach a processed-frame polygon to a native-resolution tile detection."""
+    bbox = detection.get("bbox_xyxy") or detection.get("bbox")
+    if bbox is None or len(bbox) != 4:
+        return detection
+    x1, y1, x2, y2 = map(float, bbox)
+    corners = np.asarray([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+    polygon = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), native_to_processed).reshape(-1, 2)
+    row = dict(detection)
+    row["source_polygon_xy"] = polygon.tolist()
+    row["bbox_xyxy"] = [float(polygon[:, 0].min()), float(polygon[:, 1].min()),
+                        float(polygon[:, 0].max()), float(polygon[:, 1].max())]
+    row["source_coordinate_frame"] = "NATIVE_RECTIFIED_IMAGE_PIXEL"
+    return row
+
+
+def _detection_sort_key(detection: dict[str, Any]) -> tuple[Any, ...]:
+    box = detection.get("bbox_xyxy") or detection.get("bbox") or []
+    try:
+        normalized_box = tuple(round(float(value), 3) for value in box)
+    except (TypeError, ValueError):
+        normalized_box = ()
+    try:
+        confidence_key = -float(detection.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        confidence_key = 0.0
+    return (str(detection.get("class_name", detection.get("predicted_class", "unknown_component"))),
+            normalized_box, confidence_key,
+            str(detection.get("detection_id") or ""), str(detection.get("ocr_text") or ""))
+
+
+def _generated_detection_id(photo_id: str, class_name: str, box: list[float], model_id: Any,
+                            ocr_text: Any) -> str:
+    payload = json.dumps([photo_id, class_name, [round(float(value), 2) for value in box],
+                          str(model_id or ""), str(ocr_text or "").strip().upper()], separators=(",", ":"))
+    return "det_auto_" + hashlib.sha256(payload.encode()).hexdigest()[:20]
+
+
+def _stable_observation_id(photo_id: str, detection_id: str, class_name: str,
+                           box: list[float], ocr_text: Any) -> str:
+    payload = json.dumps([photo_id, detection_id, class_name,
+                          [round(float(value), 2) for value in box],
+                          str(ocr_text or "").strip().upper()], separators=(",", ":"))
+    return "observation_" + hashlib.sha256(payload.encode()).hexdigest()[:20]
 
 
 def _fuse_observations(board_id: str, side: str, observations: list[dict[str, Any]], *,
@@ -746,9 +884,11 @@ def _fuse_observations(board_id: str, side: str, observations: list[dict[str, An
     valid = [item for item in observations if item.get("bbox_xyxy")]
     groups: list[list[dict[str, Any]]] = []
     for item in sorted(valid, key=lambda row: (row["class_name"], row["bbox_xyxy"], row["photo_id"])):
-        target = next((group for group in groups if _same_component(item, group[0])), None)
-        if target is not None:
-            target.append(item)
+        # Complete-link fusion prevents a chain A~B and A~C from merging B/C
+        # if those observations do not independently satisfy the same gates.
+        targets = [group for group in groups if all(_same_component(item, member) for member in group)]
+        if len(targets) == 1:
+            targets[0].append(item)
         else:
             groups.append([item])
     previous_components = list((previous_side or {}).get("components", []))
@@ -827,17 +967,36 @@ def _fuse_observations(board_id: str, side: str, observations: list[dict[str, An
             identity_status = "IDENTITY_CONFLICT"
             identity_evidence.append({"method": "OCR_MARKING_CONFLICT", "markings": sorted(markings)})
         for other in valid:
-            if other in group or other.get("photo_id") in {item.get("photo_id") for item in group}:
+            if other in group:
                 continue
-            proximity = _observation_pair_metrics(group[0], other)
-            if (proximity["iou"] < 0.65 or proximity["normalized_center_distance"] > 0.25
-                    or proximity["bbox_scale_ratio"] < 0.65):
+            proximity_by_member = [(member, _observation_pair_metrics(member, other)) for member in group]
+            nearby = [(member, metrics) for member, metrics in proximity_by_member
+                      if metrics["iou"] >= 0.65 and metrics["normalized_center_distance"] <= 0.25
+                      and metrics["bbox_scale_ratio"] >= 0.65]
+            if not nearby:
+                continue
+            proximity = max((metrics for _, metrics in nearby),
+                            key=lambda metrics: (metrics["iou"], -metrics["normalized_center_distance"]))
+            if other.get("photo_id") in {item.get("photo_id") for item in group}:
+                if identity_status != "IDENTITY_CONFLICT":
+                    identity_status = "IDENTITY_AMBIGUOUS"
+                identity_evidence.append({"method": "SAME_PHOTO_OVERLAPPING_DETECTIONS",
+                    "observation_id": other.get("observation_id"), **proximity})
                 continue
             if str(other.get("class_name", "")).lower() != str(group[0].get("class_name", "")).lower():
                 identity_status = "IDENTITY_CONFLICT"
                 identity_evidence.append({"method": "OVERLAPPING_CLASS_CONFLICT",
                     "observation_id": other.get("observation_id"), "other_class": other.get("class_name"),
                     **proximity})
+            elif any(_same_component(member, other) for member in group) and not all(
+                    _same_component(other, member) for member in group):
+                if identity_status != "IDENTITY_CONFLICT":
+                    identity_status = "IDENTITY_AMBIGUOUS"
+                identity_evidence.append({"method": "PAIRWISE_FUSION_DISAGREEMENT",
+                    "observation_id": other.get("observation_id"),
+                    "pairwise_matches": [item.get("observation_id") for item, _ in nearby
+                                         if _same_component(item, other)],
+                    "group_observation_ids": [item.get("observation_id") for item in group], **proximity})
             elif not all(item.get("registration_status") in {None, "REFERENCE", "REGISTERED_CANDIDATE"}
                          and (item.get("registration_rmse_px") is None or item["registration_rmse_px"] <= 4.0)
                          and (item.get("registration_inlier_ratio") is None or item["registration_inlier_ratio"] >= 0.2)

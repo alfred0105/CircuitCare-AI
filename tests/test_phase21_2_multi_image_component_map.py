@@ -3,12 +3,14 @@ import io
 
 import cv2
 import numpy as np
+import pytest
 from PIL import Image
 from PIL import ImageFilter
 
 from circuitcare.vision.reconstruction.multi_image_component_map import (
     CaptureRole, ImageBudget, MultiImageComponentMapService, MultiImageError,
-    PhotoInput, save_identity_manifest, to_json,
+    PhotoInput, _detection_to_processed_frame, _fuse_observations, _native_rectified_image,
+    save_identity_manifest, to_json,
 )
 
 
@@ -61,6 +63,19 @@ def test_intake_hashes_orients_limits_and_keeps_sides_separate():
         assert exc.code == "IMAGE_COUNT_LIMIT"
     else:
         raise AssertionError("image count limit was not enforced")
+
+
+def test_native_tiled_frame_restores_detection_to_processed_coordinates():
+    source = np.full((160, 200, 3), 145, dtype=np.uint8)
+    service = MultiImageComponentMapService(budget=ImageBudget(max_decoded_edge=80))
+    session = service.ingest("native-tile", [PhotoInput(_png(source), "TOP")])
+    photo = session.photos[0]
+    native, native_to_processed = _native_rectified_image(photo)
+    assert native.size == (200, 160)
+    assert photo.image.size == (80, 64)
+    mapped = _detection_to_processed_frame({"bbox_xyxy": [50, 30, 100, 70]}, native_to_processed)
+    assert mapped["bbox_xyxy"] == pytest.approx([20, 12, 40, 28])
+    assert mapped["source_polygon_xy"][0] == pytest.approx([20, 12])
 
 
 def test_exif_orientation_is_applied_and_corrupt_images_fail_closed():
@@ -246,6 +261,73 @@ def test_fusion_rejects_same_photo_duplicate_and_conflicting_ocr():
     assert all(component["identity_match_status"] == "IDENTITY_CONFLICT" for component in class_components)
     assert all(any(evidence["method"] == "OVERLAPPING_CLASS_CONFLICT"
                    for evidence in component["identity_evidence"]) for component in class_components)
+
+
+def test_missing_and_duplicate_detector_ids_are_unique_and_order_stable():
+    image = _textured_scene()[:, :400]
+    service = MultiImageComponentMapService()
+    session = service.ingest("id-collision-board", [PhotoInput(_png(image), "TOP", CaptureRole.REFERENCE, "same.png")])
+    detections = [
+        {"class_name": "resistor", "bbox_xyxy": [80, 90, 100, 110], "confidence": 0.8},
+        {"class_name": "resistor", "bbox_xyxy": [120, 90, 140, 110], "confidence": 0.8},
+        {"detection_id": "reused", "class_name": "capacitor", "bbox_xyxy": [160, 90, 180, 110], "confidence": 0.8},
+        {"detection_id": "reused", "class_name": "capacitor", "bbox_xyxy": [200, 90, 220, 110], "confidence": 0.8},
+        {"class_name": "diode", "bbox_xyxy": [240, 90, 260, 110], "confidence": 0.8},
+        {"class_name": "diode", "bbox_xyxy": [240, 90, 260, 110], "confidence": 0.8},
+    ]
+
+    def run(rows):
+        result = service.build_map(session, detector=lambda _: {"status": "INFERENCE_COMPLETE", "detections": rows})
+        observations = result["sides"]["TOP"]["component_observations"]
+        return observations
+
+    first = run(detections)
+    second = run(list(reversed(detections)))
+    assert len({row["observation_id"] for row in first}) == len(detections)
+    assert len({row["detection_id"] for row in first}) == len(detections)
+    key = lambda row: (row["class_name"], tuple(row["processed_bbox_xyxy"]))
+    first_ids = {}
+    second_ids = {}
+    for row in first:
+        first_ids.setdefault(key(row), []).append(row["observation_id"])
+    for row in second:
+        second_ids.setdefault(key(row), []).append(row["observation_id"])
+    assert {item: sorted(ids) for item, ids in first_ids.items()} == {
+        item: sorted(ids) for item, ids in second_ids.items()}
+
+
+def test_complete_link_fusion_does_not_chain_merge_and_marks_ambiguity():
+    def obs(name, box):
+        return {"observation_id": name, "photo_id": name, "detection_id": name,
+                "class_name": "resistor", "bbox_xyxy": box, "original_bbox_xyxy": box,
+                "confidence": 0.9, "registration_status": "REGISTERED_CANDIDATE",
+                "registration_rmse_px": 1.0, "registration_inlier_ratio": 0.8,
+                "evidence": "TEST"}
+
+    components, _ = _fuse_observations("chain-board", "TOP", [
+        obs("A", [0, 0, 10, 10]), obs("B", [2, 0, 12, 10]), obs("C", [-2, 0, 8, 10]),
+    ])
+    assert len(components) == 2
+    assert sorted(len(item["component_observation_ids"]) for item in components) == [1, 2]
+    assert any(item["identity_match_status"] == "IDENTITY_AMBIGUOUS"
+               and any(evidence["method"] == "PAIRWISE_FUSION_DISAGREEMENT"
+                       for evidence in item["identity_evidence"]) for item in components)
+
+
+def test_same_photo_overlapping_detector_boxes_are_kept_separate_and_flagged():
+    def obs(name, box):
+        return {"observation_id": name, "photo_id": "same-photo", "detection_id": name,
+                "class_name": "capacitor", "bbox_xyxy": box, "original_bbox_xyxy": box,
+                "confidence": 0.9, "registration_status": "REFERENCE",
+                "evidence": "TEST"}
+
+    components, _ = _fuse_observations("dense-board", "TOP", [
+        obs("C1", [40, 40, 64, 64]), obs("C2", [41, 41, 65, 65]),
+    ])
+    assert len(components) == 2
+    assert all(component["identity_match_status"] == "IDENTITY_AMBIGUOUS" for component in components)
+    assert all(any(evidence["method"] == "SAME_PHOTO_OVERLAPPING_DETECTIONS"
+                   for evidence in component["identity_evidence"]) for component in components)
 
 
 def test_automatic_rectification_uses_clear_boundary_candidate_and_detector_absence_is_explicit(tmp_path):

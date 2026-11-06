@@ -12,6 +12,7 @@ build/
 .env
 data/private/
 data/external/prism/
+data/external/pcb-component-detection/
 data/benchmarks/prism/
 data/benchmarks/phase21_1/prism_baseline/
 data/benchmarks/phase21_1_1/prism_baseline/
@@ -28,6 +29,9 @@ data/benchmarks/phase21_2/*
 data/benchmarks/phase21_2_1/*
 !data/benchmarks/phase21_2_1/synthetic_summary.json
 !data/benchmarks/phase21_2_1/prism_pipeline_smoke.json
+data/benchmarks/phase21_3/*
+!data/benchmarks/phase21_3/single_baseline_summary.json
+!data/benchmarks/phase21_3/tiled_comparison_summary.json
 data/ui_runs/
 data/vision_results/
 data/visualizations/

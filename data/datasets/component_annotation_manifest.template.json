@@ -1,0 +1,22 @@
+{
+  "schema_version": "circuitcare.component-annotation.v1",
+  "dataset_name": "replace-with-dataset-name",
+  "dataset_source": "replace-with-source-url-and-commit",
+  "dataset_license": "replace-with-declared-license-or-REVIEW_REQUIRED",
+  "split_policy": "Assign every image from a board revision to one split before making crops, augmentations, or alternate views.",
+  "class_names": [
+    "resistor",
+    "capacitor",
+    "inductor",
+    "diode",
+    "transistor",
+    "mosfet",
+    "integrated_circuit",
+    "connector",
+    "fuse",
+    "crystal",
+    "switch_button",
+    "unknown_component"
+  ],
+  "images": []
+}

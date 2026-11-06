@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://circuitcare.local/schemas/component_annotation.schema.json",
+  "title": "CircuitCare PCB Component Annotation Manifest",
+  "type": "object",
+  "required": ["schema_version", "dataset_name", "dataset_source", "dataset_license", "split_policy", "images"],
+  "properties": {
+    "schema_version": {"const": "circuitcare.component-annotation.v1"},
+    "dataset_name": {"type": "string", "minLength": 1},
+    "dataset_source": {"type": "string", "minLength": 1},
+    "dataset_license": {"type": "string", "minLength": 1},
+    "split_policy": {"type": "string", "minLength": 1},
+    "class_names": {"type": "array", "items": {"type": "string"}},
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["image_id", "board_id", "board_revision", "board_side", "split", "image_sha256", "image_size_px", "source", "annotations"],
+        "properties": {
+          "image_id": {"type": "string", "minLength": 1},
+          "board_id": {"type": "string", "minLength": 1},
+          "board_revision": {"type": "string", "minLength": 1},
+          "board_side": {"enum": ["TOP", "BOTTOM"]},
+          "split": {"enum": ["development", "training", "validation", "sealed_test"]},
+          "image_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "image_size_px": {"type": "array", "prefixItems": [{"type": "integer", "minimum": 1}, {"type": "integer", "minimum": 1}], "minItems": 2, "maxItems": 2},
+          "source": {"type": "string", "minLength": 1},
+          "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "annotation": {
+      "type": "object",
+      "required": ["component_id", "class", "bbox_xyxy", "occlusion_state", "small_component", "annotation_status", "reviewer", "source"],
+      "properties": {
+        "component_id": {"type": "string", "minLength": 1},
+        "class": {"type": "string", "minLength": 1},
+        "bbox_xyxy": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+        "polygon_xy": {"type": "array", "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}, "minItems": 3},
+        "occlusion_state": {"enum": ["VISIBLE", "PARTIAL", "OCCLUDED", "UNKNOWN"]},
+        "small_component": {"type": "boolean"},
+        "annotation_status": {"enum": ["REVIEWED_GROUND_TRUTH", "DRAFT_ANNOTATION", "MODEL_PSEUDO_LABEL", "UNRESOLVED"]},
+        "reviewer": {"type": ["string", "null"]},
+        "source": {"type": "string", "minLength": 1},
+        "provenance": {"type": "object"}
+      }
+    }
+  }
+}

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import time
 from PIL import Image
 
+from circuitcare.vision import component_detector
 from circuitcare.vision.component_detector import add_manual_detection, apply_detection_corrections
 from circuitcare.vision.detection_evaluation import evaluate_detections
 from circuitcare.vision.detection_postprocess import class_aware_nms, decode_yolov8_output, letterbox_rgb
@@ -53,6 +55,53 @@ def test_nms_removes_same_class_duplicates_but_keeps_other_classes() -> None:
     scores = np.asarray([0.9, 0.8, 0.7])
     class_ids = np.asarray([0, 0, 1])
     assert class_aware_nms(boxes, scores, class_ids, iou_threshold=0.4) == [0, 2]
+
+
+def test_tiled_detector_restores_coordinates_and_fuses_tile_edge_duplicates(monkeypatch, tmp_path) -> None:
+    calls = []
+    def fake_detect(tile, model_path, *, confidence_threshold, iou_threshold):
+        calls.append(tile.size)
+        if len(calls) == 1:
+            rows = [{"class_name": "resistor", "predicted_class": "resistor", "confidence": 0.9,
+                     "bbox_xyxy": [700, 100, 760, 160]}]
+        else:
+            rows = [
+                {"class_name": "resistor", "predicted_class": "resistor", "confidence": 0.8,
+                 "bbox_xyxy": [568, 100, 628, 160]},
+                {"class_name": "capacitor", "predicted_class": "capacitor", "confidence": 0.7,
+                 "bbox_xyxy": [718, 250, 760, 300]},
+            ]
+        return {"status": "INFERENCE_COMPLETE", "model": {"status": "READY"}, "detections": rows}
+    monkeypatch.setattr(component_detector, "detect_components", fake_detect)
+    result = component_detector.detect_components_tiled(Image.new("RGB", (900, 600)),
+        str(tmp_path / "model.onnx"), tile_size_px=768, tile_overlap_px=128)
+    assert result["tile_count"] == 2
+    assert calls == [(768, 600), (768, 600)]
+    assert len(result["detections"]) == 2
+    resistor = next(row for row in result["detections"] if row["class_name"] == "resistor")
+    assert resistor["bbox_xyxy"] == pytest.approx([700, 100, 760, 160])
+    assert resistor["source_tile"]["column"] == 0
+    capacitor = next(row for row in result["detections"] if row["class_name"] == "capacitor")
+    assert capacitor["bbox_xyxy"] == pytest.approx([850, 250, 892, 300])
+
+
+def test_tiled_detector_enforces_resource_and_time_budgets(monkeypatch, tmp_path) -> None:
+    with pytest.raises(ValueError, match="tile size"):
+        component_detector.detect_components_tiled(Image.new("RGB", (100, 100)),
+            str(tmp_path / "model.onnx"), tile_size_px=128, tile_overlap_px=96)
+    with pytest.raises(ValueError, match="40 megapixel"):
+        component_detector.detect_components_tiled(type("ImageFrame", (), {"size": (7000, 6000),
+            "convert": lambda self, mode: self})(),
+            str(tmp_path / "model.onnx"), tile_size_px=1024, tile_overlap_px=128)
+
+    def slow_detect(tile, model_path, *, confidence_threshold, iou_threshold):
+        time.sleep(0.01)
+        return {"status": "INFERENCE_COMPLETE", "detections": []}
+    monkeypatch.setattr(component_detector, "detect_components", slow_detect)
+    with pytest.raises(TimeoutError, match="time budget"):
+        component_detector.detect_components_tiled(Image.new("RGB", (300, 300)),
+            str(tmp_path / "model.onnx"), tile_size_px=256, tile_overlap_px=64,
+            timeout_seconds=0.001)
 
 
 def test_low_score_class_becomes_unknown_and_outside_box_is_rejected() -> None:
