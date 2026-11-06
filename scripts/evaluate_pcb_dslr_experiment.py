@@ -34,13 +34,13 @@ def match_at_iou(rows, threshold, confidence=0.001, small_only=False, imgsz=640)
     per_image = {}
     for row in rows:
         factor = imgsz / max(row["image_size_px"])
-        gts = [a["bbox_xyxy"] for a in row["ground_truth"]
-               if not small_only or (a["bbox_xyxy"][2]-a["bbox_xyxy"][0]) *
-                                      (a["bbox_xyxy"][3]-a["bbox_xyxy"][1]) * factor * factor < 32*32]
+        is_small=lambda a:(a["bbox_xyxy"][2]-a["bbox_xyxy"][0])*(a["bbox_xyxy"][3]-a["bbox_xyxy"][1])*factor*factor<32*32
+        gts = [a["bbox_xyxy"] for a in row["ground_truth"] if not small_only or is_small(a)]
+        ignored_gts=[a["bbox_xyxy"] for a in row["ground_truth"] if small_only and not is_small(a)]
         gt_total += len(gts)
         preds = [p for p in row["predictions"] if p["confidence"] >= confidence]
         candidates.extend((p["confidence"], row["image_id"], p["bbox_xyxy"]) for p in preds)
-        per_image[row["image_id"]] = {"ground_truth": gts, "matched": set(), "fp": 0, "tp": 0}
+        per_image[row["image_id"]] = {"ground_truth": gts, "ignored_ground_truth":ignored_gts, "matched": {}, "fp": 0, "tp": 0}
     candidates.sort(key=lambda x: -x[0])
     tp_flags, fp_flags = [], []
     for conf, image_id, box in candidates:
@@ -49,7 +49,11 @@ def match_at_iou(rows, threshold, confidence=0.001, small_only=False, imgsz=640)
                    if index not in state["matched"]]
         best = max(matches, default=(0.0, -1))
         if best[0] >= threshold:
-            state["matched"].add(best[1]); state["tp"] += 1; tp_flags.append(1); fp_flags.append(0)
+            state["matched"][best[1]] = {"bbox_xyxy": box, "confidence": conf, "iou": best[0]}
+            state["tp"] += 1; tp_flags.append(1); fp_flags.append(0)
+        elif small_only and any(iou_xyxy(box,gt)>=threshold for gt in state["ignored_ground_truth"]):
+            # A detection assigned to a known large object is neutral for AP-small.
+            continue
         else:
             state["fp"] += 1; fp_flags.append(1); tp_flags.append(0)
     tp = sum(tp_flags); fp = sum(fp_flags); fn = gt_total - tp
@@ -61,8 +65,8 @@ def match_at_iou(rows, threshold, confidence=0.001, small_only=False, imgsz=640)
             "confidences": [c[0] for c in candidates]}
 
 
-def average_precision(rows, iou_threshold, imgsz):
-    result = match_at_iou(rows, iou_threshold, confidence=0.001, imgsz=imgsz)
+def average_precision(rows, iou_threshold, imgsz, small_only=False):
+    result = match_at_iou(rows, iou_threshold, confidence=0.001, imgsz=imgsz, small_only=small_only)
     if result["gt"] == 0: return 0.0
     tp = np.cumsum(result["tp_flags"]); fp = np.cumsum(result["fp_flags"])
     recall = tp / result["gt"]
@@ -105,6 +109,7 @@ def main():
     parser.add_argument("--confidence", type=float, default=0.25)
     parser.add_argument("--nms-iou", type=float, default=0.45)
     parser.add_argument("--device", choices=("mps", "cpu"), default="mps")
+    parser.add_argument("--head", choices=("raw", "nms-free"), default="raw")
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
     rows=[]
@@ -122,10 +127,16 @@ def main():
     from ultralytics import YOLO
     if args.device == "mps" and not torch.backends.mps.is_available(): raise RuntimeError("MPS requested but unavailable")
     model=YOLO(str(args.weights)); latencies=[]
+    names=model.names
+    class_names=list(names.values()) if isinstance(names,dict) else list(names)
+    if class_names != ["integrated_circuit"]:
+        raise ValueError(f"expected single-class contract ['integrated_circuit'], got {class_names}")
     for row in rows:
         started=time.perf_counter()
-        result=model.predict(row["image"],imgsz=args.imgsz,conf=0.001,iou=args.nms_iou,
-                             device=args.device,verbose=False)[0]
+        predict_args={"imgsz":args.imgsz,"conf":0.001,"device":args.device,"verbose":False}
+        if args.head=="nms-free":predict_args["nms"]=False
+        else:predict_args["iou"]=args.nms_iou
+        result=model.predict(row["image"],**predict_args)[0]
         latencies.append((time.perf_counter()-started)*1000)
         if result.boxes is not None:
             row["predictions"]=[{"bbox_xyxy":[float(v) for v in box.xyxy[0].cpu().tolist()],
@@ -134,6 +145,8 @@ def main():
     small=match_at_iou(rows,0.5,args.confidence,small_only=True,imgsz=args.imgsz)
     aps={f"{threshold:.2f}":average_precision(rows,threshold,args.imgsz)
          for threshold in np.arange(.5,.96,.05)}
+    small_aps={f"{threshold:.2f}":average_precision(rows,threshold,args.imgsz,small_only=True)
+               for threshold in np.arange(.5,.96,.05)}
     boards=defaultdict(lambda:{"gt":0,"tp":0})
     for row in rows:
         state=fixed["per_image"][row["image_id"]];board=boards[row["board_id"]]
@@ -151,11 +164,13 @@ def main():
     fig,ax=plt.subplots();ax.imshow(cm,cmap="Blues");ax.set_xticks([0,1],labels=["Detected","Missed"]);ax.set_yticks([0,1],labels=["GT IC","Background FP"])
     for (i,j),v in np.ndenumerate(cm):ax.text(j,i,str(v),ha="center",va="center")
     ax.set_title("IC confusion counts @ confidence 0.25, IoU 0.5");fig.tight_layout();fig.savefig(output/"confusion_matrix.png",dpi=160);plt.close(fig)
-    report={"schema_version":"circuitcare.pcb-dslr-yolov8-experiment-evaluation.v1",
+    report={"schema_version":"circuitcare.pcb-dslr-component-model-evaluation.v2",
       "dataset_id":manifest["dataset_id"],"dataset_version":manifest["source_version"],"dataset_manifest_sha256":__import__("hashlib").sha256(args.manifest.read_bytes()).hexdigest(),
       "split":args.split,"image_count":len(rows),"board_count":len(boards),"board_ids":sorted(boards),"annotation_count":sum(len(r["ground_truth"]) for r in rows),
-      "model":str(args.weights.resolve()),"model_class_contract":["integrated_circuit"],"image_size":args.imgsz,"device":args.device,"confidence_threshold":args.confidence,"nms_iou":args.nms_iou,"metric_iou":0.5,
-      "metrics":{"precision":fixed["precision"],"recall":fixed["recall"],"f1":fixed["f1"],"mAP50":aps["0.50"],"mAP50_95":float(np.mean(list(aps.values()))),"ap_by_iou":aps,"tp":fixed["tp"],"fp":fixed["fp"],"fn":fixed["fn"],"small_object_recall":small["recall"],"small_object_gt_count":small["gt"]},
+      "model":str(args.weights.resolve()),"model_class_contract":["integrated_circuit"],"prediction_head":args.head,"image_size":args.imgsz,"device":args.device,"confidence_threshold":args.confidence,"nms_iou":args.nms_iou if args.head=="raw" else None,"metric_iou":0.5,
+      "metrics":{"precision":fixed["precision"],"recall":fixed["recall"],"f1":fixed["f1"],"mAP50":aps["0.50"],"mAP50_95":float(np.mean(list(aps.values()))),"ap_by_iou":aps,"tp":fixed["tp"],"fp":fixed["fp"],"fn":fixed["fn"],"small_object_recall":small["recall"],"small_object_gt_count":small["gt"],"small_object_tp":small["tp"],"small_object_fn":small["fn"],"small_object_AP50":small_aps["0.50"],"small_object_AP50_95":float(np.mean(list(small_aps.values()))),"small_object_ap_by_iou":small_aps},
+      "localization_error_on_matched_boxes":{"matched_count":fixed["tp"],"mean_absolute_xyxy_error_px":float(np.mean([np.abs(np.asarray(pair["bbox_xyxy"])-np.asarray(row["ground_truth"][gt_i]["bbox_xyxy"])).mean() for row in rows for gt_i,pair in fixed["per_image"][row["image_id"]]["matched"].items()])) if fixed["tp"] else None,"mean_iou":float(np.mean([pair["iou"] for row in rows for pair in fixed["per_image"][row["image_id"]]["matched"].values()])) if fixed["tp"] else None},
+      "confidence_distribution":{"count":len(fixed["confidences"]),"min":float(np.min(fixed["confidences"])) if fixed["confidences"] else None,"q25":float(np.percentile(fixed["confidences"],25)) if fixed["confidences"] else None,"median":float(np.median(fixed["confidences"])) if fixed["confidences"] else None,"q75":float(np.percentile(fixed["confidences"],75)) if fixed["confidences"] else None,"max":float(np.max(fixed["confidences"])) if fixed["confidences"] else None},
       "board_metrics":{board:{"gt":v["gt"],"tp":v["tp"],"recall":v["tp"]/v["gt"] if v["gt"] else None} for board,v in sorted(boards.items())},
       "inference_latency_ms":{"mean":statistics.mean(latencies),"median":statistics.median(latencies),"p95":float(np.percentile(latencies,95))},
       "peak_process_rss_bytes":int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if platform.system()=="Darwin" else resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024),
