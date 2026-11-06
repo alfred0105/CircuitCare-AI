@@ -21,15 +21,14 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from circuitcare.vision.reconstruction.coordinate_frames import (
-    CalibrationPoint, CoordinateFrame, TransformType, fit_transform,
-)
-from circuitcare.vision.reconstruction.anchor_detection import detect_dark_round_anchors
-from circuitcare.vision.reconstruction.anchor_matching import extract_design_anchors, match_anchors
+from circuitcare.vision.reconstruction.coordinate_frames import CalibrationPoint, CoordinateFrame
 from circuitcare.vision.reconstruction.dataset_bundle import build_prism_bundle
 from circuitcare.vision.reconstruction.ground_truth import summarize_reference_geometry
 from circuitcare.vision.reconstruction.registration_visualization import (
     save_registration_overlay, save_top_bottom_comparison,
+)
+from circuitcare.vision.reconstruction.registration_service import (
+    RegistrationBudget, RegistrationRequest, RegistrationServiceError, register,
 )
 from circuitcare.vision.reconstruction.prism_dataset import (
     PRISM_COMMIT, SAMPLES, load_references, load_sample, validate_inventory,
@@ -72,7 +71,11 @@ def _report_path(path: Path) -> str:
 def _image_feature_diagnostics(image_path: Path, sample_name: str, side: str) -> dict[str, Any]:
     """Run image-only candidates as diagnostics; do not promote them to anchors."""
     try:
-        image = Image.open(image_path).convert("RGB")
+        with Image.open(image_path) as source:
+            if source.width * source.height > 4_000_000:
+                return {"status": "SKIPPED_IMAGE_PIXEL_LIMIT", "image_only": True,
+                        "usable_calibration_correspondences": 0}
+            image = source.convert("RGB")
         arr = np.asarray(image)
         board = detect_board_candidates(image)
         mask = segment_visible_copper(arr, board_side="TOP" if side == "TOP" else "BOTTOM").mask
@@ -162,17 +165,18 @@ def main() -> int:
                 }
                 if args.mode == "AUTO_REGISTRATION":
                     try:
-                        image_anchors, detected_size = detect_dark_round_anchors(
-                            image_path, photo_id=f"prism-{sample_name}-{side.lower()}",
-                            board_side=side,
-                        )
-                        design_anchors = extract_design_anchors(
-                            refs["expected_geometry"], board_side=side,
-                        )
-                        automatic_result = match_anchors(
-                            design_anchors, image_anchors, board_side=side,
-                            image_size_px=detected_size,
-                        )
+                        service_result = register(RegistrationRequest(
+                            board_id=sample_name, board_side=side, image=image_path,
+                            design_reference_geometry=refs["expected_geometry"],
+                            registration_mode=args.mode,
+                            calibration_points=tuple(calibration),
+                            validation_points=tuple(validation),
+                            acceptance_threshold_px=args.acceptance_threshold_px,
+                            budget=RegistrationBudget(ransac_threshold_px=args.ransac_threshold_px),
+                        ))
+                        automatic_result = service_result.automatic_match
+                        image_anchors = list(service_result.image_anchors)
+                        design_anchors = list(service_result.design_anchors)
                         side_dir = artifact_dir / "anchors"
                         side_dir.mkdir(parents=True, exist_ok=True)
                         anchor_path = side_dir / f"{sample_name}_{side}.json"
@@ -183,83 +187,101 @@ def main() -> int:
                         }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
                         match_path = artifact_dir / "matches" / f"{sample_name}_{side}.json"
                         match_path.parent.mkdir(parents=True, exist_ok=True)
-                        match_path.write_text(json.dumps(automatic_result.to_dict(), indent=2,
+                        match_path.write_text(json.dumps(service_result.to_dict(), indent=2,
                                                          ensure_ascii=False) + "\n", encoding="utf-8")
                         overlay_path = artifact_dir / "overlays" / f"{sample_name}_{side}_registration.png"
-                        save_registration_overlay(
-                            image_path, overlay_path, image_anchors=image_anchors,
-                            design_anchors=design_anchors, result=automatic_result,
-                        )
+                        if automatic_result:
+                            save_registration_overlay(
+                                image_path, overlay_path, image_anchors=image_anchors,
+                                design_anchors=design_anchors, result=automatic_result,
+                            )
+                        matching = service_result.to_dict()["matching"]
+                        independent_validation = service_result.independent_validation
                         row.update({
-                            "registration_status": automatic_result.status,
-                            "verification_status": automatic_result.status,
-                            "reason": automatic_result.reason,
-                            "calibration_point_count": automatic_result.candidate_count,
-                            "validation_point_count": 0,
-                            "fit_error_px": (automatic_result.transform.fit_error_px
-                                             if automatic_result.transform else None),
-                            "mean_error_px": automatic_result.mean_residual_px,
-                            "median_error_px": automatic_result.median_residual_px,
-                            "rmse_error_px": automatic_result.rmse_residual_px,
-                            "p95_error_px": automatic_result.p95_residual_px,
-                            "max_error_px": automatic_result.max_residual_px,
-                            "error_data_scope": "AUTO_MATCHED_INLIERS_TRAINING_ONLY_NOT_HELD_OUT",
-                            "inlier_count": len(automatic_result.matches),
-                            "review_flags": list(automatic_result.review_flags),
-                            "inlier_ratio": automatic_result.inlier_ratio,
-                            "candidate_match_count": automatic_result.candidate_count,
-                            "candidate_transform_count": automatic_result.candidate_transform_count,
-                            "design_anchor_count": automatic_result.design_anchor_count,
-                            "image_anchor_count": automatic_result.image_anchor_count,
-                            "spatial_coverage": automatic_result.spatial_coverage,
-                            "transform_stability_px": automatic_result.transform_stability_px,
-                            "orientation": automatic_result.orientation,
-                            "matching_reason": automatic_result.reason,
-                            "transform": automatic_result.transform.to_dict()
-                                         if automatic_result.transform else None,
-                            "matches": [match.to_dict() for match in automatic_result.matches],
+                            "registration_status": service_result.registration_status,
+                            "verification_status": service_result.registration_status,
+                            "reason": service_result.error_detail,
+                            "error_code": service_result.error_code,
+                            "calibration_point_count": matching["candidate_count"],
+                            "validation_point_count": independent_validation["point_count"],
+                            "independent_validation": independent_validation,
+                            "service_record": service_result.to_dict(),
+                            "fit_error_px": (service_result.transform.fit_error_px
+                                             if service_result.transform else None),
+                            "mean_error_px": (automatic_result.mean_residual_px if automatic_result
+                                              else (service_result.fit_metrics or {}).get("held_out_error_target_units", {}).get("mean")),
+                            "median_error_px": (automatic_result.median_residual_px if automatic_result
+                                                else (service_result.fit_metrics or {}).get("held_out_error_target_units", {}).get("median")),
+                            "rmse_error_px": (automatic_result.rmse_residual_px if automatic_result
+                                              else (service_result.fit_metrics or {}).get("held_out_error_target_units", {}).get("rmse")),
+                            "p95_error_px": (automatic_result.p95_residual_px if automatic_result
+                                             else (service_result.fit_metrics or {}).get("held_out_error_target_units", {}).get("p95")),
+                            "max_error_px": (automatic_result.max_residual_px if automatic_result
+                                             else (service_result.fit_metrics or {}).get("held_out_error_target_units", {}).get("max")),
+                            "error_data_scope": ("AUTO_MATCHED_INLIERS_TRAINING_ONLY_NOT_HELD_OUT"
+                                                 if automatic_result else "MANUAL_VALIDATION_HELD_OUT"),
+                            "inlier_count": matching["inlier_count"],
+                            "review_flags": list(automatic_result.review_flags) if automatic_result else [],
+                            "inlier_ratio": matching["inlier_ratio"],
+                            "candidate_match_count": matching["candidate_count"],
+                            "candidate_transform_count": (automatic_result.candidate_transform_count
+                                                           if automatic_result else 0),
+                            "design_anchor_count": len(design_anchors),
+                            "image_anchor_count": len(image_anchors),
+                            "spatial_coverage": automatic_result.spatial_coverage if automatic_result else None,
+                            "transform_stability_px": automatic_result.transform_stability_px if automatic_result else None,
+                            "orientation": automatic_result.orientation if automatic_result else None,
+                            "transform": service_result.transform.to_dict() if service_result.transform else None,
+                            "matches": [match.to_dict() for match in automatic_result.matches]
+                                       if automatic_result else [],
                             "anchor_file": _report_path(anchor_path),
                             "match_file": _report_path(match_path),
-                            "overlay_file": _report_path(overlay_path),
-                            "design_assisted": True,
+                            "overlay_file": _report_path(overlay_path) if automatic_result else None,
+                            "design_assisted": service_result.provenance["track"] == "DESIGN_ASSISTED_REGISTRATION",
                             "image_only_status": "CANDIDATES_ONLY",
-                            "design_assisted_status": automatic_result.status,
+                            "design_assisted_status": service_result.registration_status,
                         })
                     except (ValueError, OSError, KeyError, TypeError) as exc:
                         row.update(
                             registration_status="REGISTRATION_FAILED",
                             verification_status="REGISTRATION_FAILED",
                             reason=f"{type(exc).__name__}: {exc}",
+                            error_code=(exc.code.value if isinstance(exc, RegistrationServiceError)
+                                        else "REGISTRATION_FAILED"),
                         )
-                elif calibration:
+                else:
                     try:
-                        transform, metrics = fit_transform(
-                            calibration, board_side=side,
-                            source_frame=CoordinateFrame.KICAD_DESIGN,
-                            target_frame=CoordinateFrame.IMAGE_RAW,
-                            validation_points=validation,
-                            ransac_threshold_px=args.ransac_threshold_px,
+                        service_result = register(RegistrationRequest(
+                            board_id=sample_name, board_side=side, image=image_path,
+                            design_reference_geometry=refs["expected_geometry"],
+                            registration_mode=args.mode,
+                            calibration_points=tuple(calibration),
+                            validation_points=tuple(validation),
                             acceptance_threshold_px=args.acceptance_threshold_px,
-                            transform_type=TransformType.HOMOGRAPHY,
-                        )
+                            budget=RegistrationBudget(ransac_threshold_px=args.ransac_threshold_px),
+                        ))
+                        transform = service_result.transform
+                        metrics = service_result.fit_metrics or {}
                         row.update({
-                            "registration_status": transform.verification_status.value,
-                            "verification_status": transform.verification_status.value,
-                            "reason": "INDEPENDENT_VALIDATION_NOT_PROVIDED" if not validation else None,
-                            "fit_error_px": transform.fit_error_px,
-                            "median_error_px": metrics["held_out_error_target_units"]["median"],
-                            "p95_error_px": metrics["held_out_error_target_units"]["p95"],
-                            "inlier_count": transform.inlier_count,
-                            "inlier_ratio": transform.inlier_ratio,
-                            "transform": transform.to_dict(),
+                            "registration_status": service_result.registration_status,
+                            "verification_status": service_result.registration_status,
+                            "reason": service_result.error_detail,
+                            "error_code": service_result.error_code,
+                            "fit_error_px": transform.fit_error_px if transform else None,
+                            "median_error_px": metrics.get("held_out_error_target_units", {}).get("median"),
+                            "p95_error_px": metrics.get("held_out_error_target_units", {}).get("p95"),
+                            "inlier_count": transform.inlier_count if transform else 0,
+                            "inlier_ratio": transform.inlier_ratio if transform else None,
+                            "transform": transform.to_dict() if transform else None,
                             "metrics": metrics,
+                            "service_record": service_result.to_dict(),
                         })
-                        if transform.verification_status.value == "REGISTRATION_FAILED":
-                            row["reason"] = "HELD_OUT_ERROR_EXCEEDS_PREDECLARED_THRESHOLD"
                     except (ValueError, KeyError, TypeError) as exc:
                         row.update(registration_status="REGISTRATION_FAILED",
                                    verification_status="REGISTRATION_FAILED",
-                                   reason=f"{type(exc).__name__}: {exc}")
+                                   reason=f"{type(exc).__name__}: {exc}",
+                                   error_code=(exc.code.value if isinstance(exc, RegistrationServiceError)
+                                               else "REGISTRATION_FAILED"))
                 row["runtime_seconds"] = time.perf_counter() - side_started
                 sides[side] = row
             top_result = None
@@ -294,7 +316,7 @@ def main() -> int:
             })
             print(f"{sample_name}: TOP={sides['TOP']['registration_status']} BOTTOM={sides['BOTTOM']['registration_status']}", flush=True)
         report = {
-            "schema": "phase21.1.1-registration-attempt-v1",
+            "schema": "phase21.1.2-registration-attempt-v1",
             "dataset_source": "https://github.com/KamMalinski/PRISM",
             "prism_commit": commit,
             "circuitcare_commit": subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
@@ -317,6 +339,13 @@ def main() -> int:
                 "ransac_threshold_px": 2.0,
                 "match_tolerance_px": "max(3.5, 0.006 * min(image_width_px, image_height_px))",
                 "bottom_mirror": "searched as a negative-determinant similarity candidate; never forced",
+                "resource_limits": {
+                    "max_image_pixels": 4_000_000, "max_design_anchors": 128,
+                    "max_image_anchors": 128, "max_pair_products": 1_000_000,
+                    "max_hypotheses": 200_000, "max_retained_candidates": 10,
+                    "timeout_seconds": 20.0,
+                },
+                "determinism": "stable OpenCV RANSAC seed from source/target coordinates; matching hypothesis order is deterministic",
                 "track": "DESIGN_ASSISTED_REGISTRATION",
             },
             "samples_requested": len(rows), "sample_results": rows,

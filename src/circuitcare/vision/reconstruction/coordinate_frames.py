@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import threading
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any, Iterable
 
 import cv2
 import numpy as np
+
+
+_CV_RANSAC_LOCK = threading.Lock()
 
 
 class CoordinateFrame(StrEnum):
@@ -83,11 +88,15 @@ class CoordinateTransform:
         if board_side != self.board_side:
             raise ValueError("PCB side mismatch; TOP/BOTTOM transforms cannot be interchanged")
         matrix = np.asarray(self.matrix, dtype=np.float64)
+        if matrix.shape != (3, 3) or not np.isfinite(matrix).all() or abs(np.linalg.det(matrix)) < 1e-12:
+            raise ValueError("Coordinate transform matrix must be finite, 3x3, and invertible")
         values = _points(points, minimum=0)
         return cv2.perspectiveTransform(values.reshape(1, -1, 2), matrix).reshape(-1, 2)
 
     def inverse(self) -> "CoordinateTransform":
         matrix = np.asarray(self.matrix, dtype=np.float64)
+        if matrix.shape != (3, 3) or not np.isfinite(matrix).all() or abs(np.linalg.det(matrix)) < 1e-12:
+            raise ValueError("Coordinate transform matrix must be finite, 3x3, and invertible")
         inverse = np.linalg.inv(matrix)
         if abs(inverse[2, 2]) > 1e-12:
             inverse /= inverse[2, 2]
@@ -128,12 +137,16 @@ def fit_transform(calibration_points: Iterable[CalibrationPoint], *, board_side:
         raise ValueError("Calibration and held-out validation point IDs must be disjoint")
     calibration_locations = np.asarray([point.source_xy for point in calibration], dtype=np.float64)
     validation_locations = np.asarray([point.source_xy for point in validation], dtype=np.float64)
-    if len(calibration_locations) and len(validation_locations):
-        duplicate_locations = np.linalg.norm(
-            calibration_locations[:, None, :] - validation_locations[None, :, :], axis=2,
-        ) <= 1e-6
-        if duplicate_locations.any():
-            raise ValueError("Calibration and validation cannot reuse the same physical source location")
+    calibration_targets = np.asarray([point.target_xy for point in calibration], dtype=np.float64)
+    validation_targets = np.asarray([point.target_xy for point in validation], dtype=np.float64)
+    for calibration_xy, validation_xy, frame in (
+        (calibration_locations, validation_locations, "source"),
+        (calibration_targets, validation_targets, "target"),
+    ):
+        if len(calibration_xy) and len(validation_xy):
+            duplicates = np.linalg.norm(calibration_xy[:, None, :] - validation_xy[None, :, :], axis=2) <= 1e-6
+            if duplicates.any():
+                raise ValueError(f"Calibration and validation cannot reuse the same physical {frame} location")
     required = 3 if transform_type == TransformType.AFFINE else 4
     if len(calibration) < required:
         raise ValueError(f"{transform_type.value} requires at least {required} calibration points")
@@ -142,14 +155,15 @@ def fit_transform(calibration_points: Iterable[CalibrationPoint], *, board_side:
     _ensure_spread(source, "source")
     _ensure_spread(target, "target")
     if transform_type == TransformType.AFFINE:
-        affine, inliers = cv2.estimateAffine2D(source, target, method=cv2.RANSAC,
-                                               ransacReprojThreshold=ransac_threshold_px)
+        affine, inliers = estimate_affine_ransac(source, target, ransac_threshold_px)
         if affine is None:
             raise ValueError("Affine RANSAC could not estimate a transform")
         matrix = np.vstack([affine, [0.0, 0.0, 1.0]])
         inlier_mask = np.asarray(inliers).reshape(-1).astype(bool)
     else:
-        matrix, inliers = cv2.findHomography(source, target, cv2.RANSAC, ransac_threshold_px)
+        with _CV_RANSAC_LOCK:
+            cv2.setRNGSeed(_ransac_seed(source, target))
+            matrix, inliers = cv2.findHomography(source, target, cv2.RANSAC, ransac_threshold_px)
         if matrix is None or inliers is None:
             raise ValueError("Homography RANSAC could not estimate a transform")
         inlier_mask = np.asarray(inliers).reshape(-1).astype(bool)
@@ -187,6 +201,25 @@ def fit_transform(calibration_points: Iterable[CalibrationPoint], *, board_side:
     if acceptance_threshold_px is not None:
         report["acceptance_threshold_px"] = acceptance_threshold_px
     return transform, report
+
+
+def estimate_affine_ransac(source: np.ndarray, target: np.ndarray, threshold_px: float,
+                           *, max_iterations: int = 2000, confidence: float = 0.99,
+                           refine_iterations: int = 10) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Run OpenCV affine RANSAC with a stable seed and serialized RNG access."""
+    with _CV_RANSAC_LOCK:
+        cv2.setRNGSeed(_ransac_seed(source, target))
+        return cv2.estimateAffine2D(
+            source, target, method=cv2.RANSAC, ransacReprojThreshold=threshold_px,
+            maxIters=max_iterations, confidence=confidence, refineIters=refine_iterations,
+        )
+
+
+def _ransac_seed(source: np.ndarray, target: np.ndarray) -> int:
+    digest = hashlib.sha256(
+        np.asarray(source, dtype="<f8").tobytes() + np.asarray(target, dtype="<f8").tobytes(),
+    ).digest()
+    return int.from_bytes(digest[:4], "little") & 0x7FFFFFFF
 
 
 def registration_metrics(transform: CoordinateTransform, calibration: list[CalibrationPoint],
@@ -234,6 +267,16 @@ def _validate_points(points: list[CalibrationPoint], source_frame: CoordinateFra
         if point.role != role:
             raise ValueError(f"Point {point.point_id} has role {point.role}; expected {role}")
         _points([point.source_xy, point.target_xy], minimum=0)
+    for coordinates, name in (
+        ([point.source_xy for point in points], "source"),
+        ([point.target_xy for point in points], "target"),
+    ):
+        values = np.asarray(coordinates, dtype=np.float64)
+        if len(values) > 1:
+            distances = np.linalg.norm(values[:, None, :] - values[None, :, :], axis=2)
+            np.fill_diagonal(distances, np.inf)
+            if np.any(distances <= 1e-6):
+                raise ValueError(f"{role} points cannot duplicate a physical {name} location")
 
 
 def _points(values: Iterable[tuple[float, float]], *, minimum: int) -> np.ndarray:

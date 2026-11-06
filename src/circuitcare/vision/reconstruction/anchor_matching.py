@@ -13,7 +13,7 @@ import numpy as np
 from circuitcare.vision.reconstruction.anchor_detection import ImageAnchor
 from circuitcare.vision.reconstruction.coordinate_frames import (
     CalibrationPoint, CoordinateFrame, CoordinateTransform, TransformType,
-    VerificationStatus, fit_transform,
+    VerificationStatus, estimate_affine_ransac, fit_transform,
 )
 
 
@@ -67,6 +67,8 @@ class AutomaticMatchResult:
     status: str
     reason: str | None
     runtime_seconds: float
+    pair_product_count: int = 0
+    hypotheses_examined: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +92,9 @@ class AutomaticMatchResult:
             "registration_status": self.status,
             "reason": self.reason,
             "runtime_seconds": self.runtime_seconds,
+            "pair_product_count": self.pair_product_count,
+            "estimated_pair_ratio_bytes": self.pair_product_count * 8,
+            "hypotheses_examined": self.hypotheses_examined,
         }
 
 
@@ -141,7 +146,13 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
                   image_size_px: tuple[int, int], scale_range: tuple[float, float] = (1.0, 80.0),
                   scale_peak_count: int = 4, scale_tolerance: float = 0.015,
                   match_tolerance_px: float | None = None,
-                  ransac_threshold_px: float = 2.0) -> AutomaticMatchResult:
+                  max_design_anchors: int = 128,
+                  max_image_anchors: int = 128,
+                  ransac_threshold_px: float = 2.0,
+                  max_pair_products: int = 1_000_000,
+                  max_hypotheses: int = 200_000,
+                  max_retained_candidates: int = 10,
+                  timeout_seconds: float = 20.0) -> AutomaticMatchResult:
     """Search pair-distance consensus, score similarity/mirror hypotheses, then affine-RANSAC refine.
 
     The design anchors participate in correspondence matching. This is therefore
@@ -154,29 +165,63 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
         raise ValueError("Design anchor IDs must be unique")
     if len({anchor.anchor_id for anchor in image}) != len(image):
         raise ValueError("Image anchor IDs must be unique")
+    if (max_design_anchors < 1 or max_image_anchors < 1
+            or max_pair_products < 1 or max_hypotheses < 1 or max_retained_candidates < 1
+            or not math.isfinite(timeout_seconds) or timeout_seconds <= 0):
+        raise ValueError("Matching resource budgets must be positive and finite")
+    if (not (0 < scale_range[0] < scale_range[1])
+            or not all(math.isfinite(value) for value in scale_range)
+            or scale_peak_count < 1 or not 0 < scale_tolerance < 1
+            or ransac_threshold_px <= 0 or not math.isfinite(ransac_threshold_px)
+            or (match_tolerance_px is not None
+                and (match_tolerance_px <= 0 or not math.isfinite(match_tolerance_px)))):
+        raise ValueError("Invalid matching geometry configuration")
+    if len(design) > max_design_anchors:
+        return _failure(design, image, started, "RESOURCE_LIMIT_DESIGN_ANCHORS")
+    if len(image) > max_image_anchors:
+        return _failure(design, image, started, "RESOURCE_LIMIT_IMAGE_ANCHORS")
+    if len(image_size_px) != 2 or any(not isinstance(value, (int, np.integer)) or value <= 0
+                                      for value in image_size_px):
+        raise ValueError("image_size_px must contain positive integer width and height")
+    design_pair_count = len(design) * (len(design) - 1) // 2
+    image_pair_count = len(image) * (len(image) - 1) // 2
+    pair_product_count = design_pair_count * image_pair_count
+    if pair_product_count > max_pair_products:
+        return _failure(design, image, started, "RESOURCE_LIMIT_PAIR_PRODUCTS",
+                        pair_product_count=pair_product_count)
     src = np.asarray([[item.x_mm, item.y_mm] for item in design], dtype=np.float64)
     dst = np.asarray([item.center_px for item in image], dtype=np.float64)
     width, height = image_size_px
     tolerance = float(match_tolerance_px or max(3.5, min(width, height) * 0.006))
     if len(src) < 3 or len(dst) < 3:
-        return _failure(design, image, started, "INSUFFICIENT_ANCHORS")
+        return _failure(design, image, started, "INSUFFICIENT_ANCHORS",
+                        pair_product_count=pair_product_count)
     d_pairs, d_dist = _pairs(src)
     i_pairs, i_dist = _pairs(dst)
     if not len(d_dist) or not len(i_dist):
-        return _failure(design, image, started, "INSUFFICIENT_NONZERO_PAIR_DISTANCES")
+        return _failure(design, image, started, "INSUFFICIENT_NONZERO_PAIR_DISTANCES",
+                        pair_product_count=pair_product_count)
     ratios = (i_dist[:, None] / d_dist[None, :]).ravel()
     low, high = scale_range
     ratios = ratios[(ratios >= low) & (ratios <= high) & np.isfinite(ratios)]
     if not len(ratios):
-        return _failure(design, image, started, "NO_PLAUSIBLE_PIXEL_PER_MM_SCALE")
+        return _failure(design, image, started, "NO_PLAUSIBLE_PIXEL_PER_MM_SCALE",
+                        pair_product_count=pair_product_count)
     log_low, log_high = math.log(low), math.log(high)
     histogram, edges = np.histogram(np.log(ratios), bins=720, range=(log_low, log_high))
     peak_indices = _top_peaks(histogram, count=scale_peak_count, separation=4)
     scales = [math.exp((edges[index] + edges[index + 1]) * 0.5) for index in peak_indices]
-    candidates: list[tuple[tuple[int, float, float], np.ndarray, list[tuple[int, int, float]], str]] = []
+    candidates: list[tuple[tuple[float, ...], tuple[tuple[int, float, float], np.ndarray,
+                                                    list[tuple[int, int, float]], str]]] = []
     candidate_transform_count = 0
+    hypotheses_examined = 0
     for scale in scales:
         for (si, sj), source_distance in zip(d_pairs, d_dist):
+            if time.perf_counter() - started >= timeout_seconds:
+                return _failure(design, image, started, "RESOURCE_LIMIT_TIMEOUT",
+                                candidate_transform_count=candidate_transform_count,
+                                pair_product_count=pair_product_count,
+                                hypotheses_examined=hypotheses_examined)
             possible = np.flatnonzero(np.abs(i_dist - source_distance * scale)
                                       <= source_distance * scale * scale_tolerance)
             for target_pair_index in possible:
@@ -195,6 +240,17 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
                     target_axis = target_vector / target_length
                     target_normal = np.array([-target_axis[1], target_axis[0]])
                     for handedness in (1.0, -1.0):
+                        if hypotheses_examined >= max_hypotheses:
+                            return _failure(design, image, started, "RESOURCE_LIMIT_HYPOTHESES",
+                                            candidate_transform_count=candidate_transform_count,
+                                            pair_product_count=pair_product_count,
+                                            hypotheses_examined=hypotheses_examined)
+                        if time.perf_counter() - started >= timeout_seconds:
+                            return _failure(design, image, started, "RESOURCE_LIMIT_TIMEOUT",
+                                            candidate_transform_count=candidate_transform_count,
+                                            pair_product_count=pair_product_count,
+                                            hypotheses_examined=hypotheses_examined)
+                        hypotheses_examined += 1
                         basis = np.column_stack((target_axis, handedness * target_normal)) @ np.column_stack((source_axis, source_normal)).T
                         matrix = basis * (target_length / source_length)
                         translation = dst[first] - matrix @ src[si]
@@ -210,16 +266,31 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
                         coverage = _spatial_coverage(src, [item[0] for item in pairs])
                         score = (len(pairs), coverage, -float(np.median(residuals)))
                         orientation = "MIRROR" if np.linalg.det(affine[:, :2]) < 0 else "ROTATION_SCALE"
-                        candidates.append((score, affine, pairs, orientation))
+                        candidate = (score, affine, pairs, orientation)
+                        matrix_key = tuple(np.round(affine.reshape(-1), 6))
+                        duplicate_index = next((index for index, (key, _) in enumerate(candidates)
+                                                if key == matrix_key), None)
+                        if duplicate_index is not None:
+                            if score > candidates[duplicate_index][1][0]:
+                                candidates[duplicate_index] = (matrix_key, candidate)
+                                candidates.sort(key=lambda item: item[1][0], reverse=True)
+                        elif len(candidates) < max_retained_candidates:
+                            candidates.append((matrix_key, candidate))
+                            candidates.sort(key=lambda item: item[1][0], reverse=True)
+                        elif score > candidates[-1][1][0]:
+                            candidates[-1] = (matrix_key, candidate)
+                            candidates.sort(key=lambda item: item[1][0], reverse=True)
     if not candidates:
         return _failure(design, image, started, "NO_GEOMETRICALLY_CONSISTENT_ANCHOR_MATCHES",
-                        candidate_transform_count=candidate_transform_count)
-    candidates.sort(key=lambda item: item[0], reverse=True)
+                        candidate_transform_count=candidate_transform_count,
+                        pair_product_count=pair_product_count,
+                        hypotheses_examined=hypotheses_examined)
+    candidates.sort(key=lambda item: item[1][0], reverse=True)
     unique = []
-    for candidate in candidates:
+    for _, candidate in candidates:
         if all(_matrix_distance(candidate[1], selected[1], src) > 0.5 for selected in unique):
             unique.append(candidate)
-        if len(unique) >= 30:
+        if len(unique) >= max_retained_candidates:
             break
     best_score, _, best_pairs, orientation = unique[0]
     calibration_points = [CalibrationPoint(
@@ -246,7 +317,8 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
     except ValueError as exc:
         return _failure(design, image, started, f"DEGENERATE_OR_INVALID_MATCH_GEOMETRY: {exc}",
                         candidate_transform_count=candidate_transform_count,
-                        candidate_count=len(best_pairs))
+                        candidate_count=len(best_pairs), pair_product_count=pair_product_count,
+                        hypotheses_examined=hypotheses_examined)
     final_matrix = np.asarray(transform.matrix, dtype=np.float64)
     matches = []
     candidate_count = len(best_pairs)
@@ -260,7 +332,8 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
     if len(matches) < 3:
         return _failure(design, image, started, "RANSAC_REFINEMENT_LEFT_TOO_FEW_INLIERS",
                         candidate_transform_count=candidate_transform_count,
-                        candidate_count=candidate_count)
+                        candidate_count=candidate_count, pair_product_count=pair_product_count,
+                        hypotheses_examined=hypotheses_examined)
     errors = np.asarray([match.residual_px for match in matches])
     best_residual = -best_score[2]
     stable_candidates = [candidate for candidate in unique
@@ -291,6 +364,8 @@ def match_anchors(design: list[DesignAnchor], image: list[ImageAnchor], *, board
         status=VerificationStatus.AUTO_ESTIMATED_UNVERIFIED.value,
         reason="Automatic correspondences are not independent validation; rendered PRISM data only",
         runtime_seconds=time.perf_counter() - started,
+        pair_product_count=pair_product_count,
+        hypotheses_examined=hypotheses_examined,
     )
     blocking_flags = {"LOW_MATCH_SUPPORT", "LOW_SPATIAL_COVERAGE", "AMBIGUOUS_TRANSFORM_HYPOTHESES"}
     if blocking_flags.intersection(review_flags):
@@ -349,10 +424,7 @@ def _refine(source: np.ndarray, target: np.ndarray, matches: list[tuple[int, int
     for _ in range(3):
         src = np.asarray([source[i] for i, _, _ in current], dtype=np.float32)
         dst = np.asarray([target[j] for _, j, _ in current], dtype=np.float32)
-        candidate, inliers = cv2.estimateAffine2D(
-            src, dst, method=cv2.RANSAC, ransacReprojThreshold=tolerance,
-            maxIters=2000, confidence=0.99, refineIters=10,
-        )
+        candidate, inliers = estimate_affine_ransac(src, dst, tolerance)
         if candidate is None or inliers is None or int(inliers.sum()) < 3:
             return None
         affine = candidate.astype(np.float64)
@@ -406,8 +478,10 @@ def _transform_stability(candidates: list[tuple[Any, np.ndarray, Any, Any]],
 
 def _failure(design: list[DesignAnchor], image: list[ImageAnchor], started: float,
              reason: str, *, candidate_transform_count: int = 0,
-             candidate_count: int = 0) -> AutomaticMatchResult:
+             candidate_count: int = 0, pair_product_count: int = 0,
+             hypotheses_examined: int = 0) -> AutomaticMatchResult:
     return AutomaticMatchResult(None, (), candidate_transform_count, candidate_count,
                                 len(design), len(image), 0.0, None, None, None, None, None,
                                 0.0, None, None, (), "REGISTRATION_FAILED", reason,
-                                time.perf_counter() - started)
+                                time.perf_counter() - started, pair_product_count,
+                                hypotheses_examined)
