@@ -19,6 +19,7 @@ from circuitcare.frontend.intake import (
     validate_circuit_upload,
 )
 from circuitcare.frontend.photo_adapter import normalize_photo_metadata
+from circuitcare.frontend.component_map_adapter import clear_component_map_state
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY,
     INTAKE_PROJECT_KEY,
@@ -151,6 +152,8 @@ def render_diagnosis_entry(st: Any) -> str | None:
                 images, ((item.name, item.getvalue()) for item in uploaded),
             )
             state[INTAKE_IMAGES_KEY] = new_images
+            if new_images != images:
+                clear_component_map_state(state)
             state["circuitcare_v2_photo_messages"] = messages
             state[INTAKE_UPLOAD_BATCH_KEY] += 1
             state.pop(INTAKE_PROJECT_KEY, None)
@@ -185,11 +188,13 @@ def render_diagnosis_entry(st: Any) -> str | None:
                             label_visibility="collapsed",
                         )
                         if side != image_record["side"] or capture_type != image_record["capture_type"]:
+                            clear_component_map_state(state)
                             image_record["side"] = side
                             image_record["capture_type"] = capture_type
                             state.pop(INTAKE_PROJECT_KEY, None)
                             state.pop("circuitcare_v2_analysis_status", None)
                         if st.button("사진 제거", key=f"cc_v2_remove_{image_record['sha256']}", use_container_width=True):
+                            clear_component_map_state(state)
                             state[INTAKE_IMAGES_KEY] = [item for item in images if item["sha256"] != image_record["sha256"]]
                             state.pop(INTAKE_PROJECT_KEY, None)
                             state.pop("circuitcare_v2_analysis_status", None)

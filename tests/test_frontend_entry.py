@@ -8,7 +8,12 @@ import pytest
 from PIL import Image
 
 from circuitcare.frontend.intake import create_preview_context, create_project_context
+from circuitcare.frontend.models import ImageRecord, ProjectContext
 from circuitcare.frontend.state import INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY
+from circuitcare.frontend.component_map_adapter import (
+    COMPONENT_MAP_STATE_KEY, component_map_cache_key, photo_input_fingerprint,
+)
+from circuitcare.frontend.photo_adapter import adapt_component_map_input
 
 
 def test_v2_flag_routes_to_real_entry_screen(monkeypatch):
@@ -325,4 +330,92 @@ def test_preview_context_is_separate_from_strict_diagnostic_factory():
     assert preview.board_id == "preview-board"
     with pytest.raises(ValueError, match="한 장 이상"):
         create_project_context(images=[], symptom_category="unknown", symptom_description=None)
+
+
+@pytest.mark.parametrize("sides, expected", [
+    (["front", "front", "back"], {"앞면": 2, "뒷면": 1}),
+    (["front", "unknown"], {"앞면": 1, "미지정": 1}),
+    (["front", "back", "unknown"], {"앞면": 1, "뒷면": 1, "미지정": 1}),
+    (["unknown", "unknown", "unknown"], {"미지정": 3}),
+])
+def test_workbench_exposes_originals_for_every_present_side(monkeypatch, sides, expected):
+    pytest.importorskip("streamlit")
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.setenv("CIRCUITCARE_UI_V2", "1")
+    project_root = Path(__file__).parents[1]
+    app = AppTest.from_file(str(project_root / "src/circuitcare/ui.py"), default_timeout=30)
+    records = []
+    photos = []
+    for index, side in enumerate(sides):
+        image = Image.new("RGB", (24, 16), (30 + index, 70, 110))
+        stream = io.BytesIO()
+        image.save(stream, format="PNG")
+        data = stream.getvalue()
+        image_id = f"photo-{index}"
+        digest = hashlib.sha256(data).hexdigest()
+        records.append(ImageRecord(
+            image_id=image_id, side=side, capture_type="unknown", filename=f"{image_id}.png",
+            content_sha256=digest, media_type="image/png", image_dimensions=(24, 16), image_format="PNG",
+        ))
+        photos.append({"image_id": image_id, "data": data})
+    project = ProjectContext("project-side-test", "board-side-test", tuple(records), input_fingerprint="photo-fp")
+    app.session_state[INTAKE_PROJECT_KEY] = project
+    app.session_state[INTAKE_IMAGES_KEY] = photos
+    app.session_state["circuitcare_v2_screen"] = "workbench"
+    app.run()
+
+    assert not app.exception
+    side_widget = next(widget for widget in app.selectbox if widget.label == "면")
+    assert side_widget.options == list(expected)
+    original_widget = next(widget for widget in app.selectbox if widget.label == "원본 사진")
+    assert len(original_widget.options) == next(iter(expected.values()))
+
+
+def test_broken_canonical_artifact_falls_back_to_source_without_dropping_map(monkeypatch):
+    pytest.importorskip("streamlit")
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.setenv("CIRCUITCARE_UI_V2", "1")
+    image = Image.new("RGB", (24, 16), "orange")
+    stream = io.BytesIO()
+    image.save(stream, format="PNG")
+    data = stream.getvalue()
+    digest = hashlib.sha256(data).hexdigest()
+    record = ImageRecord("photo-1", "front", "full_view", "board.png", digest,
+                         "image/png", (24, 16), "PNG")
+    project = ProjectContext("fallback-project", "fallback-board", (record,), input_fingerprint="unused")
+    request = adapt_component_map_input(record, board_id=project.board_id, data=data).request
+    photo_fp = photo_input_fingerprint([record])
+    cache_key = component_map_cache_key(
+        project_id=project.project_id, board_id=project.board_id, inputs=[request], photo_manifest=[record],
+    )
+    bad_map = {
+        "schema_version": "circuitcare.pcb-component-map.v1", "board_id": project.board_id,
+        "photos": [], "sides": {"TOP": {"registrations": [], "canonical_image": {
+            "image_id": "frame-bad", "coordinate_frame": "MOSAIC_PIXEL", "image_size_px": [1, 1],
+            "reference_photo_id": None, "image_png_base64": "not-base64"}}},
+    }
+    app = AppTest.from_file(str(Path(__file__).parents[1] / "src/circuitcare/ui.py"), default_timeout=30)
+    app.session_state[INTAKE_PROJECT_KEY] = project
+    app.session_state[INTAKE_IMAGES_KEY] = [{"image_id": record.image_id, "data": data}]
+    app.session_state["circuitcare_v2_screen"] = "workbench"
+    app.session_state["circuitcare_v3_view_mode"] = "통합 이미지"
+    app.session_state[COMPONENT_MAP_STATE_KEY] = {
+        "project_id": project.project_id, "board_id": project.board_id,
+        "input_fingerprint": photo_fp, "component_map_cache_key": cache_key,
+        "component_map": bad_map, "photo_id_map": [], "failed_artifacts": [],
+    }
+    app.run()
+
+    assert not app.exception
+    assert len(app.image) == 1
+    assert app.session_state["circuitcare_v3_view_mode"] == "원본 사진"
+    assert any("원본 사진으로 전환" in warning.value for warning in app.warning)
+    assert app.session_state[COMPONENT_MAP_STATE_KEY]["component_map"] == bad_map
+    assert app.session_state[COMPONENT_MAP_STATE_KEY]["failed_artifacts"]
+    app.run()
+    assert not app.exception
+    assert not app.warning
+    assert len(app.image) == 1
 

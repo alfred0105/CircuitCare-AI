@@ -10,7 +10,9 @@ import hashlib
 import importlib
 import io
 import json
+import logging
 import math
+from collections.abc import Mapping, MutableMapping
 from typing import Any, Protocol
 
 from PIL import Image
@@ -18,6 +20,15 @@ from PIL import Image
 from circuitcare.frontend.photo_adapter import ComponentMapPhotoInput
 
 SCHEMA_VERSION = "circuitcare.pcb-component-map.v1"
+COMPONENT_MAP_STATE_KEY = "circuitcare_v3_component_map_entry"
+LEGACY_COMPONENT_MAP_KEYS = (
+    "circuitcare_v3_component_map_result", "circuitcare_v3_component_map_cache_key",
+    "circuitcare_v3_photo_map", "circuitcare_v3_selected_canonical_image",
+    "circuitcare_v3_registration_status", "circuitcare_v3_processing_error",
+    "circuitcare_v3_active_side", "circuitcare_v3_view_mode", "circuitcare_v3_failed_artifacts",
+    "circuitcare_v2_view_transform", "circuitcare_v2_active_photo_id", "circuitcare_v2_view_zoom",
+)
+LOGGER = logging.getLogger(__name__)
 MAX_CANONICAL_BYTES = 24 * 1024 * 1024
 MAX_CANONICAL_PIXELS = 8_000_000
 MAX_CANONICAL_EDGE = 4000
@@ -88,7 +99,7 @@ def validate_component_map(value: Any, *, board_id: str) -> dict[str, Any]:
             raise ValueError("Component Map 촬영면 형식 불일치")
         canonical = entry.get("canonical_image")
         if canonical is not None and (not isinstance(canonical, dict) or not isinstance(canonical.get("image_id"), str)
-                                      or canonical.get("coordinate_frame") != "MOSAIC_PIXEL"):
+                                      or not canonical.get("image_id")):
             raise ValueError("Canonical Image 메타데이터 불일치")
         for registration in entry.get("registrations", []):
             if not isinstance(registration, dict) or registration.get("status") not in {
@@ -132,6 +143,9 @@ def map_backend_photo_ids(*, project_id: str, board_id: str, inputs: list[Compon
 
 
 def decode_canonical_image(canonical: dict[str, Any]) -> CanonicalImage:
+    if (not isinstance(canonical, dict) or canonical.get("coordinate_frame") != "MOSAIC_PIXEL"
+            or not isinstance(canonical.get("image_id"), str) or not canonical["image_id"]):
+        raise ValueError("Canonical Image 프레임 정보가 유효하지 않습니다.")
     encoded = canonical.get("image_png_base64")
     if not isinstance(encoded, str) or len(encoded) > (MAX_CANONICAL_BYTES * 4 // 3 + 16):
         raise ValueError("통합 이미지 크기 제한 초과 또는 데이터 누락")
@@ -149,14 +163,71 @@ def decode_canonical_image(canonical: dict[str, Any]) -> CanonicalImage:
         image = loaded.convert("RGB")
     width, height = image.size
     declared = canonical.get("image_size_px")
-    if declared != [width, height]:
+    if (not isinstance(declared, list) or len(declared) != 2
+            or any(not isinstance(value, int) or value < 1 for value in declared)
+            or declared != [width, height]):
         raise ValueError("통합 이미지 크기 메타데이터 불일치")
     return CanonicalImage(image, canonical["image_id"], width, height,
                           canonical.get("reference_photo_id"), "CANDIDATE_GEOMETRY_ONLY")
 
 
-def component_map_cache_key(*, project_id: str, board_id: str, inputs: list[ComponentMapPhotoInput], options: dict | None = None) -> str:
-    payload = {"schema": SCHEMA_VERSION, "project": project_id, "board": board_id,
-               "photos": [(item.frontend_photo_id, item.content_sha256, item.side, item.role) for item in inputs],
-               "options": options or {}}
+def photo_input_fingerprint(photos: list[Any]) -> str:
+    """Fingerprint every photo record, independent of symptom-only changes."""
+    manifest = []
+    for photo in photos:
+        get = photo.get if isinstance(photo, Mapping) else lambda name, default=None: getattr(photo, name, default)
+        manifest.append({
+            "photo_id": get("image_id", get("frontend_photo_id", "")),
+            "sha256": get("content_sha256", get("sha256", "")),
+            "side": get("side", "unknown"),
+            "capture_type": get("capture_type", get("role", "unknown")),
+        })
+    raw = json.dumps(manifest, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def component_map_cache_key(
+    *, project_id: str, board_id: str, inputs: list[ComponentMapPhotoInput],
+    options: dict | None = None, photo_manifest: list[Any] | None = None,
+) -> str:
+    payload = {
+        "schema": SCHEMA_VERSION, "project": project_id, "board": board_id,
+        "photos": [(item.frontend_photo_id, item.content_sha256, item.side, item.role) for item in inputs],
+        "photo_manifest": photo_input_fingerprint(photo_manifest or []),
+        "options": options or {},
+    }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def clear_component_map_state(state: MutableMapping[str, Any], *, clear_viewer_selection: bool = True) -> None:
+    """Clear F3 results and viewer coordinates without touching intake inputs."""
+    state.pop(COMPONENT_MAP_STATE_KEY, None)
+    for key in LEGACY_COMPONENT_MAP_KEYS:
+        if not clear_viewer_selection and key in {
+            "circuitcare_v3_active_side", "circuitcare_v2_active_photo_id",
+        }:
+            continue
+        state.pop(key, None)
+
+
+def component_map_entry_is_current(
+    entry: Any, *, project_id: str, board_id: str | None, photo_fingerprint: str, cache_key: str,
+) -> bool:
+    return bool(
+        isinstance(entry, dict)
+        and entry.get("project_id") == project_id
+        and entry.get("board_id") == board_id
+        and entry.get("input_fingerprint") == photo_fingerprint
+        and entry.get("component_map_cache_key") == cache_key
+        and isinstance(entry.get("component_map"), dict)
+        and isinstance(entry.get("photo_id_map"), list)
+    )
+
+
+def available_photo_sides(photo_records: list[Any]) -> list[str]:
+    """Return only represented sides in stable PCB order, including unknown metadata."""
+    present = {
+        photo.get("side", "unknown") if isinstance(photo, Mapping) else getattr(photo, "side", "unknown")
+        for photo in photo_records
+    }
+    return [side for side in ("front", "back", "unknown") if side in present]
