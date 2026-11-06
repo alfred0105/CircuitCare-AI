@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -103,6 +104,16 @@ def main() -> None:
     import streamlit as st
 
     st.set_page_config(page_title="CircuitCare AI", page_icon="🔧", layout="wide")
+    if os.environ.get("CIRCUITCARE_UI_V2") == "1" and not st.session_state.get("circuitcare_v2_legacy_demo"):
+        from circuitcare.dashboard.views.diagnosis_entry import render_diagnosis_entry
+
+        if render_diagnosis_entry(st) == "demo":
+            st.rerun()
+        st.stop()
+    if os.environ.get("CIRCUITCARE_UI_V2") == "1":
+        if st.sidebar.button("새 PCB 진단으로 돌아가기", key="cc_v2_return_to_entry"):
+            st.session_state.pop("circuitcare_v2_legacy_demo", None)
+            st.rerun()
     from circuitcare.dashboard.navigation import (
         ADVANCED_VIEWS, ANALYSIS_VIEWS, AREAS, CASE_LABELS, WORKBENCH_VIEW,
         WORKSPACE_VIEWS, korean_status,

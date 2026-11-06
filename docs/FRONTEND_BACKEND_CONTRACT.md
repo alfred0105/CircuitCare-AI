@@ -37,4 +37,4 @@ The current application is a local Streamlit UI rather than a versioned HTTP API
 
 ## F1 boundary
 
-F1 can build intake validation and a UI-owned draft `ProjectContext`. It can reuse local image validation and existing netlist/schematic loaders where appropriate. Durable project creation and claims of backend analysis remain unsupported until the integration gaps are resolved. Preserve the existing demo entry path behind a clearly labeled compatibility route.
+F1 provides a real intake screen behind `CIRCUITCARE_UI_V2=1`. It uses the existing bounded image decoder (20 MB per image, 25 million pixels), a UI cap of eight photos/80 MB aggregate, and accepts currently parsed KiCad XML Netlist and `.kicad_sch` files. The generated `ProjectContext` is session-local; it is not durable project storage and does not invoke diagnosis. The legacy demo remains reachable from the intake screen and the legacy UI remains the default when the flag is unset.

@@ -2,6 +2,8 @@
 
 Status: requests identified during F0; no backend changes made.
 
+F1 now creates a session-only UI project draft behind `CIRCUITCARE_UI_V2=1`. It does not persist projects or run diagnosis. The existing legacy UI remains the default without the flag.
+
 1. Specify project and board identity for projects created from uploaded photos and optional circuit files.
 2. Specify intake persistence and supported attachment types/limits, including multiple photos and front/back/detail roles.
 3. Specify measurement update and diagnosis refresh inputs/outputs, including `probe_id`, `node_id`, unit, source, timestamp, analysis context, project and board identity. Preserve zero as a valid value.
