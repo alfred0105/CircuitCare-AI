@@ -12,9 +12,13 @@ SELECTION_KEY = "circuitcare_v2_selection"
 ACTIVE_PHOTO_KEY = "circuitcare_v2_active_photo_id"
 VIEW_ZOOM_KEY = "circuitcare_v2_view_zoom"
 VIEW_TRANSFORM_KEY = "circuitcare_v2_view_transform"
+MODE_KEY = "circuitcare_v2_workbench_mode"
+PHOTO_STATUS_KEY = "circuitcare_v2_photo_status"
 
 
-def enter_workbench(state: MutableMapping[str, Any], project: ProjectContext) -> SelectionState:
+def enter_workbench(
+    state: MutableMapping[str, Any], project: ProjectContext, *, preview: bool = False,
+) -> SelectionState:
     """Initialize PCB-first state without carrying a previous project's selection."""
     selection = SelectionState(
         project_id=project.project_id,
@@ -23,10 +27,16 @@ def enter_workbench(state: MutableMapping[str, Any], project: ProjectContext) ->
         active_photo_id=project.image_records[0].image_id if project.image_records else None,
     )
     state[SCREEN_KEY] = "workbench"
+    state[MODE_KEY] = "PREVIEW_ONLY" if preview else "DIAGNOSTIC"
+    state[PHOTO_STATUS_KEY] = "NO_IMAGES" if not project.image_records else "READY"
     state[SELECTION_KEY] = selection
     state[ACTIVE_PHOTO_KEY] = selection.active_photo_id
     state[VIEW_ZOOM_KEY] = 1.0
-    state[VIEW_TRANSFORM_KEY] = {"scale": 1.0, "offset_x": 0.0, "offset_y": 0.0}
+    state[VIEW_TRANSFORM_KEY] = {
+        "active_photo_id": selection.active_photo_id,
+        "coordinate_frame": "source_image_px",
+        "coordinate_status": "NO_IMAGE" if not project.image_records else "PENDING_RENDER",
+    }
     return selection
 
 

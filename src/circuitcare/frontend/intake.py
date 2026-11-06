@@ -196,3 +196,30 @@ def create_project_context(
         symptom_description=description, circuit_source=source,
         input_fingerprint=fingerprint,
     )
+
+
+def create_preview_context(
+    *, symptom_category: str, symptom_description: str | None,
+    circuit_source: Mapping[str, Any] | None = None,
+    project_id: str | None = None, board_id: str | None = None,
+) -> ProjectContext:
+    """Create an explicitly photo-free UI preview, never a diagnostic project."""
+    category = validate_symptom_category(symptom_category)
+    description = normalize_symptom_description(symptom_description)
+    source = dict(circuit_source) if circuit_source else None
+    payload = {
+        "mode": "PREVIEW_ONLY", "images": [], "symptom_category": category,
+        "symptom_description": description,
+        "circuit_source": ({
+            "content_sha256": source.get("content_sha256"),
+            "source_type": source.get("source_type"),
+        } if source else None),
+    }
+    fingerprint = hashlib.sha256(json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
+    return ProjectContext(
+        project_id=project_id or str(uuid.uuid4()), board_id=board_id or str(uuid.uuid4()),
+        image_records=(), symptom_category=category, symptom_description=description,
+        circuit_source=source, input_fingerprint=fingerprint,
+    )

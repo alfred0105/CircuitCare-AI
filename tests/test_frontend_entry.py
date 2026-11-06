@@ -7,7 +7,7 @@ import io
 import pytest
 from PIL import Image
 
-from circuitcare.frontend.intake import create_project_context
+from circuitcare.frontend.intake import create_preview_context, create_project_context
 from circuitcare.frontend.state import INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY
 
 
@@ -261,4 +261,68 @@ def test_workbench_edit_preserves_project_identity_and_new_project_clears_state(
     assert INTAKE_PROJECT_KEY not in app.session_state
     assert "circuitcare_v2_selected_component" not in app.session_state
     assert app.session_state["circuitcare_v2_screen"] == "entry"
+
+
+def test_photo_free_preview_and_add_photo_returns_to_same_project(monkeypatch):
+    pytest.importorskip("streamlit")
+    from streamlit.testing.v1 import AppTest
+
+    def png() -> bytes:
+        image = Image.new("RGB", (64, 48), "purple")
+        stream = io.BytesIO()
+        image.save(stream, format="PNG")
+        return stream.getvalue()
+
+    monkeypatch.setenv("CIRCUITCARE_UI_V2", "1")
+    app = AppTest.from_file(str(Path(__file__).parents[1] / "src/circuitcare/ui.py"), default_timeout=30).run()
+    app.radio[0].set_value("overheating").run()
+    app.text_area[0].set_value("팬이 돌지 않음").run()
+    next(button for button in app.button if button.label == "사진 없이 작업공간 보기").click().run()
+
+    assert not app.exception
+    preview = app.session_state[INTAKE_PROJECT_KEY]
+    assert preview.image_records == ()
+    assert preview.symptom_category == "overheating"
+    assert preview.symptom_description == "팬이 돌지 않음"
+    assert app.session_state["circuitcare_v2_workbench_mode"] == "PREVIEW_ONLY"
+    assert app.session_state["circuitcare_v2_photo_status"] == "NO_IMAGES"
+    assert app.session_state["circuitcare_v2_active_tab"] == "PCB"
+    assert app.session_state["circuitcare_v2_view_transform"]["coordinate_status"] == "NO_IMAGE"
+    assert not app.selectbox
+    assert not app.slider
+    assert any("미리보기 · 진단 미실행" in item.value for item in app.info)
+
+    next(button for button in app.button if button.label == "사진 추가").click().run()
+    assert app.session_state["circuitcare_v2_screen"] == "entry"
+    assert INTAKE_PROJECT_KEY not in app.session_state
+    assert app.session_state["circuitcare_v2_edit_project_id"] == preview.project_id
+    assert app.radio[0].value == "overheating"
+    assert app.text_area[0].value == "팬이 돌지 않음"
+
+    app.file_uploader[0].set_value(("board.png", png(), "image/png")).run()
+    next(button for button in app.button if button.label == "진단 시작").click().run()
+    completed = app.session_state[INTAKE_PROJECT_KEY]
+    assert not app.exception
+    assert len(completed.image_records) == 1
+    assert completed.project_id == preview.project_id
+    assert completed.board_id == preview.board_id
+    assert app.session_state["circuitcare_v2_workbench_mode"] == "DIAGNOSTIC"
+    assert app.session_state["circuitcare_v2_photo_status"] == "READY"
+    next(button for button in app.button if button.label == "새 프로젝트").click().run()
+    assert not app.session_state[INTAKE_IMAGES_KEY]
+    assert INTAKE_PROJECT_KEY not in app.session_state
+    assert "circuitcare_v2_workbench_mode" not in app.session_state
+    assert "circuitcare_v2_view_transform" not in app.session_state
+
+
+def test_preview_context_is_separate_from_strict_diagnostic_factory():
+    preview = create_preview_context(
+        symptom_category="unknown", symptom_description=None,
+        project_id="preview-project", board_id="preview-board",
+    )
+    assert preview.image_records == ()
+    assert preview.project_id == "preview-project"
+    assert preview.board_id == "preview-board"
+    with pytest.raises(ValueError, match="한 장 이상"):
+        create_project_context(images=[], symptom_category="unknown", symptom_description=None)
 

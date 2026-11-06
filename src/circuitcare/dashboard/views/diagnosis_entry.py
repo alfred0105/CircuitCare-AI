@@ -14,6 +14,7 @@ from circuitcare.frontend.intake import (
     SYMPTOM_CATEGORIES,
     add_image_batch,
     create_project_context,
+    create_preview_context,
     normalize_symptom_description,
     validate_circuit_upload,
 )
@@ -273,6 +274,26 @@ def render_diagnosis_entry(st: Any) -> str | None:
                 state.pop("circuitcare_v2_edit_project_id", None)
                 state.pop("circuitcare_v2_edit_board_id", None)
                 enter_workbench(state, project)
+                st.rerun()
+
+        if not images and description_error is None and st.button(
+            "사진 없이 작업공간 보기", use_container_width=True, key="cc_v2_photo_free_preview",
+        ):
+            try:
+                project = create_preview_context(
+                    symptom_category=category_code, symptom_description=description,
+                    circuit_source=state.get("circuitcare_v2_circuit_source"),
+                    project_id=state.get("circuitcare_v2_edit_project_id"),
+                    board_id=state.get("circuitcare_v2_edit_board_id"),
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                state[INTAKE_PROJECT_KEY] = project
+                state["circuitcare_v2_analysis_status"] = "NOT_RUN"
+                state.pop("circuitcare_v2_edit_project_id", None)
+                state.pop("circuitcare_v2_edit_board_id", None)
+                enter_workbench(state, project, preview=True)
                 st.rerun()
 
         if st.button("예제 회로 체험", use_container_width=True, key="cc_v2_demo"):

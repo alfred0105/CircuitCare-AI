@@ -56,4 +56,12 @@ The `CIRCUITCARE_UI_V2=1` flow now records a PCB-first workbench screen after in
 
 The Phase 21.2 boundary is represented by `frontend.photo_adapter.adapt_component_map_input()` without importing backend modules on the frontend branch. Current mappings are `front → TOP`, `back → BOTTOM`, `full_view → OVERVIEW`, `close_up → CLOSEUP`, and `oblique → ANGLED`. `unknown` side/capture and `marking_detail` return `UNSUPPORTED`. `full_view` never becomes `REFERENCE`; the backend requires explicit reference-selection policy. `frontend_photo_id` and content SHA-256 are retained because backend-generated `photo_id` may differ. Calling the backend service and rendering a canonical map are deferred to F3.
 
-The F2 schematic tab renders only data that is present. A KiCad XML Netlist is connectivity data and does not imply an original drawing layout. `.kicad_sch` uploads are identified as available source material, but the existing schematic renderer is not connected to this intake-only workbench yet.
+The F2 schematic tab renders only data that is present. A KiCad XML Netlist is connectivity data and does not imply an original drawing layout. F2.1 reuses the local schematic SVG export/viewer path for `.kicad_sch` when its bounded export succeeds.
+
+## F2.1 preview and viewer state
+
+`create_preview_context()` creates a frontend-only `ProjectContext` with no `ImageRecord`s and a separate session mode of `PREVIEW_ONLY`; `create_project_context()` still rejects an empty image list. Preview state also records `NOT_RUN` and `NO_IMAGES`. It is never an analysis input. **사진 없이 작업공간 보기** uses this path. Adding a photo returns to the normal intake form, preserves symptom/design inputs and project/board IDs, then clears preview mode when the user starts a photo-backed project.
+
+PCB view geometry preserves the original EXIF-corrected image dimensions and the requested display dimensions/aspect ratio. `scale_x`/`scale_y` describe the requested size only; `coordinate_status=UNVERIFIED_RESPONSIVE_CSS` means browser CSS may resize it. These values cannot be used for F4 overlays until an interactive viewer measures and validates its rendered bounds. Empty-image state uses `NO_IMAGE` and has no image-specific select or zoom widgets.
+
+For an uploaded `.kicad_sch`, the workbench reuses the bounded local `export_schematic()` SVG exporter and existing interactive SVG viewer when available. It exports within a temporary project directory; if KiCad CLI, complete sheets or valid SVG output are unavailable it shows a clear status. XML Netlist remains non-graphical connectivity data and is never rendered as a schematic layout.
