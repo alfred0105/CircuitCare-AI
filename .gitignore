@@ -12,6 +12,12 @@ build/
 .env
 data/private/
 data/external/prism/
+data/external/connectivity_pairs/
+data/external/connectivity_pairs-5000*/
+data/external/open-schematics/
+data/external/open-schematics-5000/
+data/external/kicad-netlist-sft/
+data/external/pcb-bench/
 data/external/pcb-component-detection/
 data/benchmarks/prism/
 data/benchmarks/phase21_1/prism_baseline/
@@ -39,4 +45,8 @@ data/schematic_svg_cache/
 data/schematic_equivalence_cache/
 models/*.pt
 models/*.onnx
+models/phase22_connectivity/
 reports/
+data/benchmarks/phase22_connectivity/*
+!data/benchmarks/phase22_connectivity/model_comparison.json
+!data/benchmarks/phase22_connectivity/extraction_summary.json
