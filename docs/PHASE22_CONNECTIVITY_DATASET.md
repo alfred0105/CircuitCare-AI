@@ -198,6 +198,58 @@ negative candidates per positive (capped at 1,000 negatives per schematic); GNN
 uses all candidate links in the sampled training schematics. Treat the trend as
 indicative, not as a statistical significance claim.
 
+### Ranking, hard-negative, net-aware, and ensemble experiments
+
+The follow-up used the same released graph archive and fixed project-grouped
+split: 3,920 training schematics, 515 validation schematics, and 513 test
+schematics (3,258,373 test candidate edges). All candidate models below were
+evaluated on the same full test candidate set. The random seed was 42 and
+LightGBM models used 250 trees.
+
+Hard negatives were mined from three-fold project-grouped out-of-fold scores,
+so each training schematic's hard-negative scores came from a model that did
+not train on its project. H1 used 75% random and 25% hard negatives; H2 used
+50% each. N1 approximately equalized positive sample mass per net. N2 capped
+sampled positive pairs at 64 per net. The ranker used one query per anchor pin,
+the `lambdarank` objective, and at most 50 sampled negatives per query. The
+CUDA GNN used all candidate links, 15 epochs, and graph batches of 8. Ensemble
+scores were endpoint-local rank normalized; alpha was selected from 0.25, 0.5,
+0.75, and 0.9 on validation Pin Precision@1 only.
+
+| Experiment | PR-AUC | Pin Precision@1 | End-to-end Recall@5 |
+|---|---:|---:|---:|
+| H0 LightGBM baseline | **0.2785** | 0.3219 | **0.1131** |
+| H1 random 75% / hard 25% | 0.2468 | 0.2980 | 0.1048 |
+| H2 random 50% / hard 50% | 0.2124 | 0.2822 | 0.0983 |
+| N1 net-weighted positives | 0.0928 | 0.2799 | 0.0906 |
+| N2 cap 64 positive pairs per net | 0.2408 | 0.3305 | 0.1123 |
+| LightGBM Ranker | 0.2103 | **0.3485** | 0.1111 |
+| GNN on CUDA | 0.2133 | 0.2687 | 0.0896 |
+| Rank-normalized ensemble (alpha 0.9) | 0.1972 | 0.3298 | 0.1136 |
+
+Pin Precision@K is macro averaged over anchor pins that have at least one
+positive in the generated candidate set. End-to-end Recall@5 counts all
+directed ground-truth pin pairs in its denominator, including pairs omitted by
+candidate generation. Candidate recall on test is 0.8065 as a per-schematic
+macro average, but 0.6482 when weighted by the number of truth pairs. Keep
+these two candidate-coverage views distinct when comparing experiments.
+
+The Ranker produced the highest Pin Precision@1, while H0 retained the highest
+PR-AUC and end-to-end Recall@5 among the classifier/ranker/GNN models. N2
+slightly exceeded H0 on Pin Precision@1 but not on the other two metrics. Hard
+negative mining and N1 reduced all three metrics. These single-seed results do
+not establish statistical significance. Adaptive candidate generation reduced
+the average test candidates from 6,365 to 3,958, while per-schematic macro
+candidate recall fell from 0.8065 to 0.6846; this setting is not an improvement
+under the current recall/density tradeoff.
+
+PyTorch GNN training used CUDA on an NVIDIA GeForce RTX 4060 Ti. The installed
+Windows LightGBM wheel has no GPU learner, so the classifier and Ranker trained
+on CPU. The report and experiment script are
+`data/benchmarks/phase22_connectivity/recommendation_experiments.json` and
+`scripts/benchmark_connectivity_recommendations.py`. A local progress page is
+available from `scripts/connectivity_progress_dashboard.py`.
+
 The GNN-ACLP paper describes port-level prediction with a SEAL framework and
 its official implementation is GPL-3.0. This repository uses a separate
 implementation and does not copy that code. See the [paper](https://doi.org/10.1016/j.engappai.2025.113035)

@@ -46,8 +46,12 @@ data/schematic_equivalence_cache/
 models/*.pt
 models/*.onnx
 models/phase22_connectivity/
+!models/phase22_connectivity/
+models/phase22_connectivity/*
+!models/phase22_connectivity/recommendation_gnn_cuda.pt
 reports/
 data/benchmarks/phase22_connectivity/*
 !data/benchmarks/phase22_connectivity/model_comparison.json
 !data/benchmarks/phase22_connectivity/extraction_summary.json
 !data/benchmarks/phase22_connectivity/learning_curve.json
+!data/benchmarks/phase22_connectivity/recommendation_experiments.json
