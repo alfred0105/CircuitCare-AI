@@ -1,0 +1,123 @@
+{
+  "metadata": {
+    "experiment": "E3 candidate generation, validation-only",
+    "validation_graphs": 515,
+    "test_accessed": false,
+    "baseline_k": 96,
+    "baseline_radius_mm": 250,
+    "role_candidate_cap_per_pin": 8,
+    "twohop_candidate_cap_per_pin": 8,
+    "same_component_truth_pairs_excluded_from_recall": true,
+    "role_names_are_candidate_hints_only": true
+  },
+  "runs": {
+    "C0_baseline": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 189373,
+      "candidate_recall_micro": 0.6343240337237852,
+      "candidate_recall_macro": 0.8745339732344165,
+      "candidate_precision": 0.05814761467137768,
+      "candidate_edges": 3256763,
+      "candidates_per_pin_mean": 99.19024776523977,
+      "candidate_edges_per_graph_mean": 6323.811650485437
+    },
+    "C1_k64_r250": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 149213,
+      "candidate_recall_micro": 0.49980404832804654,
+      "candidate_recall_macro": 0.7844648570401695,
+      "candidate_precision": 0.0626404249102456,
+      "candidate_edges": 2382056,
+      "candidates_per_pin_mean": 72.54956066212861,
+      "candidate_edges_per_graph_mean": 4625.351456310679
+    },
+    "C2_k128_r250": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 219554,
+      "candidate_recall_micro": 0.7354183484456176,
+      "candidate_recall_macro": 0.9228076201398119,
+      "candidate_precision": 0.05590969049692636,
+      "candidate_edges": 3926940,
+      "candidates_per_pin_mean": 119.60162638768331,
+      "candidate_edges_per_graph_mean": 7625.126213592233
+    },
+    "C3_k96_r150": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 171410,
+      "candidate_recall_micro": 0.5741551468297699,
+      "candidate_recall_macro": 0.8058871536237663,
+      "candidate_precision": 0.05997630479341573,
+      "candidate_edges": 2857962,
+      "candidates_per_pin_mean": 87.04408607062908,
+      "candidate_edges_per_graph_mean": 5549.440776699029
+    },
+    "C4_k96_r350": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 190455,
+      "candidate_recall_micro": 0.6379483022546166,
+      "candidate_recall_macro": 0.8773756801827154,
+      "candidate_precision": 0.05806905416851383,
+      "candidate_edges": 3279802,
+      "candidates_per_pin_mean": 99.89193963482418,
+      "candidate_edges_per_graph_mean": 6368.547572815534
+    },
+    "C5_k128_r350": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 222175,
+      "candidate_recall_micro": 0.7441976532693783,
+      "candidate_recall_macro": 0.9285806900675403,
+      "candidate_precision": 0.05573299137220432,
+      "candidate_edges": 3986418,
+      "candidates_per_pin_mean": 121.41312988258943,
+      "candidate_edges_per_graph_mean": 7740.617475728155
+    },
+    "P1_power_ground_added": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 191587,
+      "candidate_recall_micro": 0.6417400508469466,
+      "candidate_recall_macro": 0.8774894451674864,
+      "candidate_precision": 0.05874353884542104,
+      "candidate_edges": 3261414,
+      "candidates_per_pin_mean": 99.33190186851843,
+      "candidate_edges_per_graph_mean": 6332.842718446602
+    },
+    "H1_twohop_added": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 202008,
+      "candidate_recall_micro": 0.6766462452645012,
+      "candidate_recall_macro": 0.8974934087117082,
+      "candidate_precision": 0.05726475253110104,
+      "candidate_edges": 3527615,
+      "candidates_per_pin_mean": 107.4395053832214,
+      "candidate_edges_per_graph_mean": 6849.73786407767
+    },
+    "H2_hybrid": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 232683,
+      "candidate_recall_micro": 0.7793952629939406,
+      "candidate_recall_macro": 0.9428030565313965,
+      "candidate_precision": 0.05544359066249328,
+      "candidate_edges": 4196752,
+      "candidates_per_pin_mean": 127.81920903954803,
+      "candidate_edges_per_graph_mean": 8149.033009708738
+    }
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "experiment": "E3 LightGBM validation scoring on H2 hybrid candidates",
+    "features": [
+      "neighbor_geometry",
+      "relative_geometry",
+      "component_type_pair",
+      "pin_facing",
+      "pin_name_category",
+      "power_ground",
+      "pitch_normalized_distance"
+    ],
+    "training_graphs": 3920,
+    "validation_graphs": 515,
+    "test_accessed": false,
+    "device": "mps",
+    "gnn_epochs": 15,
+    "gnn_batch_size": 256,
+    "lightgbm_trees": 250,
+    "loss_edge_policy": "same sampled candidate edges for both models; GNN message-passes over all candidates",
+    "negative_ratio": 20,
+    "max_negatives_per_graph": 1000,
+    "threshold_policy": "validation-only F1 maximization; scores are not calibrated probabilities"
+  },
+  "runs": [
+    {
+      "seed": 42,
+      "lightgbm": {
+        "candidate_edges": 4196752,
+        "candidate_positive_rate": 0.05544359066249328,
+        "candidate_pr_auc": 0.41713885889593816,
+        "candidate_roc_auc": 0.827095542030637,
+        "validation_f1_threshold": 0.8304113491636155,
+        "validation_precision_at_selected_threshold": 0.45904447754841454,
+        "validation_recall_at_selected_threshold": 0.37081351022635944,
+        "candidate_recall_micro_excluding_same_ref": 0.7793952629939406,
+        "candidate_recall_macro_excluding_same_ref": 0.9428030565313965,
+        "same_ref_truth_pairs_excluded": 36570,
+        "truth_pairs_excluding_same_ref": 298543,
+        "candidates_per_pin_mean": 127.81920903954803,
+        "probabilities_calibrated": false,
+        "pin_precision_at_1_micro": 0.3063417310593937,
+        "pin_precision_at_1_macro": 0.3063417310593937,
+        "end_to_end_recall_at_1_micro": 0.052729422562243965,
+        "pin_precision_at_3_micro": 0.26559131036166145,
+        "pin_precision_at_3_macro": 0.26539710118421656,
+        "end_to_end_recall_at_3_micro": 0.12971330763072655,
+        "pin_precision_at_5_micro": 0.24424839834612824,
+        "pin_precision_at_5_macro": 0.24393260481916695,
+        "end_to_end_recall_at_5_micro": 0.1944744978110356
+      }
+    },
+    {
+      "seed": 123,
+      "lightgbm": {
+        "candidate_edges": 4196752,
+        "candidate_positive_rate": 0.05544359066249328,
+        "candidate_pr_auc": 0.41336981602671924,
+        "candidate_roc_auc": 0.8267470799712011,
+        "validation_f1_threshold": 0.8385699726617019,
+        "validation_precision_at_selected_threshold": 0.4730507084476371,
+        "validation_recall_at_selected_threshold": 0.35942892261144993,
+        "candidate_recall_micro_excluding_same_ref": 0.7793952629939406,
+        "candidate_recall_macro_excluding_same_ref": 0.9428030565313965,
+        "same_ref_truth_pairs_excluded": 36570,
+        "truth_pairs_excluding_same_ref": 298543,
+        "candidates_per_pin_mean": 127.81920903954803,
+        "probabilities_calibrated": false,
+        "pin_precision_at_1_micro": 0.3067837166415192,
+        "pin_precision_at_1_macro": 0.3067837166415192,
+        "end_to_end_recall_at_1_micro": 0.05273277216347394,
+        "pin_precision_at_3_micro": 0.26431491802611773,
+        "pin_precision_at_3_macro": 0.26412194737831424,
+        "end_to_end_recall_at_3_micro": 0.12919746904131063,
+        "pin_precision_at_5_micro": 0.24386668865314498,
+        "pin_precision_at_5_macro": 0.2435515827656105,
+        "end_to_end_recall_at_5_micro": 0.19393186241177987
+      }
+    },
+    {
+      "seed": 2026,
+      "lightgbm": {
+        "candidate_edges": 4196752,
+        "candidate_positive_rate": 0.05544359066249328,
+        "candidate_pr_auc": 0.4143366803898197,
+        "candidate_roc_auc": 0.826726223312376,
+        "validation_f1_threshold": 0.8364056194271577,
+        "validation_precision_at_selected_threshold": 0.4698590952431402,
+        "validation_recall_at_selected_threshold": 0.3621450643149693,
+        "candidate_recall_micro_excluding_same_ref": 0.7793952629939406,
+        "candidate_recall_macro_excluding_same_ref": 0.9428030565313965,
+        "same_ref_truth_pairs_excluded": 36570,
+        "truth_pairs_excluding_same_ref": 298543,
+        "candidates_per_pin_mean": 127.81920903954803,
+        "probabilities_calibrated": false,
+        "pin_precision_at_1_micro": 0.30530535107372014,
+        "pin_precision_at_1_macro": 0.30530535107372014,
+        "end_to_end_recall_at_1_micro": 0.05233416961710708,
+        "pin_precision_at_3_micro": 0.2646810544729669,
+        "pin_precision_at_3_macro": 0.2644877285497285,
+        "end_to_end_recall_at_3_micro": 0.12946208753847854,
+        "pin_precision_at_5_micro": 0.24385752762051338,
+        "pin_precision_at_5_macro": 0.24354243823632513,
+        "end_to_end_recall_at_5_micro": 0.19416633449787804
+      }
+    }
+  ]
+}

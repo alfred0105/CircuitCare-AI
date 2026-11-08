@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "experiment": "E5-B edge-MLP GNN Optuna search; validation only",
+    "candidate_graph": "H2_hybrid",
+    "features": [
+      "neighbor_geometry",
+      "relative_geometry",
+      "component_type_pair",
+      "pin_facing",
+      "pin_name_category",
+      "power_ground",
+      "pitch_normalized_distance"
+    ],
+    "training_graphs": 3920,
+    "validation_graphs": 515,
+    "test_accessed": false,
+    "seed": 42,
+    "device": "mps",
+    "max_epochs": 30,
+    "batch_size": 128,
+    "early_stopping": {
+      "metric": "validation candidate PR-AUC",
+      "eval_every_epochs": 5,
+      "patience_evaluations": 2,
+      "restore_best_checkpoint": true
+    }
+  },
+  "trials": [
+    {
+      "number": 0,
+      "params": {
+        "hidden": 48,
+        "layers": 1,
+        "learning_rate": 0.001,
+        "dropout": 0.3,
+        "weight_decay": 1e-05
+      },
+      "validation": {
+        "candidate_edges": 4196752,
+        "candidate_positive_rate": 0.05544359066249328,
+        "candidate_pr_auc": 0.4236864826567077,
+        "candidate_roc_auc": 0.842444057234708,
+        "validation_f1_threshold": 0.3759382963180542,
+        "validation_precision_at_selected_threshold": 0.45410131265621,
+        "validation_recall_at_selected_threshold": 0.39666413102805104,
+        "candidate_recall_micro_excluding_same_ref": 0.7793952629939406,
+        "candidate_recall_macro_excluding_same_ref": 0.9428030565313965,
+        "same_ref_truth_pairs_excluded": 36570,
+        "truth_pairs_excluding_same_ref": 298543,
+        "candidates_per_pin_mean": 127.81920903954803,
+        "probabilities_calibrated": false,
+        "pin_precision_at_1_micro": 0.2594455367076646,
+        "pin_precision_at_1_macro": 0.2594455367076646,
+        "end_to_end_recall_at_1_micro": 0.04771171991974355,
+        "pin_precision_at_3_micro": 0.23463243968919084,
+        "pin_precision_at_3_macro": 0.23446827102352683,
+        "end_to_end_recall_at_3_micro": 0.12105793805247485,
+        "pin_precision_at_5_micro": 0.2208572283601141,
+        "pin_precision_at_5_macro": 0.2205835733772271,
+        "end_to_end_recall_at_5_micro": 0.1844357429248048
+      },
+      "fit": {
+        "best_epoch": 30,
+        "best_validation_pr_auc_during_training": 0.423686460405698,
+        "history": [
+          {
+            "epoch": 5,
+            "validation_candidate_pr_auc": 0.3078910746533565,
+            "training_loss": 0.28848656025250463
+          },
+          {
+            "epoch": 10,
+            "validation_candidate_pr_auc": 0.34312410888517786,
+            "training_loss": 0.27551721330786344
+          },
+          {
+            "epoch": 15,
+            "validation_candidate_pr_auc": 0.3789271320082587,
+            "training_loss": 0.26920611218519386
+          },
+          {
+            "epoch": 20,
+            "validation_candidate_pr_auc": 0.4061298719276376,
+            "training_loss": 0.25887613320564173
+          },
+          {
+            "epoch": 25,
+            "validation_candidate_pr_auc": 0.4163813394822073,
+            "training_loss": 0.24492012358138368
+          },
+          {
+            "epoch": 30,
+            "validation_candidate_pr_auc": 0.423686460405698,
+            "training_loss": 0.24092650879395203
+          }
+        ],
+        "optimizer_steps": 930,
+        "loss_edges": 4966062
+      }
+    }
+  ],
+  "best_trial_number": 0,
+  "best_validation_pr_auc": 0.4236864826567077
+}

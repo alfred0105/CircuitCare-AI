@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "experiment": "E3 candidate generation; validation-only selection",
+    "validation_graphs": 515,
+    "test_accessed": false,
+    "export_splits": [
+      "train",
+      "validation"
+    ],
+    "baseline_k": 96,
+    "baseline_radius_mm": 250,
+    "role_candidate_cap_per_pin": 8,
+    "twohop_candidate_cap_per_pin": 8,
+    "same_component_truth_pairs_excluded_from_recall": true,
+    "role_names_are_candidate_hints_only": true
+  },
+  "runs": {
+    "H2_hybrid": {
+      "graphs": 515,
+      "truth_pairs_excluding_same_ref": 298543,
+      "unreachable_same_ref_truth_pairs": 36570,
+      "candidate_true_pairs": 232683,
+      "candidate_recall_micro": 0.7793952629939406,
+      "candidate_recall_macro": 0.9428030565313965,
+      "candidate_precision": 0.05544359066249328,
+      "candidate_edges": 4196752,
+      "candidates_per_pin_mean": 127.81920903954803,
+      "candidate_edges_per_graph_mean": 8149.033009708738
+    }
+  }
+}
