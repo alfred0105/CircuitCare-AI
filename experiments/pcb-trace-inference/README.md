@@ -32,6 +32,20 @@ print(result["edges"])
 
 `pcb_connection_inference.py` retains the earlier location-guided alternatives: conductivity/line-likelihood A* routing between nearby component boxes and connected-region flood fill. A* pairs that fail route-evidence, supported-length, or both-endpoint thresholds are returned as `UNKNOWN` diagnostics instead of being drawn as routes. Flood-fill samples are explicitly stored as `(x, y)` and are not misrepresented as ordered polylines.
 
+## Additional trace experiments
+
+- `trace_filter_experiments.py` runs scikit-image Frangi and Meijering at multiple scales and both ridge polarities. The UI overlays show filter response strength only; they are not accepted routes. These filters are ridge enhancers and may also highlight silkscreen and component edges.
+- `cldice_loss.py` contains a PyTorch soft-clDice loss combined with BCE and Dice for a future binary trace-segmentation model. It is not attached to the current YOLO detection model. The local PCB-Layout sample set contains photo/design-image pairs, not verified trace masks, so it is not enough to train or score this loss as-is.
+- `sam2_label_assist.py` is an optional point/box-prompted SAM 2 mask proposal helper. A person must inspect and correct each mask before using it as training truth. The official SAM 2 installation guide recommends WSL/Ubuntu for Windows; this helper does not install SAM 2 or download checkpoints.
+
+Example from a configured SAM 2 checkout/environment:
+
+```bash
+python sam2_label_assist.py --image board.png --output proposed-trace-mask.png --checkpoint checkpoints/sam2.1_hiera_small.pt --config configs/sam2.1/sam2.1_hiera_s.yaml --positive-points '[[420,180],[510,205]]' --negative-points '[[455,260]]'
+```
+
+Current UI response-map experiment dependency: `scikit-image==0.26.0`.
+
 ## Limits
 
 - Box-edge terminal priors are not pin detections; package pitch, orientation, and pin count are not yet read from a footprint library.
@@ -45,6 +59,9 @@ print(result["edges"])
 - [PRISM](https://github.com/KamMalinski/PRISM): its mask can be supplied as an optional vote; this prototype does not import PRISM code.
 - [PCB Mapper](https://github.com/AMFT/pcb-mapper): reference for conductivity scoring and A* route ranking; no upstream source is included.
 - [PCB Tracer](https://github.com/cm68/traces): reference for pad/pin anchor and flood-fill connectivity concepts; no upstream source is included.
+- [scikit-image ridge filters](https://scikit-image.org/docs/stable/api/skimage.filters.html): API reference for Frangi and Meijering.
+- [clDice reference implementation](https://github.com/jocpae/clDice): topology-aware segmentation metric/loss reference; `cldice_loss.py` is a standalone adaptation for binary PCB masks.
+- [SAM 2](https://github.com/facebookresearch/sam2): promptable image/video segmentation; use the official install guide before setting up the optional helper.
 - Zhang and Suen, “A fast parallel algorithm for thinning digital patterns,” *Communications of the ACM*, 27(3), 236–239, 1984, [DOI](https://doi.org/10.1145/357994.358023). The thinning procedure is implemented independently.
 
 The two cited GitHub projects have distinct upstream licenses (MIT for PCB Mapper; GPL-3.0 for PCB Tracer). No source files from either project are included here. Review upstream terms before incorporating their code.
