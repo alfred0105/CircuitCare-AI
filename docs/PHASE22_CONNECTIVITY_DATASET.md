@@ -224,6 +224,17 @@ The `sweep` command nests the same seeded 200-graph baseline subset into each
 larger training-size run, trains GNNs with bounded graph mini-batches, and
 writes the consolidated learning curve to `learning_curve.json`.
 
+### Mac training archive
+
+Download [`circuitcare-connectivity-training-2026-11-08.tar.gz`](https://github.com/alfred0105/CircuitCare-AI/releases/download/connectivity-dataset-v1/circuitcare-connectivity-training-2026-11-08.tar.gz)
+from the [connectivity-dataset-v1 Release](https://github.com/alfred0105/CircuitCare-AI/releases/tag/connectivity-dataset-v1).
+The 535,115,641-byte archive contains 4,948 ready-to-train pin graphs, pair
+records, source inventory, and result summaries. Verify the download with the
+accompanying `.sha256` asset; the archive digest is
+`85a09edf9a3c67c4f0ffb8f962c19029a90ccc6dea57ef2e6d7787597a30fd8c`.
+It does not contain the original KiCad schematic files or trained model
+weights. The archive README has the extraction and Mac training commands.
+
 The repository does not download the full 317 GB source dataset. The completed
 bounded acquisition contains 5,046 unique schematic files in ignored
 `data/external/open-schematics-5000/`, with a SHA-256 inventory. The generated
