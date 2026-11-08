@@ -489,8 +489,9 @@ def run_trace_graph_pipeline(image: np.ndarray, detections: list[dict], prism_ma
         for pad, closest_index, gap in attached_pads:
             nearest_point = [int(xs[closest_index]), int(ys[closest_index])]
             points = [[int(round(pad["xy"][0])), int(round(pad["xy"][1]))], nearest_point]
-            rank = max(0.0, min(100.0, 100 * (0.55 * density + 0.25 * pad["confidence"] +
-                                               0.20 * math.exp(-gap / max(1.0, max_pad_gap))))
+            rank = max(0.0, min(100.0, 100 * (
+                0.55 * density + 0.25 * pad["confidence"] +
+                0.20 * math.exp(-gap / max(1.0, max_pad_gap)))))
             graph_edges.append({"id": len(graph_edges)+1, "from": f"pad_{pad['id']}",
                                 "to": trace_node_id, "points": points,
                                 "rank_score": round(rank, 1), "evidence": round(density, 3),
