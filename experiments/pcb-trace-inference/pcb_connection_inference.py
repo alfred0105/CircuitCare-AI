@@ -147,7 +147,7 @@ def _astar(score: np.ndarray, start: tuple[int, int], goal: tuple[int, int],
 
 
 def infer_mapper_connections(image: np.ndarray, detections: list[dict], max_pairs: int = 12):
-    """Rank plausible paths between nearby detected component boxes."""
+    """Rank image-supported paths; leave unsupported pairs explicitly UNKNOWN."""
     score, step, diagnostics = _conductivity_map(image)
     h, w = image.shape[:2]
     comps = [d for d in detections if d.get("bbox_xyxy")]
@@ -158,30 +158,56 @@ def infer_mapper_connections(image: np.ndarray, detections: list[dict], max_pair
                       (min(w - 1, x1 - 2), min(h - 1, y1 - 2)), 255, -1)
     blocked = cv2.resize(blocked_full, (score.shape[1], score.shape[0]), interpolation=cv2.INTER_NEAREST) > 0
     paths = []
+    unknown_pairs = []
     for i, j, center_distance in _nearest_pairs(comps, max_pairs=max_pairs):
         start = _facing_anchor(comps[i]["bbox_xyxy"], comps[j]["bbox_xyxy"], (h, w), step)
         goal = _facing_anchor(comps[j]["bbox_xyxy"], comps[i]["bbox_xyxy"], (h, w), step)
         route = _astar(score, start, goal, blocked)
         if not route or len(route) < 2:
+            unknown_pairs.append({"from_index": i + 1, "to_index": j + 1,
+                                  "status": "UNKNOWN", "reason": "NO_ROUTE_WITHIN_SEARCH_BUDGET"})
             continue
         avg = float(np.mean([score[y, x] for x, y in route]))
+        support_fraction = float(np.mean([score[y, x] >= 0.35 for x, y in route]))
+        def endpoint_support(point):
+            x, y = point
+            y0, y1 = max(0, y-2), min(score.shape[0], y+3)
+            x0, x1 = max(0, x-2), min(score.shape[1], x+3)
+            return float(score[y0:y1, x0:x1].max()) if y1 > y0 and x1 > x0 else 0.0
+        start_support, goal_support = endpoint_support(start), endpoint_support(goal)
+        if avg < 0.30 or support_fraction < 0.25 or min(start_support, goal_support) < 0.30:
+            unknown_pairs.append({"from_index": i + 1, "to_index": j + 1,
+                                  "status": "UNKNOWN", "reason": "INSUFFICIENT_IMAGE_ROUTE_EVIDENCE",
+                                  "mean_conductivity": round(avg, 3),
+                                  "supported_route_fraction": round(support_fraction, 3),
+                                  "start_support": round(start_support, 3),
+                                  "goal_support": round(goal_support, 3)})
+            continue
         route_length = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(route, route[1:])) * step
         straight = max(1.0, center_distance - (float(comps[i]["bbox_xyxy"][2])-float(comps[i]["bbox_xyxy"][0]))/2
                        - (float(comps[j]["bbox_xyxy"][2])-float(comps[j]["bbox_xyxy"][0]))/2)
         detour = min(1.0, straight / max(straight, route_length))
-        rank = 100 * (0.72 * avg + 0.28 * detour)
+        rank = 100 * (0.62 * avg + 0.23 * support_fraction + 0.15 * detour)
         points = [[int(x * step + step / 2), int(y * step + step / 2)] for x, y in route]
         def label(d, index):
             return str(d.get("class_name", d.get("label", "component"))) + f" #{index + 1}"
-        paths.append({"id": len(paths) + 1, "from": label(comps[i], i), "to": label(comps[j], j),
+        paths.append({"id": len(paths) + 1, "status": "CANDIDATE",
+                      "from": label(comps[i], i), "to": label(comps[j], j),
                       "points": points, "rank_score": round(rank, 1),
                       "path_length_px": round(route_length, 1), "mean_conductivity": round(avg, 3),
+                      "supported_route_fraction": round(support_fraction, 3),
                       "center_distance_px": round(center_distance, 1), "method": "mapper_astar"})
     paths.sort(key=lambda p: p["rank_score"], reverse=True)
     for idx, p in enumerate(paths, 1):
         p["id"] = idx
     diagnostics.update({"method": "HSV conductivity likelihood + local line response + component-box anchors + A*",
-                        "pair_count": len(paths), "warning": "순위 점수는 확률 보정값이 아닌 상대 비교용입니다."})
+                        "pair_count": len(paths) + len(unknown_pairs),
+                        "candidate_count": len(paths), "unknown_count": len(unknown_pairs),
+                        "unknown_pairs": unknown_pairs,
+                        "acceptance_thresholds": {"mean_conductivity": 0.30,
+                                                   "supported_route_fraction": 0.25,
+                                                   "endpoint_support_each": 0.30},
+                        "warning": "순위 점수는 확률 보정값이 아닌 상대 비교용입니다."})
     return paths, diagnostics
 
 
@@ -212,7 +238,7 @@ def infer_connected_regions(image: np.ndarray, detections: list[dict], threshold
     for region_id, members in region_links.items():
         if len(members) < 2:
             continue
-        xs, ys = np.where(labels == region_id)
+        ys, xs = np.where(labels == region_id)
         if len(xs) < 4:
             continue
         ids = sorted(members)
@@ -220,8 +246,10 @@ def infer_connected_regions(image: np.ndarray, detections: list[dict], threshold
             c1, c2 = comps[a], comps[b]
             name_a = str(c1.get("class_name", c1.get("label", "component"))) + f" #{a+1}"
             name_b = str(c2.get("class_name", c2.get("label", "component"))) + f" #{b+1}"
-            px = [[int(x * step + step / 2), int(y * step + step / 2)] for x, y in zip(xs[::max(1, len(xs)//150)], ys[::max(1, len(ys)//150)])]
-            groups.append({"id": len(groups)+1, "region_id": region_id, "from": name_a, "to": name_b, "points": px,
+            xy_samples = [[int(x * step + step / 2), int(y * step + step / 2)]
+                          for x, y in zip(xs[::max(1, len(xs)//150)], ys[::max(1, len(ys)//150)])]
+            groups.append({"id": len(groups)+1, "region_id": region_id, "from": name_a, "to": name_b,
+                           "points": [], "region_sample_points_xy": xy_samples,
                            "region_pixels": int(stats[region_id, cv2.CC_STAT_AREA]),
                            "method": "connected_region_floodfill"})
     diagnostics.update({"method": "conductivity threshold + connected-region flood fill + component-edge association",

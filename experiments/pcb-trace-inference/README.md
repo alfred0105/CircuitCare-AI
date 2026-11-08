@@ -6,12 +6,13 @@ This folder packages the two local candidate pipelines used by the PCB component
 
 `pcb_trace_graph.py` implements:
 
-1. Multi-source mask voting: optional PRISM mask, local multi-angle line evidence, and color evidence.
+1. Multi-source mask voting: optional PRISM mask, local multi-angle line evidence, and color evidence. The 0.50 threshold requires at least two votes; no single filter is sufficient.
 2. Morphological bright-pad candidates.
 3. Pad suppression followed by Zhang-Suen thinning.
-4. Low-confidence terminal priors estimated from component box edges and class group.
-5. One-to-one pad matching using distance, outward direction, and pad shape confidence.
-6. A NetworkX graph when NetworkX is installed, with ranked candidate edges and explicit uncertainty. An adjacency-data fallback keeps image analysis available when it is not installed.
+4. Low-confidence terminal priors estimated only when a supported package template and pin count are available; unsupported IC/connector templates are listed in diagnostics.
+5. One-to-one pad matching using global Hungarian assignment, distance, outward direction, and pad shape confidence.
+6. Skeleton pixels are traversed through 8-neighbor adjacency into ordered polylines. Each connected centerline component is retained as a graph node, so branches and parallel segments are not reduced to a single farthest pad pair. Pad contacts are recorded before pad suppression and reused when attaching centerline segments.
+7. A NetworkX `MultiGraph` when NetworkX is installed, with ranked candidate edges and explicit uncertainty. An adjacency-data fallback keeps image analysis available when it is not installed.
 
 Minimal call shape (image is an OpenCV BGR array):
 
@@ -29,7 +30,7 @@ print(result["diagnostics"])
 print(result["edges"])
 ```
 
-`pcb_connection_inference.py` retains the earlier location-guided alternatives: conductivity/line-likelihood A* routing between nearby component boxes and connected-region flood fill.
+`pcb_connection_inference.py` retains the earlier location-guided alternatives: conductivity/line-likelihood A* routing between nearby component boxes and connected-region flood fill. A* pairs that fail route-evidence, supported-length, or both-endpoint thresholds are returned as `UNKNOWN` diagnostics instead of being drawn as routes. Flood-fill samples are explicitly stored as `(x, y)` and are not misrepresented as ordered polylines.
 
 ## Limits
 

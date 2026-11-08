@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import io
 import math
+import re
 from collections import defaultdict
 from typing import Iterable
 
@@ -120,7 +121,7 @@ def detect_pad_candidates(image: np.ndarray, detections: list[dict]) -> tuple[li
 
 
 def _pin_priors(detections: list[dict]) -> list[dict]:
-    """Create low-confidence package-edge terminal priors, not asserted pins."""
+    """Create package-count-constrained priors; never invent IC pins from class alone."""
     priors = []
     for comp_i, d in enumerate(detections):
         box = d.get("bbox_xyxy")
@@ -133,29 +134,129 @@ def _pin_priors(detections: list[dict]) -> list[dict]:
         label = str(d.get("class_name", "component")).lower()
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         pts = []
-        if label in {"ic", "connector", "display"}:
-            for side, length in (("top", bw), ("bottom", bw), ("left", bh), ("right", bh)):
-                n = max(3, min(32, int(round(length / max(5.0, min(bw, bh) * 0.13)))) )
-                for j in range(n):
-                    t = (j + 0.5) / n
-                    if side == "top": p, direction = [x0 + t * bw, y0], [0, -1]
-                    elif side == "bottom": p, direction = [x0 + t * bw, y1], [0, 1]
-                    elif side == "left": p, direction = [x0, y0 + t * bh], [-1, 0]
-                    else: p, direction = [x1, y0 + t * bh], [1, 0]
-                    pts.append((p, direction, side))
-        else:
+        footprint = str(d.get("footprint") or d.get("package") or "").lower()
+        package_layout = str(d.get("package_layout") or "").lower()
+        raw_pin_count = d.get("pin_count")
+        pin_count = int(raw_pin_count) if isinstance(raw_pin_count, (int, float)) and raw_pin_count > 0 else None
+        if label == "ic":
+            if not pin_count:
+                match = re.search(r"(?:soic|tssop|ssop|dip|qfp|lqfp|qfn)[-_ ]?(\d{1,3})", footprint)
+                pin_count = int(match.group(1)) if match else None
+            if pin_count and pin_count <= 128:
+                if any(token in footprint for token in ("qfp", "lqfp", "qfn")):
+                    sides = ("top", "bottom", "left", "right")
+                    side_counts = [pin_count // 4] * 4
+                    for side_index in range(pin_count % 4):
+                        side_counts[side_index] += 1
+                elif any(token in footprint for token in ("soic", "tssop", "ssop", "dip")):
+                    sides = ("left", "right") if bw >= bh else ("top", "bottom")
+                    side_counts = [pin_count // 2] * 2
+                    for side_index in range(pin_count % 2):
+                        side_counts[side_index] += 1
+                else:
+                    side_counts, sides = [], ()
+                if sides and sum(side_counts) == pin_count and all(side_counts):
+                    for side, per_side in zip(sides, side_counts):
+                        length = bw if side in {"top", "bottom"} else bh
+                        for j in range(per_side):
+                            t = (j + 0.5) / per_side
+                            if side == "top": p, direction = [x0 + t * bw, y0], [0, -1]
+                            elif side == "bottom": p, direction = [x0 + t * bw, y1], [0, 1]
+                            elif side == "left": p, direction = [x0, y0 + t * bh], [-1, 0]
+                            else: p, direction = [x1, y0 + t * bh], [1, 0]
+                            pts.append((p, direction, side))
+        elif label == "connector":
+            if not pin_count:
+                match = re.search(r"(?:1x|2x|pinheader[-_ ]?)(\d{1,3})", footprint)
+                pin_count = int(match.group(1)) if match else None
+            if pin_count and pin_count <= 128 and package_layout in {"single_row", "dual_row"}:
+                # Emit exactly the declared count on a single inferred exit face.
+                side = str(d.get("pin_side") or ("bottom" if bw >= bh else "right")).lower()
+                if side not in {"top", "bottom", "left", "right"}:
+                    side = "bottom" if bw >= bh else "right"
+                direction = {"top": [0, -1], "bottom": [0, 1],
+                             "left": [-1, 0], "right": [1, 0]}[side]
+                horizontal = side in {"top", "bottom"}
+                rows = 1 if package_layout == "single_row" else 2
+                counts = [pin_count // rows] * rows
+                for row in range(pin_count % rows):
+                    counts[row] += 1
+                for row_index, row_count in enumerate(counts):
+                    offset = 0.0 if rows == 1 else ((row_index + 0.5) / rows - 0.5) * (bh if horizontal else bw) * 0.35
+                    for j in range(row_count):
+                        t = (j + 0.5) / row_count
+                        if side == "top": p = [x0 + t * bw, y0 + abs(offset)]
+                        elif side == "bottom": p = [x0 + t * bw, y1 - abs(offset)]
+                        elif side == "left": p = [x0 + abs(offset), y0 + t * bh]
+                        else: p = [x1 - abs(offset), y0 + t * bh]
+                        pts.append((p, direction, f"{side}_row_{row_index+1}"))
+        elif label in {"resistor", "capacitor", "inductor", "diode", "led", "fuse",
+                       "ferrite_bead", "emi_filter", "mov", "thermistor", "potentiometer"}:
             # Two-terminal package prior at opposite ends of the long axis.
             if bw >= bh:
                 pts = [([x0, cy], [-1, 0], "left"), ([x1, cy], [1, 0], "right")]
             else:
                 pts = [([cx, y0], [0, -1], "top"), ([cx, y1], [0, 1], "bottom")]
+        else:
+            # No pin count/footprint template is available for this class.
+            # Emit no fictitious individual pins.
+            continue
         for point, direction, side in pts:
             priors.append({"id": len(priors) + 1, "component_index": comp_i,
                            "component": label, "xy": [round(point[0], 1), round(point[1], 1)],
                            "direction_xy": direction, "side": side,
                            "confidence": 0.25 if label in {"ic", "connector", "display"} else 0.18,
-                           "prior_type": "package_edge_estimate"})
+                           "pin_count_template": pin_count,
+                           "prior_type": "package_template_estimate"})
     return priors
+
+
+def _hungarian_assignment(cost: np.ndarray) -> list[tuple[int, int]]:
+    """Minimum-cost rectangular assignment (Kuhn-Munkres potentials form)."""
+    matrix = np.asarray(cost, dtype=np.float64)
+    if matrix.ndim != 2 or matrix.size == 0:
+        return []
+    if matrix.shape[0] > matrix.shape[1]:
+        pairs = _hungarian_assignment(matrix.T)
+        return [(column, row) for row, column in pairs]
+    rows, cols = matrix.shape
+    u = np.zeros(rows + 1)
+    v = np.zeros(cols + 1)
+    p = np.zeros(cols + 1, dtype=np.int32)
+    way = np.zeros(cols + 1, dtype=np.int32)
+    for i in range(1, rows + 1):
+        p[0] = i
+        j0 = 0
+        minv = np.full(cols + 1, np.inf)
+        used = np.zeros(cols + 1, dtype=bool)
+        while True:
+            used[j0] = True
+            i0 = p[j0]
+            delta, j1 = np.inf, 0
+            for j in range(1, cols + 1):
+                if used[j]:
+                    continue
+                cur = matrix[i0 - 1, j - 1] - u[i0] - v[j]
+                if cur < minv[j]:
+                    minv[j], way[j] = cur, j0
+                if minv[j] < delta:
+                    delta, j1 = minv[j], j
+            for j in range(cols + 1):
+                if used[j]:
+                    u[p[j]] += delta
+                    v[j] -= delta
+                else:
+                    minv[j] -= delta
+            j0 = j1
+            if p[j0] == 0:
+                break
+        while True:
+            j1 = way[j0]
+            p[j0] = p[j1]
+            j0 = j1
+            if j0 == 0:
+                break
+    return [(int(p[j] - 1), j - 1) for j in range(1, cols + 1) if p[j] != 0]
 
 
 def _thin_endpoints(skeleton: np.ndarray) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
@@ -167,6 +268,69 @@ def _thin_endpoints(skeleton: np.ndarray) -> tuple[list[tuple[int, int]], list[t
     ys, xs = np.where((skeleton > 0) & (degree >= 3))
     junctions = list(zip(xs.tolist(), ys.tolist()))
     return endpoints, junctions
+
+
+def _ordered_skeleton_chains(component_mask: np.ndarray) -> list[list[list[int]]]:
+    """Walk 8-neighbor centerline adjacency into ordered, non-zigzag polylines."""
+    ys, xs = np.where(component_mask > 0)
+    pixels = {(int(x), int(y)) for x, y in zip(xs, ys)}
+    if not pixels:
+        return []
+    adjacency: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for x, y in pixels:
+        neighbors = []
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if not (dx or dy):
+                    continue
+                point = (x + dx, y + dy)
+                if point not in pixels:
+                    continue
+                # Avoid diagonal shortcuts when an orthogonal pixel already
+                # represents the same local route connection.
+                if dx and dy and ((x + dx, y) in pixels or (x, y + dy) in pixels):
+                    continue
+                neighbors.append(point)
+        adjacency[(x, y)] = neighbors
+
+    def edge(a: tuple[int, int], b: tuple[int, int]):
+        return (a, b) if a < b else (b, a)
+
+    remaining = {edge(point, neighbor) for point, neighbors in adjacency.items() for neighbor in neighbors}
+    chains: list[list[list[int]]] = []
+    starts = sorted(point for point in pixels if len(adjacency[point]) != 2)
+    for start in starts:
+        if not adjacency[start]:
+            chains.append([[start[0], start[1]]])
+        for neighbor in adjacency[start]:
+            if edge(start, neighbor) not in remaining:
+                continue
+            chain = [start, neighbor]
+            remaining.remove(edge(start, neighbor))
+            previous, current = start, neighbor
+            while len(adjacency[current]) == 2:
+                following = next((point for point in adjacency[current] if point != previous), None)
+                if following is None or edge(current, following) not in remaining:
+                    break
+                remaining.remove(edge(current, following))
+                chain.append(following)
+                previous, current = current, following
+            chains.append([[x, y] for x, y in chain])
+    while remaining:
+        start, neighbor = min(remaining)
+        chain = [start, neighbor]
+        remaining.remove(edge(start, neighbor))
+        previous, current = start, neighbor
+        while True:
+            following = next((point for point in adjacency[current]
+                              if point != previous and edge(current, point) in remaining), None)
+            if following is None:
+                break
+            remaining.remove(edge(current, following))
+            chain.append(following)
+            previous, current = current, following
+        chains.append([[x, y] for x, y in chain])
+    return chains
 
 
 def run_trace_graph_pipeline(image: np.ndarray, detections: list[dict], prism_mask: np.ndarray | None = None):
@@ -198,13 +362,30 @@ def run_trace_graph_pipeline(image: np.ndarray, detections: list[dict], prism_ma
     hue, sat, val = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
     conductive_color = (((hue <= 30) & (sat >= 35) & (val >= 65)) |
                         ((sat <= 75) & (val >= 145))).astype(np.uint8) * 255
-    voting_score = (0.50 * (prism_vote > 0).astype(np.float32) +
+    voting_score = (0.45 * (prism_vote > 0).astype(np.float32) +
                     0.40 * (line_vote > 0).astype(np.float32) +
-                    0.10 * (conductive_color > 0).astype(np.float32))
-    trace_mask = (voting_score >= 0.40).astype(np.uint8) * 255
+                    0.15 * (conductive_color > 0).astype(np.float32))
+    # A single filter can no longer pass by itself: any two independent votes
+    # exceed 0.50; color evidence is a weak corroborating vote.
+    trace_mask = (voting_score >= 0.50).astype(np.uint8) * 255
 
     pads, pad_mask = detect_pad_candidates(image, detections)
-    # Pads stay as graph anchors and are removed from the trace body before thinning.
+    # Record which pre-suppression trace regions touch each pad. Pad interiors
+    # are removed before thinning, but this contact ledger preserves endpoints.
+    _, original_labels, _, _ = cv2.connectedComponentsWithStats(trace_mask, 8)
+    pad_contact_labels: dict[int, set[int]] = {}
+    for pad in pads:
+        px, py = [int(round(value)) for value in pad["xy"]]
+        radius = max(3, int(round(max(pad["bbox_xyxy"][2] - pad["bbox_xyxy"][0],
+                                      pad["bbox_xyxy"][3] - pad["bbox_xyxy"][1]) / 2)) + 4)
+        x0, x1 = max(0, px-radius), min(w, px+radius+1)
+        y0, y1 = max(0, py-radius), min(h, py+radius+1)
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        disk = (xx-px) ** 2 + (yy-py) ** 2 <= radius ** 2
+        touched = set(int(value) for value in np.unique(original_labels[y0:y1, x0:x1][disk]) if value > 0)
+        pad_contact_labels[pad["id"]] = touched
+        pad["pre_suppression_trace_regions"] = sorted(touched)
+    # Pads remain graph anchors and are suppressed only from the centerline mask.
     pad_exclusion = cv2.dilate(pad_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), 1)
     body_mask = _component_body_mask((h, w), detections)
     trace_mask[pad_exclusion > 0] = 0
@@ -221,35 +402,48 @@ def run_trace_graph_pipeline(image: np.ndarray, detections: list[dict], prism_ma
     endpoints, junctions = _thin_endpoints(skeleton)
     priors = _pin_priors(detections)
 
-    # Assign each low-confidence package prior to at most one nearby pad.
+    # Global one-to-one assignment prevents iteration order from consuming the
+    # best pad for an earlier, weaker pin prior.
     matches = []
-    used_pads: set[int] = set()
-    for prior in priors:
-        px, py = prior["xy"]
-        choices = []
-        for pad in pads:
-            if pad["id"] in used_pads:
-                continue
-            qx, qy = pad["xy"]
-            distance = math.hypot(px - qx, py - qy)
-            tolerance = max(8.0, min(h, w) * 0.025)
-            if distance <= tolerance:
-                # Combine proximity, the expected lead direction, and pad morphology.
+    match_scores: dict[tuple[int, int], tuple[float, float]] = {}
+    if priors and pads:
+        unmatched_cost = 0.52
+        invalid_cost = 10.0
+        cost = np.full((len(priors), len(pads) + len(priors)), unmatched_cost, dtype=np.float64)
+        cost[:, :len(pads)] = invalid_cost
+        tolerance = max(8.0, min(h, w) * 0.025)
+        for prior_i, prior in enumerate(priors):
+            px, py = prior["xy"]
+            for pad_i, pad in enumerate(pads):
+                qx, qy = pad["xy"]
+                distance = math.hypot(px - qx, py - qy)
+                if distance > tolerance:
+                    continue
                 dx, dy = qx - px, qy - py
                 norm = max(1e-6, math.hypot(dx, dy))
                 direction = prior["direction_xy"]
                 direction_score = max(0.0, min(1.0, (dx * direction[0] + dy * direction[1]) / norm))
                 score = (0.50 * math.exp(-distance / max(1.0, tolerance * 0.55)) +
                          0.30 * direction_score + 0.20 * pad["confidence"])
-                choices.append((score, pad, distance))
-        if choices:
-            score, pad, distance = max(choices, key=lambda item: item[0])
-            used_pads.add(pad["id"])
+                if direction_score < 0.15:
+                    continue
+                cost[prior_i, pad_i] = 1.0 - score
+                match_scores[(prior_i, pad_i)] = (score, distance)
+        for prior_i, pad_i in _hungarian_assignment(cost):
+            if pad_i >= len(pads) or (prior_i, pad_i) not in match_scores:
+                continue
+            score, distance = match_scores[(prior_i, pad_i)]
+            if score < 1.0 - unmatched_cost:
+                continue
+            prior, pad = priors[prior_i], pads[pad_i]
             matches.append({"prior_id": prior["id"], "pad_id": pad["id"],
                             "component_index": prior["component_index"],
-                            "distance_px": round(distance, 1), "match_score": round(score, 3)})
+                            "distance_px": round(distance, 1), "match_score": round(score, 3),
+                            "assignment": "HUNGARIAN_GLOBAL"})
 
-    # Treat each retained centerline component as a possible path edge between pads.
+    # Each connected centerline component becomes its own graph node. Every
+    # pad touching that component gets an edge, preserving branches and parallel
+    # trace segments without collapsing a multi-pad net to one extreme pair.
     n_skel, skel_labels, skel_stats, _ = cv2.connectedComponentsWithStats(skeleton, 8)
     max_pad_gap = max(5.0, min(h, w) * 0.012)
     graph_nodes = [{"id": f"pad_{p['id']}", "kind": "pad", "xy": p["xy"],
@@ -274,52 +468,63 @@ def run_trace_graph_pipeline(image: np.ndarray, detections: list[dict], prism_ma
         ys, xs = np.where(skel_labels == label_id)
         if not len(xs):
             continue
-        indices = []
+        local_component = (skel_labels == label_id).astype(np.uint8)
+        polylines = _ordered_skeleton_chains(local_component)
+        original_regions = set(int(v) for v in np.unique(original_labels[ys, xs]) if v > 0)
+        attached_pads = []
         for pad in pads:
             x, y = pad["xy"]
             d2 = (xs - x) ** 2 + (ys - y) ** 2
-            if float(np.min(d2)) <= max_pad_gap ** 2:
-                indices.append((pad["id"], int(np.argmin(d2))))
-        if len(indices) < 2:
-            continue
-        # Keep only the two most separated pad anchors on a given trace fragment.
-        pairs = []
-        for a in range(len(indices)):
-            for b in range(a + 1, len(indices)):
-                pa, pb = pads[indices[a][0]-1], pads[indices[b][0]-1]
-                pairs.append((math.hypot(pa["xy"][0]-pb["xy"][0], pa["xy"][1]-pb["xy"][1]), indices[a], indices[b]))
-        _, left, right = max(pairs, key=lambda p: p[0])
-        pad_a, pad_b = pads[left[0]-1], pads[right[0]-1]
-        points = [[int(x), int(y)] for x, y in zip(xs.tolist(), ys.tolist())]
+            closest_index = int(np.argmin(d2))
+            contact_preserved = bool(pad_contact_labels.get(pad["id"], set()) & original_regions)
+            if contact_preserved or float(d2[closest_index]) <= max_pad_gap ** 2:
+                attached_pads.append((pad, closest_index, math.sqrt(float(d2[closest_index]))))
         density = float(np.mean(voting_score[ys, xs]))
-        size_penalty = 0.12 if len(indices) > 4 else 0.0
-        rank = max(0.0, min(100.0, 100 * (0.55 * density + 0.25 * (pad_a["confidence"] + pad_b["confidence"]) / 2 + 0.20) - size_penalty * 100))
-        graph_edges.append({"id": len(graph_edges)+1, "from": f"pad_{pad_a['id']}",
-                            "to": f"pad_{pad_b['id']}", "points": points,
-                            "rank_score": round(rank, 1), "evidence": round(density, 3),
-                            "uncertainty": round(1.0 - rank / 100.0, 3),
-                            "centerline_pixels": len(points), "method": "pad_centerline_match"})
+        trace_node_id = f"trace_component_{label_id}"
+        graph_nodes.append({"id": trace_node_id, "kind": "centerline_component",
+                            "centerline_pixels": int(skel_stats[label_id, cv2.CC_STAT_AREA]),
+                            "polylines": polylines, "evidence": round(density, 3),
+                            "attached_pad_ids": [p[0]["id"] for p in attached_pads],
+                            "contact_preserved_from_pre_suppression_mask": bool(attached_pads)})
+        for pad, closest_index, gap in attached_pads:
+            nearest_point = [int(xs[closest_index]), int(ys[closest_index])]
+            points = [[int(round(pad["xy"][0])), int(round(pad["xy"][1]))], nearest_point]
+            rank = max(0.0, min(100.0, 100 * (0.55 * density + 0.25 * pad["confidence"] +
+                                               0.20 * math.exp(-gap / max(1.0, max_pad_gap))))
+            graph_edges.append({"id": len(graph_edges)+1, "from": f"pad_{pad['id']}",
+                                "to": trace_node_id, "points": points,
+                                "rank_score": round(rank, 1), "evidence": round(density, 3),
+                                "uncertainty": round(1.0 - rank / 100.0, 3),
+                                "centerline_pixels": len(points), "method": "pad_centerline_contact"})
 
     graph_backend = "adjacency-list"
     try:
         import networkx as nx
-        graph = nx.Graph()
+        graph = nx.MultiGraph()
         for node in graph_nodes:
             graph.add_node(node["id"], **node)
         for edge in graph_edges:
             graph.add_edge(edge["from"], edge["to"], **edge)
-        graph_backend = "NetworkX"
+        graph_backend = "NetworkX MultiGraph"
         graph_nodes = [{"id": node, **attrs} for node, attrs in graph.nodes(data=True)]
         graph_edges = [{k: v for k, v in attrs.items() if k not in {"from", "to"}} |
                        {"from": a, "to": b} for a, b, attrs in graph.edges(data=True)]
     except ImportError:
         pass
 
+    prior_component_indexes = {p["component_index"] for p in priors}
+    prior_unavailable = [{"component_index": i,
+                          "class": str(d.get("class_name", "component")),
+                          "reason": "NO_SUPPORTED_PACKAGE_PIN_TEMPLATE"}
+                         for i, d in enumerate(detections)
+                         if str(d.get("class_name", "component")).lower() in {"ic", "connector"}
+                         and i not in prior_component_indexes]
     diagnostics = {"stages": ["PRISM/line/color multi-filter voting", "morphological pad candidates",
                               "pad exclusion", "Zhang-Suen centerline", "package-edge pin priors",
                               "distance/geometric pad matching", "uncertainty-ranked graph"],
                    "mask_pixels": int(cv2.countNonZero(clean)), "centerline_pixels": int(cv2.countNonZero(skeleton)),
                    "pad_candidates": len(pads), "pin_priors": len(priors), "pin_pad_matches": len(matches),
+                   "pin_prior_unavailable_components": prior_unavailable,
                    "endpoints": len(endpoints), "junctions": len(junctions),
                    "graph_nodes": len(graph_nodes), "graph_edges": len(graph_edges),
                    "graph_backend": graph_backend,
@@ -348,6 +553,13 @@ def run_trace_graph_pipeline(image: np.ndarray, detections: list[dict], prism_ma
     for pad in pads:
         x, y = map(lambda v: int(round(v)), pad["xy"])
         cv2.circle(graph_overlay, (x, y), 3, (30, 235, 90), -1, cv2.LINE_AA)
+    for node in graph_nodes:
+        if node.get("kind") != "centerline_component":
+            continue
+        for chain in node.get("polylines", []):
+            if len(chain) > 1:
+                cv2.polylines(graph_overlay, [np.asarray(chain, np.int32).reshape((-1, 1, 2))],
+                              False, (255, 40, 220), 2, cv2.LINE_AA)
 
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
