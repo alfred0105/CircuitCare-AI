@@ -1,0 +1,231 @@
+{
+  "experiment": {
+    "seed": 42,
+    "device": "mps",
+    "graph_batch_size": 256,
+    "epochs": 15,
+    "training_graphs": 3920,
+    "project_grouped_split": true,
+    "notes": [
+      "Each feature variant changes only the listed feature group.",
+      "Pin facing is estimated from pin position relative to the component pin centroid; exact KiCad pin orientation is not present in the released graph file.",
+      "Candidate-only PR-AUC excludes candidate-generation misses. Same-component truth pairs are excluded from corrected candidate-recall metrics because candidate generation forbids them."
+    ],
+    "candidate_recall_test_legacy_macro_including_same_component": 0.8065484913870787,
+    "candidate_recall_test_macro_excluding_same_component": 0.8714459120547977,
+    "candidate_recall_test_micro_excluding_same_component": 0.6837643021452281,
+    "unreachable_same_component_truth_pairs_test": 14659
+  },
+  "runs": [
+    {
+      "features": [
+        "neighbor_geometry",
+        "relative_geometry"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.21959248153977565,
+        "roc_auc": 0.7865516419073332,
+        "f1_at_0_5": 0.22043207032501727,
+        "precision_at_0_5": 0.12981143412399251,
+        "recall_at_0_5": 0.7301357638100469
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.19676613843535062,
+        "roc_auc": 0.7773598923174678,
+        "f1_at_0_5": 0.2110169101752342,
+        "precision_at_0_5": 0.12372966037221661,
+        "recall_at_0_5": 0.7164468601548417
+      }
+    },
+    {
+      "features": [
+        "component_type_pair"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.21999610294617566,
+        "roc_auc": 0.78397273784275,
+        "f1_at_0_5": 0.21194759922270331,
+        "precision_at_0_5": 0.12351678284144808,
+        "recall_at_0_5": 0.7461412133725505
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.19564215281894126,
+        "roc_auc": 0.7749121057319086,
+        "f1_at_0_5": 0.203213460367094,
+        "precision_at_0_5": 0.11798093105476097,
+        "recall_at_0_5": 0.7321063618780443
+      }
+    },
+    {
+      "features": [
+        "pin_facing"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.26958193015045506,
+        "roc_auc": 0.7914373378211278,
+        "f1_at_0_5": 0.21553005117378293,
+        "precision_at_0_5": 0.12592781798569602,
+        "recall_at_0_5": 0.7471656466338918
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.2345201393001276,
+        "roc_auc": 0.7813620203414162,
+        "f1_at_0_5": 0.20602202152400126,
+        "precision_at_0_5": 0.11979795418342346,
+        "recall_at_0_5": 0.7351253910766045
+      }
+    },
+    {
+      "features": [
+        "pin_name_category"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.291128745939947,
+        "roc_auc": 0.8092919905868833,
+        "f1_at_0_5": 0.24575009990723545,
+        "precision_at_0_5": 0.14826002860406282,
+        "recall_at_0_5": 0.7176471830725605
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.2661451547819349,
+        "roc_auc": 0.799837669480763,
+        "f1_at_0_5": 0.23367302921975452,
+        "precision_at_0_5": 0.13993202524900247,
+        "recall_at_0_5": 0.7078938572892296
+      }
+    },
+    {
+      "features": [
+        "power_ground"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.27988856978800897,
+        "roc_auc": 0.8064267117235596,
+        "f1_at_0_5": 0.24201818202796266,
+        "precision_at_0_5": 0.1454567373344258,
+        "recall_at_0_5": 0.7199706399539533
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.2557335825592592,
+        "roc_auc": 0.7945622640927015,
+        "f1_at_0_5": 0.22936499206994063,
+        "precision_at_0_5": 0.13683485262693326,
+        "recall_at_0_5": 0.7083924628374492
+      }
+    },
+    {
+      "features": [
+        "pitch_normalized_distance"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.2238211310338118,
+        "roc_auc": 0.7839030804340992,
+        "f1_at_0_5": 0.20648473327533803,
+        "precision_at_0_5": 0.1194367228474967,
+        "recall_at_0_5": 0.7614337841191722
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.19509850917471724,
+        "roc_auc": 0.7734905379328282,
+        "f1_at_0_5": 0.19844477506736705,
+        "precision_at_0_5": 0.1144660462234673,
+        "recall_at_0_5": 0.7450701061317524
+      }
+    },
+    {
+      "features": [
+        "neighbor_geometry",
+        "relative_geometry",
+        "component_type_pair",
+        "pin_facing",
+        "pin_name_category",
+        "power_ground",
+        "pitch_normalized_distance"
+      ],
+      "device": "mps",
+      "training_graphs": 3920,
+      "graph_batch_size": 256,
+      "epochs": 15,
+      "validation": {
+        "candidate_edges": 3256763,
+        "positive_edges": 189373,
+        "positive_rate": 0.05814761467137768,
+        "pr_auc": 0.3232758775032433,
+        "roc_auc": 0.8180830023572528,
+        "f1_at_0_5": 0.2439039582529496,
+        "precision_at_0_5": 0.14584585651307083,
+        "recall_at_0_5": 0.7443827789600418
+      },
+      "test": {
+        "candidate_edges": 3258373,
+        "positive_edges": 182509,
+        "positive_rate": 0.05601231043836909,
+        "pr_auc": 0.29358623867537464,
+        "roc_auc": 0.8070607830089956,
+        "f1_at_0_5": 0.2327090857408922,
+        "precision_at_0_5": 0.13837499287095653,
+        "recall_at_0_5": 0.731163942600091
+      }
+    }
+  ]
+}

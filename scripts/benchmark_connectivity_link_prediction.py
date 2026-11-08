@@ -286,6 +286,21 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     torch.set_num_threads(args.torch_threads)
+    requested_device = getattr(args, "device", "auto")
+    if requested_device == "auto":
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+    else:
+        device = torch.device(requested_device)
+        if device.type == "cuda" and not torch.cuda.is_available():
+            raise SystemExit("CUDA was requested but is not available")
+        if device.type == "mps" and not (getattr(torch.backends, "mps", None) and torch.backends.mps.is_available()):
+            raise SystemExit("MPS was requested but is not available")
+    print(f"GNN training device: {device}", flush=True)
     graph_path = Path(args.graphs)
     metadata = []
     with graph_path.open(encoding="utf-8") as graph_file:
@@ -345,6 +360,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "validation_projects": len({g["group_id"] for g in by_split["validation"]}),
         "test_projects": len({g["group_id"] for g in by_split["test"]}),
         "split_counts": {k: len(v) for k, v in by_split.items()}, "seed": args.seed,
+        "gnn_device": str(device),
         "training_graphs_sampled_for_both_models": len(train_rows),
         "lightgbm_negative_to_positive_cap": args.negative_ratio,
         "lightgbm_max_sampled_negatives_per_graph": args.max_negatives_per_graph,
@@ -387,9 +403,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     edge_dim = train_rows[0][2].shape[1]
     total_positive = sum(int(row[3].sum()) for row in train_rows)
     total_edges = sum(len(row[3]) for row in train_rows)
-    model = ACLPGNN(node_dim, edge_dim)
+    model = ACLPGNN(node_dim, edge_dim).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    pos_weight = torch.tensor([(total_edges - total_positive) / max(total_positive, 1)], dtype=torch.float32)
+    pos_weight = torch.tensor([(total_edges - total_positive) / max(total_positive, 1)],
+                              dtype=torch.float32, device=device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     for epoch in range(args.epochs):
         order = np.random.default_rng(args.seed + epoch).permutation(len(train_rows))
@@ -397,16 +414,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         for start in range(0, len(order), args.graph_batch_size):
             batch_rows = [train_rows[int(i)] for i in order[start:start + args.graph_batch_size]]
             bx, be, ba, by = combine(batch_rows)
-            tx, te, ta = torch.as_tensor(bx), torch.as_tensor(be), torch.as_tensor(ba)
-            ty = torch.as_tensor(by, dtype=torch.float32)
+            tx = torch.as_tensor(bx, dtype=torch.float32, device=device)
+            te = torch.as_tensor(be, dtype=torch.long, device=device)
+            ta = torch.as_tensor(ba, dtype=torch.float32, device=device)
+            ty = torch.as_tensor(by, dtype=torch.float32, device=device)
             model.train(); optimizer.zero_grad(set_to_none=True)
             logits = model(tx, te, ta)
             loss = loss_fn(logits, ty)
             loss.backward(); optimizer.step()
-            total_loss += float(loss.detach()) * len(by)
+            total_loss += float(loss.detach().cpu()) * len(by)
             seen_edges += len(by)
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            print(f"GNN epoch {epoch + 1}/{args.epochs} loss={total_loss / max(seen_edges, 1):.4f}", flush=True)
+            print(f"GNN epoch {epoch + 1}/{args.epochs} device={device} "
+                  f"loss={total_loss / max(seen_edges, 1):.4f}", flush=True)
     model.eval()
     test_y_rows, gnn_score_rows, lgbm_score_rows = [], [], []
     with graph_path.open(encoding="utf-8") as graph_file, torch.no_grad():
@@ -419,8 +439,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 continue
             features = np.concatenate((ef, x[pairs[:, 0]], x[pairs[:, 1]]), axis=1)
             lgbm_score_rows.append(lgbm.booster_.predict(features))
-            gnn_score_rows.append(torch.sigmoid(model(torch.as_tensor(x), torch.as_tensor(pairs),
-                                                       torch.as_tensor(ef))).numpy())
+            test_x = torch.as_tensor(x, dtype=torch.float32, device=device)
+            test_pairs = torch.as_tensor(pairs, dtype=torch.long, device=device)
+            test_edge_features = torch.as_tensor(ef, dtype=torch.float32, device=device)
+            gnn_score_rows.append(torch.sigmoid(model(test_x, test_pairs, test_edge_features))
+                                  .cpu().numpy())
             test_y_rows.append(y)
     test_y = np.concatenate(test_y_rows)
     lgbm_scores = np.concatenate(lgbm_score_rows)
@@ -432,7 +455,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     results["methodology"] = "Same selected training schematics, cKDTree candidate links, project-group splits, and full test candidates. LightGBM uses endpoint/edge features with per-graph negative sampling capped by ratio and maximum; GNN uses all candidate edges in its sampled training graphs and two message-passing layers. GNN-ACLP-inspired, not a reproduction of the paper."
     model_dir = Path(args.model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
-    torch.save({"state_dict": model.state_dict(), "node_dim": int(node_dim),
+    torch.save({"state_dict": {key: value.detach().cpu() for key, value in model.state_dict().items()},
+                "node_dim": int(node_dim),
                 "edge_dim": int(edge_dim), "hidden_dim": 48, "seed": args.seed,
                 "epochs": args.epochs}, model_dir / "gnn_aclp_inspired.pt")
     lgbm.booster_.save_model(str(model_dir / "lightgbm.txt"))
@@ -460,6 +484,7 @@ def sweep(args: argparse.Namespace) -> None:
         if dataset_metadata is None:
             dataset_metadata = result["metadata"]
         rows.append({"training_schematics": size,
+                     "gnn_device": result["metadata"]["gnn_device"],
                      "candidate_mean_recall_test": result["metadata"]["candidate_mean_recall_test"],
                      "lightgbm": result["lightgbm"], "gnn_aclp_inspired": result["gnn_aclp_inspired"]})
         print(f"[{len(rows)}/{len(args.sizes)}] train={size} "
@@ -506,6 +531,8 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=0.001)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--torch-threads", type=int, default=4)
+    p.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto",
+                   help="GNN device; auto prefers CUDA, then Apple MPS, then CPU")
     p.add_argument("--lgbm-trees", type=int, default=400)
     p.add_argument("--negative-ratio", type=int, default=20)
     p.add_argument("--min-negatives-per-graph", type=int, default=16)
@@ -522,6 +549,8 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=0.001)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--torch-threads", type=int, default=4)
+    p.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto",
+                   help="GNN device; auto prefers CUDA, then Apple MPS, then CPU")
     p.add_argument("--lgbm-trees", type=int, default=250)
     p.add_argument("--negative-ratio", type=int, default=20)
     p.add_argument("--min-negatives-per-graph", type=int, default=16)
