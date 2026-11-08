@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
 import importlib.util
 import itertools
 import json
@@ -276,7 +277,7 @@ def metrics(y: np.ndarray, scores: np.ndarray) -> dict[str, Any]:
             "recall_at_0_5": float(recall_score(y, pred, zero_division=0))}
 
 
-def train(args: argparse.Namespace) -> None:
+def train(args: argparse.Namespace) -> dict[str, Any]:
     import torch
     from torch import nn
     from lightgbm import LGBMClassifier
@@ -300,7 +301,12 @@ def train(args: argparse.Namespace) -> None:
     train_pool = by_split["train"]
     train_pool.sort(key=lambda item: item["sample_id"])
     selected_count = min(len(train_pool), args.gnn_max_graphs or len(train_pool))
-    selected = rng.choice(len(train_pool), selected_count, replace=False)
+    baseline_count = min(200, len(train_pool))
+    baseline_indices = rng.choice(len(train_pool), baseline_count, replace=False)
+    baseline_set = set(map(int, baseline_indices))
+    remaining = np.array([i for i in range(len(train_pool)) if i not in baseline_set], dtype=np.int64)
+    nested_order = np.concatenate((baseline_indices, rng.permutation(remaining)))
+    selected = nested_order[:selected_count]
     selected_ids = {train_pool[int(i)]["sample_id"] for i in selected}
     train_rows = []
     xgb_rows, ygb_rows = [], []
@@ -319,7 +325,10 @@ def train(args: argparse.Namespace) -> None:
             neg_count = min(len(negatives), max(args.min_negatives_per_graph,
                              len(positives) * args.negative_ratio), args.max_negatives_per_graph)
             if neg_count < len(negatives):
-                negatives = rng.choice(negatives, neg_count, replace=False)
+                seed_material = f"{args.seed}:{g['sample_id']}".encode("utf-8")
+                graph_seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:8], "little")
+                graph_rng = np.random.default_rng(graph_seed)
+                negatives = graph_rng.choice(negatives, neg_count, replace=False)
             keep = np.sort(np.concatenate((positives, negatives)))
             xgb_rows.append(np.concatenate((ef[keep], x[pairs[keep, 0]], x[pairs[keep, 1]]), axis=1))
             ygb_rows.append(y[keep])
@@ -331,6 +340,7 @@ def train(args: argparse.Namespace) -> None:
                           max_depth=-1, subsample=0.85, colsample_bytree=0.85,
                           reg_lambda=1.0, random_state=args.seed, n_jobs=args.jobs, verbosity=-1)
     lgbm.fit(Xtr, ytr, sample_weight=weights)
+    del Xtr, ytr, weights, xgb_rows, ygb_rows
     results = {"metadata": {"graph_records": len(metadata), "train_projects": len({g["group_id"] for g in by_split["train"]}),
         "validation_projects": len({g["group_id"] for g in by_split["validation"]}),
         "test_projects": len({g["group_id"] for g in by_split["test"]}),
@@ -340,7 +350,7 @@ def train(args: argparse.Namespace) -> None:
         "lightgbm_max_sampled_negatives_per_graph": args.max_negatives_per_graph,
         "candidate_mean_recall_test": float(np.mean([g["candidate_recall"] for g in by_split["test"] if g["candidate_recall"] is not None]))}}
 
-    # Compact full-batch message-passing GNN on disjoint per-schematic candidate graphs.
+    # Compact message-passing GNN, trained in graph batches to bound memory.
     class ACLPGNN(nn.Module):
         def __init__(self, node_dim: int, edge_dim: int, hidden: int = 48):
             super().__init__()
@@ -373,20 +383,30 @@ def train(args: argparse.Namespace) -> None:
             offset += len(x)
         return (np.concatenate(node_list), np.concatenate(edge_list), np.concatenate(attr_list), np.concatenate(y_list))
 
-    tr_x, tr_e, tr_a, tr_y = combine(train_rows)
-    model = ACLPGNN(tr_x.shape[1], tr_a.shape[1])
+    node_dim = train_rows[0][0].shape[1]
+    edge_dim = train_rows[0][2].shape[1]
+    total_positive = sum(int(row[3].sum()) for row in train_rows)
+    total_edges = sum(len(row[3]) for row in train_rows)
+    model = ACLPGNN(node_dim, edge_dim)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    tx = torch.as_tensor(tr_x); te = torch.as_tensor(tr_e); ta = torch.as_tensor(tr_a)
-    ty = torch.as_tensor(tr_y, dtype=torch.float32)
-    pos_weight = torch.tensor([(len(tr_y) - tr_y.sum()) / max(tr_y.sum(), 1)], dtype=torch.float32)
+    pos_weight = torch.tensor([(total_edges - total_positive) / max(total_positive, 1)], dtype=torch.float32)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     for epoch in range(args.epochs):
-        model.train(); optimizer.zero_grad(set_to_none=True)
-        logits = model(tx, te, ta)
-        loss = loss_fn(logits, ty)
-        loss.backward(); optimizer.step()
+        order = np.random.default_rng(args.seed + epoch).permutation(len(train_rows))
+        total_loss, seen_edges = 0.0, 0
+        for start in range(0, len(order), args.graph_batch_size):
+            batch_rows = [train_rows[int(i)] for i in order[start:start + args.graph_batch_size]]
+            bx, be, ba, by = combine(batch_rows)
+            tx, te, ta = torch.as_tensor(bx), torch.as_tensor(be), torch.as_tensor(ba)
+            ty = torch.as_tensor(by, dtype=torch.float32)
+            model.train(); optimizer.zero_grad(set_to_none=True)
+            logits = model(tx, te, ta)
+            loss = loss_fn(logits, ty)
+            loss.backward(); optimizer.step()
+            total_loss += float(loss.detach()) * len(by)
+            seen_edges += len(by)
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            print(f"GNN epoch {epoch + 1}/{args.epochs} loss={loss.item():.4f}", flush=True)
+            print(f"GNN epoch {epoch + 1}/{args.epochs} loss={total_loss / max(seen_edges, 1):.4f}", flush=True)
     model.eval()
     test_y_rows, gnn_score_rows, lgbm_score_rows = [], [], []
     with graph_path.open(encoding="utf-8") as graph_file, torch.no_grad():
@@ -412,15 +432,57 @@ def train(args: argparse.Namespace) -> None:
     results["methodology"] = "Same selected training schematics, cKDTree candidate links, project-group splits, and full test candidates. LightGBM uses endpoint/edge features with per-graph negative sampling capped by ratio and maximum; GNN uses all candidate edges in its sampled training graphs and two message-passing layers. GNN-ACLP-inspired, not a reproduction of the paper."
     model_dir = Path(args.model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
-    torch.save({"state_dict": model.state_dict(), "node_dim": int(tr_x.shape[1]),
-                "edge_dim": int(tr_a.shape[1]), "hidden_dim": 48, "seed": args.seed,
+    torch.save({"state_dict": model.state_dict(), "node_dim": int(node_dim),
+                "edge_dim": int(edge_dim), "hidden_dim": 48, "seed": args.seed,
                 "epochs": args.epochs}, model_dir / "gnn_aclp_inspired.pt")
     lgbm.booster_.save_model(str(model_dir / "lightgbm.txt"))
     results["model_artifacts"] = {"gnn": str(model_dir / "gnn_aclp_inspired.pt"),
                                   "lightgbm": str(model_dir / "lightgbm.txt")}
-    out = Path(args.report); out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(json.dumps(results, indent=2))
+    if args.report:
+        out = Path(args.report); out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    if not getattr(args, "quiet", False):
+        print(json.dumps(results, indent=2))
+    return results
+
+
+def sweep(args: argparse.Namespace) -> None:
+    rows = []
+    dataset_metadata = None
+    for size in args.sizes:
+        run_args = argparse.Namespace(**vars(args))
+        run_args.command = "train"
+        run_args.gnn_max_graphs = size
+        run_args.report = None
+        run_args.model_dir = str(Path(args.model_root) / str(size))
+        run_args.quiet = True
+        result = train(run_args)
+        if dataset_metadata is None:
+            dataset_metadata = result["metadata"]
+        rows.append({"training_schematics": size,
+                     "candidate_mean_recall_test": result["metadata"]["candidate_mean_recall_test"],
+                     "lightgbm": result["lightgbm"], "gnn_aclp_inspired": result["gnn_aclp_inspired"]})
+        print(f"[{len(rows)}/{len(args.sizes)}] train={size} "
+              f"LightGBM PR-AUC={result['lightgbm']['pr_auc']:.4f} "
+              f"GNN PR-AUC={result['gnn_aclp_inspired']['pr_auc']:.4f}", flush=True)
+    extraction_path = DATA_DIR / "extraction_summary.json"
+    extraction = json.loads(extraction_path.read_text(encoding="utf-8")) if extraction_path.exists() else {}
+    report = {"experiment": {"seed": args.seed, "epochs": args.epochs,
+              "graph_batch_size": args.graph_batch_size, "lightgbm_trees": args.lgbm_trees,
+              "lightgbm_negative_to_positive_cap": args.negative_ratio,
+              "lightgbm_max_sampled_negatives_per_graph": args.max_negatives_per_graph,
+              "training_sample_policy": "Nested project-grouped train subset; first 200 graphs reused as the baseline subset.",
+              "candidate_generation": {"k": extraction.get("k"), "radius_mm": extraction.get("radius_mm")},
+              "dataset_counts": {"extracted_graphs": dataset_metadata["graph_records"],
+                                 "project_splits": dataset_metadata["split_counts"],
+                                 "projects_per_split": {"train": dataset_metadata["train_projects"],
+                                     "validation": dataset_metadata["validation_projects"],
+                                     "test": dataset_metadata["test_projects"]}}},
+              "metrics": rows}
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"Learning-curve results saved to {output}")
 
 
 def main() -> None:
@@ -440,6 +502,7 @@ def main() -> None:
     p.add_argument("--model-dir", default=str(ROOT / "models/phase22_connectivity"))
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--gnn-max-graphs", type=int, default=200)
+    p.add_argument("--graph-batch-size", type=int, default=8)
     p.add_argument("--lr", type=float, default=0.001)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--torch-threads", type=int, default=4)
@@ -449,6 +512,22 @@ def main() -> None:
     p.add_argument("--max-negatives-per-graph", type=int, default=1000)
     p.add_argument("--jobs", type=int, default=-1)
     p.set_defaults(func=train)
+    p = sub.add_parser("sweep", help="Run nested training-size experiments")
+    p.add_argument("--graphs", default=str(DATA_DIR / "pin_candidate_graphs.jsonl"))
+    p.add_argument("--output", default=str(DATA_DIR / "learning_curve.json"))
+    p.add_argument("--model-root", default=str(ROOT / "models/phase22_connectivity/learning_curve"))
+    p.add_argument("--sizes", nargs="+", type=int, default=[200, 500, 1000, 2000, 3920])
+    p.add_argument("--epochs", type=int, default=15)
+    p.add_argument("--graph-batch-size", type=int, default=8)
+    p.add_argument("--lr", type=float, default=0.001)
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--torch-threads", type=int, default=4)
+    p.add_argument("--lgbm-trees", type=int, default=250)
+    p.add_argument("--negative-ratio", type=int, default=20)
+    p.add_argument("--min-negatives-per-graph", type=int, default=16)
+    p.add_argument("--max-negatives-per-graph", type=int, default=1000)
+    p.add_argument("--jobs", type=int, default=8)
+    p.set_defaults(func=sweep)
     args = parser.parse_args()
     args.func(args)
 

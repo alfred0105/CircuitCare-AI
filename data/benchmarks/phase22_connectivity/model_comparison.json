@@ -11,35 +11,34 @@
     },
     "seed": 42,
     "training_graphs_sampled_for_both_models": 200,
-    "lightgbm_negative_to_positive_cap": 20,
-    "lightgbm_max_sampled_negatives_per_graph": 1000,
-    "candidate_mean_recall_test": 0.8065484913870787
+    "candidate_mean_recall_test": 0.8065484913870787,
+    "training_method": "graph mini-batches of 8; 15 epochs"
   },
   "lightgbm": {
     "candidate_edges": 3258373,
     "positive_edges": 182509,
     "positive_rate": 0.05601231043836909,
-    "pr_auc": 0.2683698415765739,
-    "roc_auc": 0.7886610527932842,
-    "f1_at_0_5": 0.2205213791318973,
-    "precision_at_0_5": 0.13085976685815362,
-    "recall_at_0_5": 0.7004531283388764
+    "pr_auc": 0.27054227915328966,
+    "roc_auc": 0.7885499045571698,
+    "f1_at_0_5": 0.2213383847128817,
+    "precision_at_0_5": 0.13143729660533338,
+    "recall_at_0_5": 0.7004038157022393
   },
   "gnn_aclp_inspired": {
     "candidate_edges": 3258373,
     "positive_edges": 182509,
     "positive_rate": 0.05601231043836909,
-    "pr_auc": 0.12398746124020513,
-    "roc_auc": 0.6638848653354129,
-    "f1_at_0_5": 0.16997233949332782,
-    "precision_at_0_5": 0.10434546008257573,
-    "recall_at_0_5": 0.45807056090384585,
+    "pr_auc": 0.1935783178869284,
+    "roc_auc": 0.7709538702259886,
+    "f1_at_0_5": 0.23536042908197627,
+    "precision_at_0_5": 0.1475616474948662,
+    "recall_at_0_5": 0.5811329852226466,
     "training_graphs": 200,
     "epochs": 15
   },
-  "methodology": "Same selected training schematics, cKDTree candidate links, project-group splits, and full test candidates. LightGBM uses endpoint/edge features with per-graph negative sampling capped by ratio and maximum; GNN uses all candidate edges in its sampled training graphs and two message-passing layers. GNN-ACLP-inspired, not a reproduction of the paper.",
+  "methodology": "Same nested training sample and full test candidates as the 200-schematic learning-curve run. LightGBM uses endpoint/edge features with per-graph negative sampling capped by ratio and maximum; GNN uses all candidate edges in graph mini-batches. GNN-ACLP-inspired, not a reproduction of the paper.",
   "model_artifacts": {
-    "gnn": "C:\\Users\\ace06\\Documents\\Codex\\2026-11-07\\rlwh\\work\\CircuitCare-AI-source\\models\\phase22_connectivity\\gnn_aclp_inspired.pt",
-    "lightgbm": "C:\\Users\\ace06\\Documents\\Codex\\2026-11-07\\rlwh\\work\\CircuitCare-AI-source\\models\\phase22_connectivity\\lightgbm.txt"
+    "gnn": "models/phase22_connectivity/learning_curve/200/gnn_aclp_inspired.pt",
+    "lightgbm": "models/phase22_connectivity/learning_curve/200/lightgbm.txt"
   }
 }

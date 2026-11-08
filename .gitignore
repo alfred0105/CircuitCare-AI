@@ -50,3 +50,4 @@ reports/
 data/benchmarks/phase22_connectivity/*
 !data/benchmarks/phase22_connectivity/model_comparison.json
 !data/benchmarks/phase22_connectivity/extraction_summary.json
+!data/benchmarks/phase22_connectivity/learning_curve.json

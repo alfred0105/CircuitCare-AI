@@ -170,6 +170,34 @@ model or reported results. Evaluation emphasizes PR-AUC because positive links
 are sparse; threshold metrics are also reported. LightGBM training caps sampled
 negative edges to control memory, while test metrics include all test candidates.
 
+### Learning-curve experiment
+
+All five runs used the same seed, 15 epochs, graph mini-batches of 8, the same
+nested training sample, and the same 513 held-out test projects (3,258,373
+candidate edges). The 200-graph sample is reused in each larger run. Test
+candidate recall stays at 0.807 because the candidate graph and test set do not
+change.
+
+| Training schematics | LightGBM PR-AUC | GNN PR-AUC | LightGBM ROC-AUC | GNN ROC-AUC |
+|---:|---:|---:|---:|---:|
+| 200 (baseline) | 0.271 | 0.194 | 0.789 | 0.771 |
+| 500 (Experiment A) | 0.274 | 0.199 | 0.790 | 0.777 |
+| 1,000 (Experiment B) | 0.277 | 0.199 | 0.793 | 0.779 |
+| 2,000 (Experiment C) | 0.278 | 0.203 | 0.796 | 0.783 |
+| 3,920 (Experiment D, full train split) | 0.277 | 0.220 | 0.796 | 0.790 |
+
+LightGBM has the highest PR-AUC at every size and levels off near 0.277 by
+1,000 examples. GNN PR-AUC rises from 0.194 to 0.220 using all 3,920 training
+schematics, but remains below LightGBM. The final LightGBM PR-AUC is slightly
+lower than its 2,000-example result, so more data did not improve both models
+monotonically. The 0.5-threshold F1 and precision/recall are recorded in
+`learning_curve.json`; threshold 0.5 was held fixed for this comparison.
+
+These are initial learning-curve results from one seed. LightGBM uses up to 20
+negative candidates per positive (capped at 1,000 negatives per schematic); GNN
+uses all candidate links in the sampled training schematics. Treat the trend as
+indicative, not as a statistical significance claim.
+
 The GNN-ACLP paper describes port-level prediction with a SEAL framework and
 its official implementation is GPL-3.0. This repository uses a separate
 implementation and does not copy that code. See the [paper](https://doi.org/10.1016/j.engappai.2025.113035)
@@ -182,6 +210,7 @@ Run the full graph extraction and comparison:
 pip install -e ".[connectivity]"
 python scripts/benchmark_connectivity_link_prediction.py extract --workers 6
 python scripts/benchmark_connectivity_link_prediction.py train
+python scripts/benchmark_connectivity_link_prediction.py sweep --sizes 200 500 1000 2000 3920
 ```
 
 KiCad CLI can be passed explicitly with `--kicad-cli PATH`; the script also
@@ -191,6 +220,9 @@ and extraction failures are local-only under ignored
 extraction summary are kept as reviewable benchmark outputs. Training also
 writes the GNN state dictionary and LightGBM text model under ignored
 `models/phase22_connectivity/`.
+The `sweep` command nests the same seeded 200-graph baseline subset into each
+larger training-size run, trains GNNs with bounded graph mini-batches, and
+writes the consolidated learning curve to `learning_curve.json`.
 
 The repository does not download the full 317 GB source dataset. The completed
 bounded acquisition contains 5,046 unique schematic files in ignored
