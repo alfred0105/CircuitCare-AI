@@ -23,7 +23,18 @@ from hr.infer.predict import agnostic_nms, combine, detect, draw, draw_elements
 
 ROOT = Path(__file__).resolve().parent
 SAMPLES = ROOT / "data" / "samples"
-WEIGHTS = Path(os.environ.get("CIRCUITCARE_PCB_WEIGHTS", ROOT / "weights")).expanduser().resolve()
+
+
+def _default_weights_root() -> Path:
+    configured = os.environ.get("CIRCUITCARE_PCB_WEIGHTS")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    local_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share"))
+    user_weights = local_data / "circuitcare-ai" / "models" / "pcb_component_pipeline"
+    return user_weights if user_weights.is_dir() else ROOT / "weights"
+
+
+WEIGHTS = _default_weights_root()
 SAMPLE_FILES = sorted(p.name for p in SAMPLES.glob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"})
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024
 DEVICE = "0" if torch.cuda.is_available() else "cpu"
@@ -43,6 +54,62 @@ EVAL_ENSEMBLES = {
     "ensemble_all_three": ("Parsa + PCB AI Doctor v12n + PCBInspect v12m", ["parsa", "pcb_ai_doctor_v12n", "pcbinspect_yolov12m"]),
 }
 EVAL_WEIGHT_ROOT = WEIGHTS / "external"
+COMPONENT_CLASS_MAP = {
+    "battery": "battery", "button": "switch", "buzzer": "buzzer",
+    "capacitor": "capacitor", "clock": "clock", "connector": "connector",
+    "diode": "diode", "display": "display", "fuse": "fuse",
+    "heatsink": "heatsink", "ic": "IC", "inductor": "inductor",
+    "led": "LED", "potentiometer": "potentiometer", "relay": "relay",
+    "resistor": "resistor", "switch": "switch", "transformer": "transformer",
+    "transistor": "transistor",
+}
+
+
+def load_component_locator() -> YOLO:
+    """Load the locator used by the component-recognition pipeline on demand."""
+    global ANY_MODEL
+    if ANY_MODEL is None:
+        weight_path = WEIGHTS / "any_best.pt"
+        if not weight_path.is_file():
+            raise FileNotFoundError(f"YOLO26s locator weight not found: {weight_path}")
+        ANY_MODEL = YOLO(str(weight_path))
+    return ANY_MODEL
+
+
+def classify_component_crop(image_bytes: bytes, bbox_xyxy: list[float], confidence: float = 0.10) -> dict:
+    """Run the component-type detector inside one user-selected box."""
+    image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("선택한 PCB 사진을 읽을 수 없습니다.")
+    height, width = image.shape[:2]
+    x0, y0, x1, y1 = [int(round(float(value))) for value in bbox_xyxy]
+    x0, x1 = max(0, min(width, x0)), max(0, min(width, x1))
+    y0, y1 = max(0, min(height, y0)), max(0, min(height, y1))
+    if x1 - x0 < 6 or y1 - y0 < 6:
+        raise ValueError("박스 크기는 가로·세로 각각 6 px 이상이어야 합니다.")
+    crop = image[y0:y1, x0:x1]
+    weight_path = EVAL_WEIGHT_ROOT / "pcb-yolov8s-detection" / "best.pt"
+    if not weight_path.is_file():
+        raise FileNotFoundError(f"소자 종류 모델을 찾을 수 없습니다: {weight_path}")
+    model_key = "arshia_pcb_yolov8s"
+    if model_key not in EXTERNAL_MODELS:
+        EXTERNAL_MODELS[model_key] = YOLO(str(weight_path))
+    model = EXTERNAL_MODELS[model_key]
+    boxes, scores, classes = detect(
+        model, crop, min(0.95, max(0.01, float(confidence))), 640, 0, 0.0, 0.5, DEVICE,
+    )
+    candidates = []
+    for index, class_id in enumerate(classes.tolist()):
+        raw = model.names.get(int(class_id), str(class_id)) if isinstance(model.names, dict) else model.names[int(class_id)]
+        label = COMPONENT_CLASS_MAP.get(str(raw).strip().lower())
+        if label:
+            candidates.append((float(scores[index]), label, [float(value) for value in boxes[index]]))
+    if not candidates:
+        return {"class_name": None, "confidence": None, "bbox_xyxy": None}
+    score, label, crop_box = max(candidates, key=lambda item: item[0])
+    return {"class_name": label, "confidence": score,
+            "bbox_xyxy": [crop_box[0] + x0, crop_box[1] + y0,
+                          crop_box[2] + x0, crop_box[3] + y0]}
 
 
 def jpeg_data_url(image: np.ndarray) -> str:

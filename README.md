@@ -94,12 +94,21 @@ The [Phase 18 User Guide](docs/USER_GUIDE.md) walks through the dashboard. Repor
 
 CI는 Python 3.11에서 `dev`, `vision`, `datasheet` 테스트 의존성을 설치합니다. PDF 테스트는 공식 데이터시트나 LLM 모델을 다운로드하지 않고 합성 PDF로 실행됩니다. Vision은 실행 시 선택 기능이지만, 현재 전체 테스트 수집에는 NumPy/OpenCV/Pillow가 필요합니다.
 
-For the integrated dashboard, install the optional UI dependency and start Streamlit:
+The integrated app opens the new PCB diagnosis Workbench by default. The legacy circuit dashboard is available through **예제 회로 체험**. To run the app, install the UI dependency and start Streamlit:
 
 ```bash
 python -m pip install -e ".[ui]"
 streamlit run src/circuitcare/ui.py
 ```
+
+To enable the Workbench's local component-box review, install the optional detector dependencies as well:
+
+```bash
+python -m pip install -e ".[ui,pcb-recognition]"
+streamlit run src/circuitcare/ui.py
+```
+
+In a PCB photo's original-photo view, **소자 탐지 · 박스 검수** displays candidate boxes. You can disable false boxes, edit their pixel coordinates and component labels, add a box using pixel coordinates, and rerun type recognition inside a selected box. Review edits are kept in the current Streamlit session and are not written back to training labels. Model weights remain local: set `CIRCUITCARE_PCB_WEIGHTS` to the directory containing `any_best.pt` and `external/`, or use `%LOCALAPPDATA%/circuitcare-ai/models/pcb_component_pipeline` on Windows.
 
 To enable the **데이터시트 AI** tab's local PDF text/table extraction, install the optional PDF readers too:
 

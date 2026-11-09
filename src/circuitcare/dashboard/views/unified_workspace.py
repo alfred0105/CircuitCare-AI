@@ -45,6 +45,7 @@ from circuitcare.schematic.exporter import export_schematic
 from circuitcare.schematic.geometry import read_svg_view_box
 from circuitcare.schematic.viewer import render_interactive_viewer
 from circuitcare.vision.image_loader import ImageLoadError, load_board_image
+from circuitcare.vision.component_recognition_panel import render_component_recognition_panel
 
 
 def _style(st: Any) -> None:
@@ -390,6 +391,14 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         mapped = entry.get("photo_id_map", []) if entry else []
         photo_mapping = next((row for row in mapped if row.frontend_photo_id == selected and row.project_id == project.project_id), None)
         st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(photo_mapping.registration_status, '상태 미확인') if photo_mapping else '정합 결과 없음'}")
+        # Keep the review detector in the exact displayed photo coordinate frame.
+        import io
+        normalized_photo = io.BytesIO()
+        image.save(normalized_photo, format="PNG")
+        render_component_recognition_panel(
+            st, image_bytes=normalized_photo.getvalue(),
+            project_id=project.project_id, photo_id=selected,
+        )
 
 
 def _photo_label(record: Any, number: int) -> str:
