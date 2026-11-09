@@ -107,7 +107,7 @@ def render_component_viewer(
     selection = st.session_state.get(SELECTION_KEY)
     selected_id = getattr(selection, "selected_component", None)
     if selected_id and selected_id not in {item.component_id for item in components}:
-        selection = update_selection(st.session_state, selected_component=None)
+        selection = update_selection(st.session_state, project=project, selected_component=None)
         selected_id = selection.selected_component
 
     mount_status_key = f"{viewer_key}_mount_status"
@@ -146,7 +146,7 @@ def render_component_viewer(
         st.session_state[last_id_key] = event.get("event_id")
         st.session_state[last_seq_key] = seq
         st.session_state[SELECTED_MAP_KEY] = map_cache_key
-        update_selection(st.session_state, selected_component=component_id)
+        update_selection(st.session_state, project=project, selected_component=component_id)
 
     payload = [{
         "component_id": item.component_id,

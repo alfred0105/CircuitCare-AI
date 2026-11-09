@@ -40,13 +40,16 @@ def enter_workbench(
     return selection
 
 
-def update_selection(state: MutableMapping[str, Any], **changes: Any) -> SelectionState:
+def update_selection(
+    state: MutableMapping[str, Any], *, project: ProjectContext | None = None, **changes: Any,
+) -> SelectionState:
     """Update one project's immutable selection snapshot."""
     current = state.get(SELECTION_KEY)
-    project = state.get("circuitcare_v2_project")
-    if not isinstance(project, ProjectContext):
+    project = project or state.get("circuitcare_v2_project")
+    project_id = getattr(project, "project_id", None)
+    if not project_id:
         raise ValueError("Workbench 프로젝트가 없습니다.")
-    if not isinstance(current, SelectionState) or current.project_id != project.project_id:
+    if not isinstance(current, SelectionState) or current.project_id != project_id:
         current = enter_workbench(state, project)
     values = {name: getattr(current, name) for name in current.__dataclass_fields__}
     values.update(changes)

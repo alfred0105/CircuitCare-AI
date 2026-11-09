@@ -122,7 +122,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         entry = None
     selection = st.session_state.get(SELECTION_KEY)
     if getattr(selection, "selected_component", None) and st.session_state.get(SELECTED_MAP_KEY) != cache_key:
-        update_selection(st.session_state, selected_component=None)
+        update_selection(st.session_state, project=project, selected_component=None)
         st.session_state.pop(SELECTED_MAP_KEY, None)
 
     if provider is None:
@@ -133,7 +133,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         if st.button("사진 정합 실행", key="circuitcare_v3_build_map"):
             try:
                 if getattr(st.session_state.get(SELECTION_KEY), "selected_component", None):
-                    update_selection(st.session_state, selected_component=None)
+                    update_selection(st.session_state, project=project, selected_component=None)
                     st.session_state.pop(SELECTED_MAP_KEY, None)
                 raw_map = provider.build_component_map(
                     board_id=project.board_id,
@@ -216,7 +216,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         key="circuitcare_v2_photo_choice",
     )
     if selected != selected_id:
-        update_selection(st.session_state, active_photo_id=selected)
+        update_selection(st.session_state, project=project, active_photo_id=selected)
     record = records[selected]
     image_data = next(item["data"] for item in side_valid if item["image_id"] == selected)
     size = record.image_dimensions
@@ -384,7 +384,7 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     current_selection = st.session_state.get(SELECTION_KEY)
     selected_component_id = getattr(current_selection, "selected_component", None)
     if selected_component_id and selected_component_id not in {item.component_id for item in component_models}:
-        update_selection(st.session_state, selected_component=None)
+        update_selection(st.session_state, project=project, selected_component=None)
         st.session_state.pop(SELECTED_MAP_KEY, None)
         selected_component_id = None
     transform = requested_view_transform(
@@ -497,7 +497,10 @@ def render_workbench_shell(st: Any, project: ProjectContext) -> None:
                 default="PCB", on_change="rerun",
             )
             active_tab = st.session_state.get("circuitcare_v2_active_tab", "PCB")
-            update_selection(st.session_state, active_tab="pcb" if active_tab == "PCB" else "schematic")
+            update_selection(
+                st.session_state, project=project,
+                active_tab="pcb" if active_tab == "PCB" else "schematic",
+            )
             with pcb_tab:
                 if active_tab == "PCB":
                     _render_pcb(st, project, st.session_state.get(INTAKE_IMAGES_KEY, []))
