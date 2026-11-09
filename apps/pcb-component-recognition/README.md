@@ -14,18 +14,19 @@ python app_server.py --port 8768
 
 Open `http://127.0.0.1:8768`. The weight root can also be the module's `weights` directory. Model files and sample PCB photos are intentionally excluded from Git; image upload remains available. Place optional sample photos under `data/samples/`.
 
-## Required local checkpoints
+## Bundled model checkpoints
 
-For the main automated pipeline:
+The repository includes the checkpoints needed by the default locator/classifier pipeline and the bundled optional comparison models. They are stored under `weights/` so a fresh checkout can start without copying files from a separate local directory:
 
-- `any_best.pt` — Parsa YOLO26s component locator.
-- `external/pcb-ai-doctor/best_v12n.pt` — AI Doctor location supplement.
+- `any_best.pt` and `fine_best.pt` — Parsa YOLO26s locator and fine classifier.
+- `external/pcb-ai-doctor/best_v8n.pt` and `best_v12n.pt` — AI Doctor comparison/location models.
 - `external/pcb-yolov8s-detection/best.pt` — Arshia YOLOv8s component classifier.
-- `fine_best.pt` — Parsa fine classifier checkpoint loaded by the current server startup path.
+- `external/PCBInspect-AI/YoloV12-Medium-160-FineTuned.pt` — PCBInspect comparison model.
+- `external/nuts_best.pt` and `nuts_best.onnx` — Nuts Vision comparison checkpoint and export.
 
-Additional model-comparison features use `external/pcb-ai-doctor/best_v8n.pt`, `external/PCBInspect-AI/YoloV12-Medium-160-FineTuned.pt`, `external/nuts_best.pt`, and `external/paine2026/unet_trained.pth`.
+The optional PAINE pin-segmentation comparison checkpoint is not bundled because its Zenodo record does not show a redistribution license. Download it from the upstream record and place it at `weights/external/paine2026/unet_trained.pth` only if its author/license permits redistribution.
 
-Check each model source's license and usage terms before downloading or redistributing weights. Model checkpoints are not committed.
+Third-party model attribution and license links are listed in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). QWEN/LLM weights are not part of this repository. Setting `CIRCUITCARE_PCB_WEIGHTS` overrides the bundled weights directory.
 
 ## What the output means
 

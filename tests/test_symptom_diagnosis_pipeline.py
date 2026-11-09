@@ -11,17 +11,19 @@ from circuitcare.symptom_diagnosis.measurement_evaluator import evaluate_compone
 
 
 def _measurement(value: str, *, low: str = "10", high: str = "100",
-                 uncertainty: str = "1", fault: str = "CAPACITOR_SHORT",
-                 component_id: str = "C3", measurement_id: str | None = None):
+                 uncertainty: str = "1", fault: str = "RESISTOR_FAILURE",
+                 component_id: str = "R3", measurement_id: str | None = None):
     return create_measurement_record(
-        project_id="p", board_id="b", component_id=component_id,
+        project_id="p", board_id="b", component_id=component_id, component_map_version="m1",
         component_identity_status="USER_CONFIRMED", measurement_type="resistance",
         value=value, unit="Ω", uncertainty=uncertainty, source="user_measurement",
         measurement_id=measurement_id, measurement_target=f"{component_id} terminals",
-        fault_hypothesis=fault, reference_min=low, reference_max=high,
-        reference_source="validated board service specification",
-        operating_conditions="power off, capacitor discharged",
-        reference_conditions="power off, capacitor discharged",
+        test_id="isolated_resistance", fault_hypothesis=fault,
+        reference_min=low, reference_max=high,
+        reference_source="manufacturer datasheet", reference_source_id="DS-R-001",
+        reference_verification_status="DATASHEET_VERIFIED",
+        operating_conditions="power off, component isolated",
+        reference_conditions="power off, component isolated",
         location_verified=True, uncertainty_source="meter accuracy specification",
     )
 
@@ -58,23 +60,44 @@ class SymptomDiagnosisPipelineTests(unittest.TestCase):
         result = diagnose(symptoms=["RELAY_NO_ACTUATION"])
         fault_ids = {row["fault_id"] for row in result["hypotheses"]}
         self.assertNotIn("BUZZER_POWER_FAILURE", fault_ids)
-        self.assertIn("RELAY_COIL_FAILURE", fault_ids)
+        self.assertNotIn("RELAY_COIL_FAILURE", fault_ids)
+        present = diagnose(symptoms=["RELAY_NO_ACTUATION"],
+                           components=[{"component_id": "K1", "component_type": "relay"}],
+                           confirmed_component_ids=["K1"])
+        self.assertIn("RELAY_COIL_FAILURE", {row["fault_id"] for row in present["hypotheses"]})
+
+    def test_buzzer_driver_requires_both_confirmed_buzzer_and_driver_candidate(self):
+        transistor_only = diagnose(
+            symptoms=["BUZZER_NO_SOUND"],
+            components=[{"component_id": "Q1", "component_type": "transistor"}],
+            confirmed_component_ids=["Q1"],
+        )
+        self.assertNotIn("BUZZER_DRIVER_FAILURE", {row["fault_id"] for row in transistor_only["hypotheses"]})
+        with_buzzer = diagnose(
+            symptoms=["BUZZER_NO_SOUND"],
+            components=[{"component_id": "BZ1", "component_type": "buzzer"},
+                        {"component_id": "Q1", "component_type": "transistor"}],
+            confirmed_component_ids=["BZ1", "Q1"],
+        )
+        self.assertIn("BUZZER_DRIVER_FAILURE", {row["fault_id"] for row in with_buzzer["hypotheses"]})
 
 
     def test_ambiguous_same_type_parts_are_withheld_until_component_evidence_exists(self):
-        parts = [{"component_id": f"C{i}", "component_type": "capacitor"} for i in range(1, 21)]
-        ambiguous = diagnose(symptoms=["SUPPLY_VOLTAGE_DROOP"], components=parts)
+        parts = [{"component_id": f"R{i}", "component_type": "resistor"} for i in range(1, 21)]
+        ids = [part["component_id"] for part in parts]
+        ambiguous = diagnose(symptoms=["PARTIAL_FUNCTION_FAILURE"], components=parts,
+                             confirmed_component_ids=ids)
         self.assertFalse(ambiguous["component_candidates"])
 
-        measured = _measurement("0.1", component_id="C3")
-        narrowed = diagnose(symptoms=["SUPPLY_VOLTAGE_DROOP"], components=parts,
-                            measurements=[measured.to_dict()])
-        self.assertEqual([(row["component_id"], row["status"]) for row in narrowed["component_candidates"]],
-                         [("C3", "TEST_ABNORMAL")])
-        normal = _measurement("50", component_id="C3")
-        normal_result = diagnose(symptoms=["SUPPLY_VOLTAGE_DROOP"], components=parts,
-                                 measurements=[normal.to_dict()])
-        self.assertEqual(normal_result["component_candidates"][0]["status"], "TEST_NORMAL")
+        measured = _measurement("0.1", component_id="R3")
+        narrowed = diagnose(symptoms=["PARTIAL_FUNCTION_FAILURE"], components=parts,
+                            confirmed_component_ids=ids, measurements=[measured.to_dict()])
+        self.assertEqual([(row["component_id"], row["measurement_verdict"])
+                          for row in narrowed["component_candidates"]], [("R3", "supports")])
+        normal = _measurement("50", component_id="R3")
+        normal_result = diagnose(symptoms=["PARTIAL_FUNCTION_FAILURE"], components=parts,
+                                 confirmed_component_ids=ids, measurements=[normal.to_dict()])
+        self.assertEqual(normal_result["component_candidates"][0]["measurement_verdict"], "refutes")
         self.assertLess(normal_result["component_candidates"][0]["score"],
                         narrowed["component_candidates"][0]["score"])
 
@@ -83,20 +106,29 @@ class SymptomDiagnosisPipelineTests(unittest.TestCase):
         normal = _measurement("50")
         abnormal = _measurement("0.1")
         edge = _measurement("9.5")
-        self.assertEqual(evaluate_component_measurements([normal.to_dict()])[('C3', 'CAPACITOR_SHORT')]["status"], "TEST_NORMAL")
-        self.assertEqual(evaluate_component_measurements([abnormal.to_dict()])[('C3', 'CAPACITOR_SHORT')]["status"], "TEST_ABNORMAL")
-        self.assertEqual(evaluate_component_measurements([edge.to_dict()])[('C3', 'CAPACITOR_SHORT')]["status"], "INCONCLUSIVE")
+        profiles = load_knowledge()["component_test_profiles"]
+        component_row = {"component_type": "resistor"}
+        normal_row = {**normal.to_dict(), **component_row}
+        abnormal_row = {**abnormal.to_dict(), **component_row}
+        edge_row = {**edge.to_dict(), **component_row}
+        key = ("R3", "RESISTOR_FAILURE", "isolated_resistance", "r3 terminals",
+               "power off, component isolated")
+        self.assertEqual(evaluate_component_measurements([normal_row], profiles=profiles)[key]["status"], "TEST_NORMAL")
+        self.assertEqual(evaluate_component_measurements([abnormal_row], profiles=profiles)[key]["status"], "TEST_ABNORMAL")
+        self.assertEqual(evaluate_component_measurements([edge_row], profiles=profiles)[key]["status"], "INCONCLUSIVE")
         no_uncertainty_source = create_measurement_record(
-            project_id="p", board_id="b", component_id="C3", component_identity_status="USER_CONFIRMED",
+            project_id="p", board_id="b", component_id="R3", component_map_version="m1", component_identity_status="USER_CONFIRMED",
             measurement_type="resistance", value="50", unit="Ω", uncertainty="1",
-            source="user_measurement", measurement_target="C3 terminals", fault_hypothesis="CAPACITOR_SHORT",
-            reference_min="10", reference_max="100", reference_source="spec",
-            operating_conditions="power off", reference_conditions="power off", location_verified=True,
+            source="user_measurement", measurement_target="R3 terminals", test_id="isolated_resistance",
+            fault_hypothesis="RESISTOR_FAILURE", reference_min="10", reference_max="100",
+            reference_source="spec", reference_source_id="DS-R-001",
+            reference_verification_status="DATASHEET_VERIFIED",
+            operating_conditions="power off, component isolated", reference_conditions="power off, component isolated",
+            location_verified=True,
         )
-        self.assertEqual(evaluate_component_measurements([no_uncertainty_source.to_dict()])[
-            ('C3', 'CAPACITOR_SHORT')]["status"], "INCONCLUSIVE")
-        conflict = evaluate_component_measurements([normal.to_dict(), abnormal.to_dict()])
-        self.assertEqual(conflict[('C3', 'CAPACITOR_SHORT')]["status"], "CONFLICTED")
+        self.assertEqual(evaluate_component_measurements([{**no_uncertainty_source.to_dict(), **component_row}], profiles=profiles)[key]["status"], "INCONCLUSIVE")
+        conflict = evaluate_component_measurements([normal_row, abnormal_row], profiles=profiles)
+        self.assertEqual(conflict[key]["status"], "CONFLICTED")
 
 
     def test_knowledge_validation_catches_duplicate_and_dangling_rules(self):
@@ -113,13 +145,16 @@ class SymptomDiagnosisPipelineTests(unittest.TestCase):
         result = {"diagnosis_id": "d1", "input_fingerprint": "f1", "component_candidates": [
             {"component_id": "C3", "visual_status": "TEST_ABNORMAL"},
         ]}
+        result["input_fingerprint"] = "f1"
         state = build_overlay_state(project_id="p", board_id="b", component_map_version="m1", result=result)
         self.assertEqual(set(current_overlay_candidates(state, project_id="p", board_id="b",
-                                                         component_map_version="m1")), {"C3"})
+                                                         component_map_version="m1", input_fingerprint="f1")), {"C3"})
         self.assertEqual(current_overlay_candidates(state, project_id="p", board_id="other",
-                                                    component_map_version="m1"), {})
+                                                    component_map_version="m1", input_fingerprint="f1"), {})
         self.assertEqual(current_overlay_candidates(state, project_id="p", board_id="b",
-                                                    component_map_version="m2"), {})
+                                                    component_map_version="m2", input_fingerprint="f1"), {})
+        self.assertEqual(current_overlay_candidates(state, project_id="p", board_id="b",
+                                                    component_map_version="m1", input_fingerprint="f2"), {})
 
 
 if __name__ == "__main__":

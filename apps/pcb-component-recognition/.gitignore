@@ -3,5 +3,14 @@ __pycache__/
 weights/*
 !weights/.gitignore
 !weights/README.md
+!weights/any_best.pt
+!weights/fine_best.pt
+!weights/external/
+weights/external/*
+!weights/external/nuts_best.pt
+!weights/external/nuts_best.onnx
+!weights/external/pcb-ai-doctor/
+!weights/external/pcb-yolov8s-detection/
+!weights/external/PCBInspect-AI/
 data/samples/*
 !data/samples/.gitkeep

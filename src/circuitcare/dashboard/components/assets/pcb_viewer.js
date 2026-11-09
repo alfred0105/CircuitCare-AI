@@ -80,8 +80,8 @@ export default function(component) {
     for (const item of data.components || []) {
       const [x1,y1,x2,y2] = item.bbox_xyxy;
       const statusClasses = {
-        SUSPECTED: "cc-fault-suspected", TEST_ABNORMAL: "cc-fault-abnormal",
-        TEST_NORMAL: "cc-fault-normal", INCONCLUSIVE: "cc-fault-undetermined",
+        SUSPECTED: "cc-fault-suspected", FAULT_SUPPORTED: "cc-fault-abnormal",
+        FAULT_REFUTED: "cc-fault-normal", INCONCLUSIVE: "cc-fault-undetermined",
         CONFLICTED: "cc-fault-undetermined",
       };
       const legacyClasses = {

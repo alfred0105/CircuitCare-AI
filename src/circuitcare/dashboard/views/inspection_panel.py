@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from dataclasses import replace
 from typing import Any
 
 from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel, display_identity_status
@@ -14,6 +15,9 @@ from circuitcare.dashboard.views.symptom_diagnosis_panel import render_symptom_d
 
 MAP_VERSION_KEY = "circuitcare_v4_selection_map_key"
 COMPONENT_EDIT_KEY = "circuitcare_v4_component_edits"
+COMPONENT_INVENTORY_KEY = "circuitcare_v4_component_inventory_by_map"
+ROLE_OPTIONS = ("power", "control", "control_input", "control_timing", "driver", "output",
+                "input", "input_output", "protection", "thermal", "buzzer", "relay")
 COMPONENT_TYPE_OPTIONS = (
     "unknown", "resistor", "inductor", "capacitor", "connector", "jumper", "IC",
     "switch", "relay", "transistor", "potentiometer", "battery", "buzzer", "diode",
@@ -37,7 +41,11 @@ def render_inspection_panel(
     selected_component: ComponentOverlayViewModel | None = None,
     detection_status: str = "UNKNOWN",
     selected_marking_context: dict[str, Any] | None = None,
+    component_map_version: str | None = None,
 ) -> None:
+    owner = f"{project.project_id}|{project.board_id or ''}|{component_map_version or ''}"
+    inventories = st.session_state.setdefault(COMPONENT_INVENTORY_KEY, {})
+    inventory = inventories.setdefault(owner, {})
     with st.container(border=True):
         st.markdown('<span class="cc-inspection-marker"></span>', unsafe_allow_html=True)
         st.markdown("### 전체 진단")
@@ -52,7 +60,8 @@ def render_inspection_panel(
         if project.symptom_description:
             st.caption(project.symptom_description)
         st.divider()
-        render_symptom_diagnosis_panel(st, project, components=components, preview=preview)
+        render_symptom_diagnosis_panel(st, project, components=components, preview=preview,
+                                       component_inventory=inventory)
         st.divider()
         if preview:
             st.markdown("**부품** · 인식 결과 없음")
@@ -74,6 +83,40 @@ def render_inspection_panel(
             current_marking = edit.get("ocr_marking", selected_component.ocr_marking or "")
             current_value = edit.get("component_info", selected_component.component_info or "")
             st.caption(f"부품 ID · {selected_component.component_id}")
+            inventory_item = inventory.setdefault(selected_component.component_id, {
+                "presence_status": "UNCONFIRMED", "confirmed_functional_roles": [],
+            })
+            presence_options = ("UNCONFIRMED", "CONFIRMED", "EXCLUDED")
+            presence_labels = {"UNCONFIRMED": "미확인", "CONFIRMED": "실제 부품 확인", "EXCLUDED": "오검출 · 제외"}
+            presence_key = f"cc_component_presence_{hash(owner)}_{selected_component.component_id}"
+            current_presence = inventory_item.get("presence_status", "UNCONFIRMED")
+            if st.session_state.get(presence_key) not in presence_options:
+                st.session_state[presence_key] = current_presence
+            presence_status = st.radio(
+                "PCB에서 선택 부품 상태", presence_options,
+                format_func=presence_labels.get, horizontal=True, key=presence_key,
+            )
+            inventory_item["presence_status"] = presence_status
+            st.caption("확인한 소자만 진단 후보로 사용합니다. 오검출은 제외하고, 아직 판단이 안 되면 미확인으로 두세요.")
+            role_key = f"cc_component_roles_{hash(owner)}_{selected_component.component_id}"
+            current_roles = inventory_item.get("confirmed_functional_roles", [])
+            if role_key not in st.session_state:
+                st.session_state[role_key] = [role for role in current_roles if role in ROLE_OPTIONS]
+            confirmed_roles = st.multiselect(
+                "이 부품에서 확인된 기능 역할", ROLE_OPTIONS, key=role_key,
+                help="직접 확인한 역할만 선택합니다. 선택하지 않은 배치/OCR 추정은 미확정 후보로 유지됩니다.",
+            )
+            inventory_item["confirmed_functional_roles"] = list(confirmed_roles)
+            inventories[owner] = inventory
+            st.session_state[COMPONENT_INVENTORY_KEY] = inventories
+            selected_component = replace(
+                selected_component,
+                component_type=current_type,
+                identification_status=("USER_CONFIRMED" if presence_status == "CONFIRMED"
+                                       else selected_component.identification_status),
+                presence_status=presence_status,
+                confirmed_functional_roles=tuple(confirmed_roles),
+            )
             if selected_component.fault_hypothesis:
                 st.caption(f"진단 후보 · {selected_component.diagnosis_display_status or '미확정'} · "
                            f"가설 {selected_component.fault_hypothesis}")

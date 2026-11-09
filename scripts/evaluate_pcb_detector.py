@@ -7,13 +7,17 @@ import argparse
 import hashlib
 import json
 import platform
-import resource
 import statistics
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
+
+try:
+    import resource
+except ImportError:  # Windows does not provide the POSIX resource module.
+    resource = None
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -208,8 +212,10 @@ def _run(records: list[dict[str, Any]], dataset: dict[str, Any], args: argparse.
         confidence_threshold=args.confidence, confidence_thresholds=[args.confidence]) for record in records}
     metrics = evaluate_detections(ground_truth, predictions, class_names=list(PCB_MODEL_CLASSES),
         confidence_threshold=args.confidence, confidence_thresholds=thresholds)
-    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    peak_rss_bytes = int(peak_rss if sys.platform == "darwin" else peak_rss * 1024)
+    peak_rss_bytes = None
+    if resource is not None:
+        peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        peak_rss_bytes = int(peak_rss if sys.platform == "darwin" else peak_rss * 1024)
     manifest_validation = dataset.get("manifest_validation")
     if not manifest_validation:
         evaluation_status = "PROVENANCE_INCOMPLETE"

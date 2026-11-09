@@ -13,7 +13,9 @@ import yaml
 from circuitcare.symptom_diagnosis.schemas import EvidenceStatus, Observation
 from circuitcare.symptom_diagnosis.functional_blocks import analyze_functional_blocks
 from circuitcare.symptom_diagnosis.component_fault_ranker import rank_component_candidates, rank_joint_candidates
-from circuitcare.symptom_diagnosis.fault_hypothesis_validator import validate_component_hypothesis
+from circuitcare.symptom_diagnosis.fault_hypothesis_validator import (
+    summarize_measurement_verdict, validate_component_hypothesis,
+)
 from circuitcare.symptom_diagnosis.measurement_evaluator import evaluate_component_measurements
 
 KNOWLEDGE_DIR = Path(__file__).with_name("knowledge")
@@ -80,12 +82,22 @@ def validate_knowledge_base(knowledge: dict[str, Any]) -> None:
                 errors.append(f"{rule_id}: unknown fault ID {fault_id!r}")
     for fault_id, mode in fault_modes.items():
         if mode.get("level") in {"component", "functional_block"}:
-            declared_types = {_normalized_type(value) for value in mode.get("component_types", [])}
+            declared_types = {_normalized_type(value) for value in mode.get("candidate_component_types", [])}
             if not declared_types:
-                errors.append(f"{fault_id}: component-scoped modes require component_types")
+                errors.append(f"{fault_id}: component-scoped modes require candidate_component_types")
             unknown_types = declared_types - set(component_types)
             if unknown_types:
                 errors.append(f"{fault_id}: unknown component types {sorted(unknown_types)}")
+        required_types = {_normalized_type(value) for value in mode.get("required_component_types", [])}
+        unknown_required_types = required_types - set(component_types)
+        if unknown_required_types:
+            errors.append(f"{fault_id}: unknown required component types {sorted(unknown_required_types)}")
+        for symptom_code, raw_types in mode.get("required_component_types_by_symptom", {}).items():
+            if symptom_code not in symptoms:
+                errors.append(f"{fault_id}: unknown symptom requirement {symptom_code!r}")
+            unknown_types = {_normalized_type(value) for value in raw_types} - set(component_types)
+            if unknown_types:
+                errors.append(f"{fault_id}: unknown symptom-required component types {sorted(unknown_types)}")
         unknown_symptoms = set(mode.get("supported_symptoms", {})) - set(symptoms)
         if unknown_symptoms:
             errors.append(f"{fault_id}: unknown symptom codes {sorted(unknown_symptoms)}")
@@ -106,6 +118,24 @@ def validate_knowledge_base(knowledge: dict[str, Any]) -> None:
     profiles = knowledge.get("component_test_profiles", {}).get("profiles", {})
     if not isinstance(profiles, dict):
         errors.append("component_test_profiles.profiles must be an object")
+    else:
+        all_test_ids: set[str] = set()
+        for component_type, profile in profiles.items():
+            tests_for_type = profile.get("tests", {}) if isinstance(profile, dict) else {}
+            for test_id, test in tests_for_type.items():
+                all_test_ids.add(str(test_id))
+                for fault_id, relations in test.get("fault_relations", {}).items():
+                    if fault_id not in fault_modes:
+                        errors.append(f"{component_type}.{test_id}: unknown fault ID {fault_id!r}")
+                    if not isinstance(relations, dict) or any(
+                        value not in {"supports", "refutes", "non_diagnostic"}
+                        for value in relations.values()
+                    ):
+                        errors.append(f"{component_type}.{test_id}: invalid fault relation")
+        for fault_id, mode in fault_modes.items():
+            missing_profiles = set(mode.get("required_measurement_tests", [])) - all_test_ids
+            if missing_profiles:
+                errors.append(f"{fault_id}: missing measurement profiles {sorted(missing_profiles)}")
     if errors:
         raise ValueError("Invalid symptom diagnosis knowledge base: " + "; ".join(errors))
 
@@ -274,6 +304,7 @@ def diagnose(
     confirmed_component_ids: list[str] | set[str] | tuple[str, ...] | None = None,
     inventory_complete: bool = False,
     measurements: list[dict[str, Any]] | None = None,
+    current_context: dict[str, Any] | None = None,
     silkscreen_labels: list[dict[str, Any]] | None = None,
     connectivity: dict[str, Any] | None = None, connectivity_status: str = "none",
     knowledge: dict[str, Any] | None = None,
@@ -336,11 +367,17 @@ def diagnose(
                      if _condition_matches(rule.get("when", {}), facts)]
     generated: set[str] = {fault_id for rule in matched_rules for fault_id in rule.get("generate", [])}
     modes = kb["fault_modes"]["fault_modes"]
+    confirmed_part_by_id = {str(part.get("component_id")): part for part in normalized_parts}
+    contextual_measurements = [
+        {**row, "component_type": confirmed_part_by_id[str(row.get("component_id"))]["component_type"]}
+        for row in (measurements or []) if isinstance(row, dict)
+        and str(row.get("component_id") or "") in confirmed_part_by_id
+    ]
     scoped_measurements = evaluate_component_measurements(
-        [row for row in (measurements or []) if isinstance(row, dict)
-         and str(row.get("component_id") or "") in confirmed_ids]
+        contextual_measurements,
+        profiles=kb.get("component_test_profiles", {}), current_context=current_context,
     )
-    generated.update(fault_id for (_component_id, fault_id), assessment in scoped_measurements.items()
+    generated.update(fault_id for (_component_id, fault_id, _test, _target, _condition), assessment in scoped_measurements.items()
                      if assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"}
                      and fault_id in modes)
     # Rule conditions may be deliberately narrow, but every asserted symptom must
@@ -349,6 +386,20 @@ def diagnose(
         fault_id for fault_id, mode in modes.items()
         if any(float(mode.get("supported_symptoms", {}).get(code, 0)) > 0 for code in selected)
     )
+    def has_required_inventory(fault_id: str) -> bool:
+        mode = modes.get(fault_id, {})
+        required = {_normalized_type(value) for value in mode.get("required_component_types", [])}
+        symptom_requirements = mode.get("required_component_types_by_symptom", {})
+        for symptom in selected:
+            required.update(_normalized_type(value) for value in symptom_requirements.get(symptom, []))
+        if not required.issubset(detected_types):
+            return False
+        candidate_types = {_normalized_type(value) for value in mode.get("candidate_component_types", [])}
+        if mode.get("level") == "board" and candidate_types and not (candidate_types & detected_types):
+            return False
+        return True
+
+    generated = {fault_id for fault_id in generated if has_required_inventory(fault_id)}
     # Component and functional-block failure modes are not valid unless at
     # least one reviewed instance has a compatible type and any required role
     # is explicitly confirmed or directly supported by component-scoped facts.
@@ -362,9 +413,13 @@ def diagnose(
             assessment = scoped_measurements.get((component_id, fault_id), {})
             validation = validate_component_hypothesis(
                 mode=mode, component=part, confirmed_component_ids=confirmed_ids,
+                confirmed_component_types=detected_types,
                 component_block=blocks_by_component.get(component_id),
                 component_observations=observations if isinstance(observations, list) else [],
-                has_validated_measurement=assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"},
+                measurement_verdict=summarize_measurement_verdict(
+                    mode=mode, component_id=component_id, fault_id=fault_id,
+                    assessments=scoped_measurements,
+                ),
             )
             if validation["eligible"]:
                 component_scoped_faults.add(fault_id)
@@ -466,9 +521,13 @@ def diagnose(
             assessment = scoped_measurements.get((component_id, fault_id), {})
             validation = validate_component_hypothesis(
                 mode=mode, component=part, confirmed_component_ids=confirmed_ids,
+                confirmed_component_types=detected_types,
                 component_block=blocks_by_component.get(component_id),
                 component_observations=observations if isinstance(observations, list) else [],
-                has_validated_measurement=assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"},
+                measurement_verdict=summarize_measurement_verdict(
+                    mode=mode, component_id=component_id, fault_id=fault_id,
+                    assessments=scoped_measurements,
+                ),
             )
             if validation["eligible"]:
                 applicable_parts.append(part)
@@ -486,9 +545,9 @@ def diagnose(
     component_candidates = rank_component_candidates(
         hypotheses=ranked, components=normalized_parts, functional_blocks=functional_blocks,
         observations=(observations if isinstance(observations, list) else []),
-        measurements=[row for row in (measurements or []) if isinstance(row, dict)
-                      and str(row.get("component_id") or "") in confirmed_ids],
-        confirmed_component_ids=confirmed_ids, knowledge=kb, limit=3,
+        measurements=contextual_measurements,
+        confirmed_component_ids=confirmed_ids, profiles=kb.get("component_test_profiles", {}),
+        current_context=current_context, knowledge=kb, limit=3,
     )
     joint_candidates = rank_joint_candidates(
         hypotheses=ranked, component_candidates=component_candidates, observations=facts,
@@ -530,6 +589,7 @@ def diagnose(
                 symptoms=selected, observations=simulated_observations,
                 components=normalized_parts, confirmed_component_ids=confirmed_ids,
                 inventory_complete=inventory_complete, measurements=measurements,
+                current_context=current_context,
                 silkscreen_labels=silkscreen_labels, connectivity=connectivity,
                 connectivity_status=connectivity_status, knowledge=kb,
                 _simulate_questions=False,
@@ -550,6 +610,11 @@ def diagnose(
     recommended.sort(key=lambda row: (-row["utility"], row["risk_level"] != "none", row["name"]))
 
     status = "CANDIDATES_AVAILABLE" if ranked and selected else "ABSTAIN_INSUFFICIENT_EVIDENCE"
+    hypothesis_groups = {
+        "component": [row for row in ranked if row.get("level") in {"component", "functional_block"}],
+        "board": [row for row in ranked if row.get("level") == "board"],
+        "system": [row for row in ranked if row.get("level") == "system"],
+    }
     connectivity_status = connectivity_status if connectivity_status in {
         "none", "inferred", "partial_verified", "verified"} else "none"
     # Verified connectivity is accepted only when supplied as scoped evidence;
@@ -559,21 +624,34 @@ def diagnose(
     measurement_evidence = [{
         "measurement_id": row.get("measurement_id"),
         "component_id": row.get("component_id"),
+        "test_id": row.get("test_id"),
         "measurement_type": row.get("measurement_type"),
         "value": row.get("value"), "unit": row.get("unit"),
         "source": row.get("source"),
         "verification_status": row.get("verification_status"),
         "fault_hypothesis": row.get("fault_hypothesis"),
         "assessment": (measurement_assessments.get((str(row.get("component_id") or ""),
-                                                    str(row.get("fault_hypothesis") or "")), {})
+                                                    str(row.get("fault_hypothesis") or ""),
+                                                    str(row.get("test_id") or ""),
+                                                    " ".join(str(row.get("measurement_target") or "").casefold().split()),
+                                                    " ".join(str(row.get("operating_conditions") or "").casefold().split())), {})
                        .get("status", "INCONCLUSIVE")),
+        "verdict": (measurement_assessments.get((str(row.get("component_id") or ""),
+                                                 str(row.get("fault_hypothesis") or ""),
+                                                 str(row.get("test_id") or ""),
+                                                 " ".join(str(row.get("measurement_target") or "").casefold().split()),
+                                                 " ".join(str(row.get("operating_conditions") or "").casefold().split())), {})
+                    .get("verdict", "non_diagnostic")),
         "used_for_ranking": any(candidate.get("component_id") == row.get("component_id")
                                  and candidate.get("fault_hypothesis") == row.get("fault_hypothesis")
-                                 and candidate.get("measurement_status") in {"TEST_NORMAL", "TEST_ABNORMAL"}
+                                 and candidate.get("measurement_verdict") in {"supports", "refutes"}
                                  for candidate in component_candidates),
         "reason": measurement_assessments.get((str(row.get("component_id") or ""),
-                                                 str(row.get("fault_hypothesis") or "")), {}).get(
-                                                     "reason", "판정에 필요한 범위·조건·측정 위치 근거가 부족합니다."),
+                                                 str(row.get("fault_hypothesis") or ""),
+                                                 str(row.get("test_id") or ""),
+                                                 " ".join(str(row.get("measurement_target") or "").casefold().split()),
+                                                 " ".join(str(row.get("operating_conditions") or "").casefold().split())), {}).get(
+                                                     "reason", "검사 프로파일·기준 출처·조건이 검증되지 않아 판정에 사용하지 않았습니다."),
     } for row in measurements or [] if isinstance(row, dict)
         and str(row.get("component_id") or "") in confirmed_ids]
     return {"status": status, "symptom_codes": selected, "observations": facts,
@@ -587,6 +665,7 @@ def diagnose(
             "matched_rules": [{"id": rule["id"], "name": rule["name"]}
                               for rule in sorted(matched_rules, key=lambda item: -item.get("priority", 0))],
             "hypotheses": ranked, "functional_blocks": functional_blocks,
+            "hypothesis_groups": hypothesis_groups,
             "component_candidates": component_candidates, "joint_candidates": joint_candidates,
             "measurement_evidence": measurement_evidence,
             "next_tests": recommended[:5], "connectivity_status": connectivity_status,

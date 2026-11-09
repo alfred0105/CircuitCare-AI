@@ -29,6 +29,9 @@ def _default_weights_root() -> Path:
     configured = os.environ.get("CIRCUITCARE_PCB_WEIGHTS")
     if configured:
         return Path(configured).expanduser().resolve()
+    bundled_weights = ROOT / "weights"
+    if (bundled_weights / "any_best.pt").is_file() and (bundled_weights / "fine_best.pt").is_file():
+        return bundled_weights
     local_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share"))
     user_weights = local_data / "circuitcare-ai" / "models" / "pcb_component_pipeline"
     return user_weights if user_weights.is_dir() else ROOT / "weights"

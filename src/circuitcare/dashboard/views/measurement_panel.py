@@ -67,8 +67,12 @@ def render_measurement_panel(
         key=type_key,
     )
     units = tuple(MEASUREMENT_UNITS[measurement_type])
-    fault_modes = load_knowledge().get("fault_modes", {}).get("fault_modes", {})
-    fault_options = [""] + list(fault_modes)
+    knowledge = load_knowledge()
+    fault_modes = knowledge.get("fault_modes", {}).get("fault_modes", {})
+    normalized_type = selected_component.component_type.casefold()
+    type_profile = knowledge.get("component_test_profiles", {}).get("profiles", {}).get(normalized_type, {})
+    test_profiles = type_profile.get("tests", {})
+    test_options = [""] + list(test_profiles)
     unit_key = f"cc_v5_unit_{owner}"
     if st.session_state.get(unit_key) not in units:
         st.session_state[unit_key] = units[0]
@@ -81,6 +85,13 @@ def render_measurement_panel(
         )
         uncertainty_source = st.text_input("측정 불확실도 출처", placeholder="예: 멀티미터 모델·정확도 사양")
         target = st.text_input("측정 대상/단자", placeholder="예: BZ1 양단 전압, U1 VCC-GND")
+        test_id = st.selectbox(
+            "부품별 검사 항목", test_options,
+            format_func=lambda value: "프로파일 검사 선택 안 함" if not value else value,
+            help="등록된 검사항목만 고장 가설 판정에 사용할 수 있습니다. 그 외 측정은 기록으로만 보관합니다.",
+        )
+        relations = test_profiles.get(test_id, {}).get("fault_relations", {})
+        fault_options = [""] + [fault_id for fault_id in fault_modes if fault_id in relations]
         fault_hypothesis = st.selectbox(
             "검사할 고장 가설", fault_options,
             format_func=lambda code: "선택 안 함" if not code else fault_modes[code]["title"],
@@ -91,6 +102,13 @@ def render_measurement_panel(
         with range_col_b:
             reference_max = st.text_input(f"정상 범위 상한 ({unit})")
         reference_source = st.text_input("정상 범위 출처", placeholder="예: 제조사 데이터시트, 보드 사양")
+        reference_source_id = st.text_input("기준 출처 ID", placeholder="예: 데이터시트 문서번호·보드 사양 항목")
+        reference_status = st.selectbox("기준 출처 검증", ("UNVERIFIED", "DATASHEET_VERIFIED", "BOARD_SPEC_VERIFIED"),
+                                        format_func=lambda value: {
+                                            "UNVERIFIED": "미검증 · 판정에 사용 안 함",
+                                            "DATASHEET_VERIFIED": "데이터시트 직접 확인",
+                                            "BOARD_SPEC_VERIFIED": "보드 사양 직접 확인",
+                                        }[value])
         operating_conditions = st.text_input("실제 측정 조건", placeholder="예: 전원 5 V, 무부하")
         reference_conditions = st.text_input("기준 조건", placeholder="실제 측정 조건과 같아야 판정에 사용")
         location_verified = st.checkbox("측정 지점이 선택한 부품의 지정 단자임을 확인함")
@@ -107,8 +125,11 @@ def render_measurement_panel(
                 source=SOURCE_CODES[source_label],
                 component_map_version=component_map_version,
                 measurement_target=target, fault_hypothesis=fault_hypothesis or None,
+                test_id=test_id or None,
                 reference_min=reference_min, reference_max=reference_max,
                 reference_source=reference_source,
+                reference_source_id=reference_source_id,
+                reference_verification_status=reference_status,
                 operating_conditions=operating_conditions,
                 reference_conditions=reference_conditions,
                 location_verified=location_verified,
@@ -204,11 +225,14 @@ def _render_record_editor(st: Any, *, project: ProjectContext, record: Measureme
                     measurement_id=record.measurement_id, timestamp=record.timestamp,
                     measurement_target=record.measurement_target,
                     fault_hypothesis=record.fault_hypothesis,
+                    test_id=record.test_id,
                     reference_min=(record.reference_min / MEASUREMENT_UNITS[edit_type][unit]
                                    if edit_type == record.measurement_type and record.reference_min is not None else None),
                     reference_max=(record.reference_max / MEASUREMENT_UNITS[edit_type][unit]
                                    if edit_type == record.measurement_type and record.reference_max is not None else None),
                     reference_source=record.reference_source,
+                    reference_source_id=record.reference_source_id,
+                    reference_verification_status=record.reference_verification_status,
                     operating_conditions=record.operating_conditions,
                     reference_conditions=record.reference_conditions,
                     location_verified=record.location_verified,

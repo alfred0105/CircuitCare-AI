@@ -3,3 +3,11 @@
 *.onnx
 *.engine
 *.plan
+!any_best.pt
+!fine_best.pt
+!external/nuts_best.pt
+!external/nuts_best.onnx
+!external/pcb-ai-doctor/best_v8n.pt
+!external/pcb-ai-doctor/best_v12n.pt
+!external/pcb-yolov8s-detection/best.pt
+!external/PCBInspect-AI/YoloV12-Medium-160-FineTuned.pt

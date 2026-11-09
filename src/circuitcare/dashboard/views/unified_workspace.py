@@ -471,12 +471,13 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         candidate_state_by_project.get(project.project_id) if isinstance(candidate_state_by_project, dict) else {},
         project_id=project.project_id, board_id=project.board_id,
         component_map_version=st.session_state.get("circuitcare_v4_selection_map_key"),
+        input_fingerprint=st.session_state.get(f"cc_symptom_diagnosis_{project.project_id}", {}).get("input_fingerprint"),
     )
     if isinstance(candidate_state, dict) and candidate_state:
         status_map = {
             "SUSPECTED": ("SUSPECTED_FAULT", "의심 후보 · 미확정"),
-            "TEST_ABNORMAL": ("TEST_ABNORMAL", "측정 이상 · 이 가설 고장 의심"),
-            "TEST_NORMAL": ("TEST_NORMAL", "해당 검사 정상 · 다른 기능은 미판정"),
+            "FAULT_SUPPORTED": ("FAULT_SUPPORTED", "검증 검사 결과 · 해당 고장 가설 지지"),
+            "FAULT_REFUTED": ("FAULT_REFUTED", "검증 검사 결과 · 해당 고장 가설 반박"),
             "INCONCLUSIVE": ("INCONCLUSIVE", "측정 판정 불가"),
             "CONFLICTED": ("CONFLICTED", "측정 결과 충돌 · 판단 보류"),
         }
@@ -627,6 +628,7 @@ def render_workbench_shell(st: Any, project: ProjectContext) -> None:
                 selected_component=selected_component,
                 detection_status=st.session_state.get("circuitcare_v4_detection_status", "UNKNOWN"),
                 selected_marking_context=st.session_state.get("circuitcare_v4_selected_marking_context"),
+                component_map_version=st.session_state.get("circuitcare_v4_selection_map_key"),
             )
 
 

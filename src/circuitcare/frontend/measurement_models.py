@@ -39,6 +39,7 @@ class MeasurementRecord:
     node_id: str | None
     mapping_status: str
     measurement_type: str
+    test_id: str | None
     value: float
     unit: str
     entered_value: float
@@ -55,6 +56,8 @@ class MeasurementRecord:
     reference_min: float | None = None
     reference_max: float | None = None
     reference_source: str | None = None
+    reference_source_id: str | None = None
+    reference_verification_status: str = "UNVERIFIED"
     operating_conditions: str | None = None
     reference_conditions: str | None = None
     location_verified: bool = False
@@ -84,7 +87,10 @@ def create_measurement_record(
     analysis_context_id: str | None = None, measurement_id: str | None = None,
     timestamp: str | None = None,
     measurement_target: str | None = None, fault_hypothesis: str | None = None,
+    test_id: str | None = None,
     reference_min: Any = None, reference_max: Any = None, reference_source: str | None = None,
+    reference_source_id: str | None = None,
+    reference_verification_status: str = "UNVERIFIED",
     operating_conditions: str | None = None, reference_conditions: str | None = None,
     location_verified: bool = False, uncertainty_source: str | None = None,
 ) -> MeasurementRecord:
@@ -96,6 +102,8 @@ def create_measurement_record(
         raise ValueError("측정 종류와 단위가 일치하지 않습니다.")
     if source not in SOURCE_LABELS:
         raise ValueError("측정 출처를 확인해 주세요.")
+    if reference_verification_status not in {"UNVERIFIED", "DATASHEET_VERIFIED", "BOARD_SPEC_VERIFIED"}:
+        raise ValueError("정상 기준 출처 검증 상태를 확인해 주세요.")
     entered = parse_finite_number(value)
     multiplier = MEASUREMENT_UNITS[measurement_type][unit]
     converted = entered * multiplier
@@ -131,6 +139,7 @@ def create_measurement_record(
         component_identity_status=component_identity_status or "UNKNOWN",
         probe_id=None, node_id=None, mapping_status="NODE_MAPPING_UNAVAILABLE",
         measurement_type=measurement_type, value=converted, unit=BASE_UNITS[measurement_type],
+        test_id=(test_id or "").strip() or None,
         entered_value=entered, entered_unit=unit, uncertainty=sigma,
         source=source, verification_status=verification,
         timestamp=timestamp or datetime.now(timezone.utc).isoformat(),
@@ -139,6 +148,8 @@ def create_measurement_record(
         fault_hypothesis=(fault_hypothesis or "").strip() or None,
         reference_min=parsed_min, reference_max=parsed_max,
         reference_source=(reference_source or "").strip() or None,
+        reference_source_id=(reference_source_id or "").strip() or None,
+        reference_verification_status=str(reference_verification_status or "UNVERIFIED"),
         operating_conditions=(operating_conditions or "").strip() or None,
         reference_conditions=(reference_conditions or "").strip() or None,
         location_verified=bool(location_verified),

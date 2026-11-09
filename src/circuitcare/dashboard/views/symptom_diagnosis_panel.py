@@ -34,6 +34,7 @@ def _diagnosis_fingerprint(
     measurements: list[Any], silkscreen_labels: list[dict[str, Any]], state: Any,
     confirmed_component_ids: list[str] | None = None,
     inventory_complete: bool = False,
+    component_inventory: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     component_rows = [{
         "id": getattr(row, "component_id", None),
@@ -48,6 +49,7 @@ def _diagnosis_fingerprint(
         "filename": getattr(row, "filename", None),
         "dimensions": getattr(row, "image_dimensions", None),
         "side": getattr(row, "side", None),
+        "content_sha256": getattr(row, "content_sha256", None),
     } for row in project.image_records]
     payload = {
         "project_id": project.project_id, "board_id": project.board_id,
@@ -58,6 +60,7 @@ def _diagnosis_fingerprint(
         "components": component_rows, "photos": photo_rows,
         "confirmed_component_ids": sorted(confirmed_component_ids or []),
         "component_inventory_complete": bool(inventory_complete),
+        "component_inventory": component_inventory or {},
         "active_photo_id": state.get(ACTIVE_PHOTO_KEY),
         "silkscreen_labels": silkscreen_labels,
         "component_map_version": state.get("circuitcare_v4_selection_map_key"),
@@ -73,23 +76,41 @@ def _measurement_fingerprint(project: ProjectContext, measurements: list[Any]) -
 
 def _sync_component_candidates(st: Any, project: ProjectContext, result: dict[str, Any]) -> None:
     projects = dict(st.session_state.get("circuitcare_v4_diagnosis_candidates_by_project", {}))
-    candidates = result.get("component_candidates", [])[:3]
-    if candidates:
-        diagnosis_state = st.session_state.get(_project_key(project), {})
-        projects[project.project_id] = build_overlay_state(
-            project_id=project.project_id, board_id=project.board_id,
-            component_map_version=st.session_state.get("circuitcare_v4_selection_map_key"),
-            result={**result, "input_fingerprint": diagnosis_state.get("input_fingerprint")},
-        )
-    else:
-        projects.pop(project.project_id, None)
+    diagnosis_state = st.session_state.get(_project_key(project), {})
+    projects[project.project_id] = build_overlay_state(
+        project_id=project.project_id, board_id=project.board_id,
+        component_map_version=st.session_state.get("circuitcare_v4_selection_map_key"),
+        result={**result, "input_fingerprint": diagnosis_state.get("input_fingerprint")},
+        previous=projects.get(project.project_id),
+    )
     st.session_state["circuitcare_v4_diagnosis_candidates_by_project"] = projects
 
 
-def _component_rows(components: tuple[Any, ...]) -> list[dict[str, Any]]:
+def _component_rows(components: tuple[Any, ...],
+                    component_inventory: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    inventory = component_inventory or {}
     return [{"component_id": item.component_id, "component_type": item.component_type,
              "bbox_xyxy": list(item.bbox_xyxy), "ocr_marking": item.ocr_marking,
-             "component_info": getattr(item, "component_info", None)} for item in components]
+             "component_info": getattr(item, "component_info", None),
+             "presence_status": inventory.get(item.component_id, {}).get("presence_status", "UNCONFIRMED"),
+             "confirmed_functional_roles": inventory.get(item.component_id, {}).get("confirmed_functional_roles", []),
+             "role_status": "CONFIRMED" if inventory.get(item.component_id, {}).get("confirmed_functional_roles") else "UNKNOWN",
+             "role_evidence": ("사용자가 선택한 기능 역할",) if inventory.get(item.component_id, {}).get("confirmed_functional_roles") else ()}
+            for item in components]
+
+
+def _current_analysis_context(project: ProjectContext, state: Any,
+                              component_inventory: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "project_id": project.project_id,
+        "board_id": project.board_id or "",
+        "component_map_version": state.get("circuitcare_v4_selection_map_key"),
+        "component_identity_statuses": {
+            component_id: "USER_CONFIRMED"
+            for component_id, row in component_inventory.items()
+            if isinstance(row, dict) and row.get("presence_status") == "CONFIRMED"
+        },
+    }
 
 
 def _combined_observations(state: dict[str, Any], answers: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -122,6 +143,7 @@ def _persist_diagnosis(project: ProjectContext, state: dict[str, Any], result: d
 
 def render_symptom_diagnosis_panel(
     st: Any, project: ProjectContext, *, components: tuple[Any, ...] = (), preview: bool = False,
+    component_inventory: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     """Collect symptoms, run local rules, and render candidates and safe next questions."""
     kb = load_knowledge()
@@ -146,30 +168,13 @@ def render_symptom_diagnosis_panel(
         "확인된 증상", list(code_to_label.values()), key=symptom_widget_key,
     )
     selected_codes = [code for code, label in code_to_label.items() if label in selected_labels]
-    component_by_id = {str(item.component_id): item for item in components if getattr(item, "component_id", None)}
-    available_component_ids = list(component_by_id)
-    inventory_key = f"{key}_confirmed_component_ids"
-    previous_inventory = st.session_state.get(inventory_key, state.get("confirmed_component_ids", []))
-    if not isinstance(previous_inventory, list):
-        previous_inventory = []
-    previous_inventory = [value for value in previous_inventory if value in available_component_ids]
-    st.markdown("**PCB에서 실제 존재를 확인한 소자**")
-    if available_component_ids:
-        confirmed_component_ids = st.multiselect(
-            "진단에 포함할 소자 ID",
-            options=available_component_ids,
-            default=previous_inventory,
-            format_func=lambda component_id: (
-                f"{component_id} · {getattr(component_by_id[component_id], 'component_type', 'unknown')}"
-            ),
-            key=inventory_key,
-            help="자동 검출만으로는 존재가 확정되지 않습니다. PCB 사진에서 실제 부품을 확인한 ID만 선택하세요.",
-        )
-        st.caption("선택한 부품만 내부 고장 후보·측정 판정 대상이 됩니다. 미검출·미선택 부품은 존재 여부 미확인으로 둡니다.")
-    else:
-        confirmed_component_ids = []
-        st.info("확인할 검출 소자가 없습니다. PCB 사진에서 박스를 보정하거나 추가한 뒤 다시 진단하세요.")
-    confirmed_component_ids = sorted({str(value) for value in confirmed_component_ids})
+    component_inventory = component_inventory or {}
+    component_rows = _component_rows(components, component_inventory)
+    confirmed_component_ids = sorted(
+        row["component_id"] for row in component_rows if row.get("presence_status") == "CONFIRMED"
+    )
+    st.markdown("**PCB에서 확인한 소자 목록**")
+    st.caption(f"박스를 클릭해 오른쪽 **선택 부품**에서 확인/제외 상태를 바꾸세요 · 확인 {len(confirmed_component_ids)}개 / 검출 {len(component_rows)}개")
     inventory_complete = st.checkbox(
         "PCB의 전체 부품 목록을 확인 완료했습니다",
         value=bool(state.get("inventory_complete", False)),
@@ -207,6 +212,7 @@ def render_symptom_diagnosis_panel(
         project, components, selected_codes, symptom_text, observations,
         state.get("answers", {}), measurements, silkscreen_labels, st.session_state,
         confirmed_component_ids, inventory_complete,
+        component_inventory,
     )
     measurement_fingerprint = _measurement_fingerprint(project, measurements)
     if state.get("input_fingerprint") != fingerprint:
@@ -215,9 +221,6 @@ def render_symptom_diagnosis_panel(
         state["input_fingerprint"] = fingerprint
         state["measurement_fingerprint"] = measurement_fingerprint
         state["diagnosis_id"] = str(uuid4())
-        candidates_by_project = dict(st.session_state.get("circuitcare_v4_diagnosis_candidates_by_project", {}))
-        candidates_by_project.pop(project.project_id, None)
-        st.session_state["circuitcare_v4_diagnosis_candidates_by_project"] = candidates_by_project
         st.session_state[key] = state
         st.rerun()
     llm_enabled = False
@@ -249,10 +252,11 @@ def render_symptom_diagnosis_panel(
         combined_observations = _combined_observations(state)
         result = diagnose(
             symptoms=state.get("symptoms", selected_codes), symptom_text="",
-            observations=combined_observations, components=_component_rows(components),
+            observations=combined_observations, components=_component_rows(components, component_inventory),
             confirmed_component_ids=state.get("confirmed_component_ids", confirmed_component_ids),
             inventory_complete=bool(state.get("inventory_complete", inventory_complete)),
             measurements=[row.to_dict() for row in measurements],
+            current_context=_current_analysis_context(project, st.session_state, component_inventory),
             silkscreen_labels=silkscreen_labels, connectivity_status="none",
         )
         result["llm_parser"] = state.get("result", {}).get("llm_parser", {})
@@ -276,7 +280,7 @@ def render_symptom_diagnosis_panel(
         state["confirmed_component_ids"] = confirmed_component_ids
         state["inventory_complete"] = inventory_complete
         state["manual_observations"] = {fact: value for fact, value in observations.items() if value is not None}
-        component_rows = _component_rows(components)
+        component_rows = _component_rows(components, component_inventory)
         parsed = {"observations": [], "uncertain_facts": [], "parser_status": "SKIPPED"}
         if llm_enabled and selected_model and symptom_text.strip():
             try:
@@ -300,6 +304,7 @@ def render_symptom_diagnosis_panel(
             confirmed_component_ids=confirmed_component_ids,
             inventory_complete=inventory_complete,
             measurements=[row.to_dict() for row in measurements],
+            current_context=_current_analysis_context(project, st.session_state, component_inventory),
             silkscreen_labels=silkscreen_labels,
             connectivity_status="none",
         )
@@ -362,8 +367,8 @@ def render_symptom_diagnosis_panel(
                         if isinstance(result.get("llm_component_explanations"), dict) else {})
         status_labels = {
             "SUSPECTED": "검사 후보 · 아직 미확정",
-            "TEST_ABNORMAL": "측정 이상 · 해당 고장 가설 의심",
-            "TEST_NORMAL": "해당 검사 정상 · 다른 기능은 미판정",
+            "FAULT_SUPPORTED": "검증된 검사 · 해당 고장 가설 지지",
+            "FAULT_REFUTED": "검증된 검사 · 해당 고장 가설 반박",
             "INCONCLUSIVE": "측정 판정 불가",
             "CONFLICTED": "측정 결과 충돌 · 판단 보류",
         }
@@ -416,18 +421,26 @@ def render_symptom_diagnosis_panel(
                     st.caption("참조 관측 · " + " · ".join(suggestion["evidence_used"]))
     if result.get("matched_rules"):
         st.caption("적용 규칙 · " + " · ".join(row["name"] for row in result["matched_rules"]))
-    for index, row in enumerate(result.get("hypotheses", [])[:5], start=1):
-        title = f"{index}. {row['title']} · 미확정 후보"
-        with st.expander(title, expanded=index == 1):
-            if row["supporting_evidence"]:
-                st.markdown("**뒷받침한 사실** · " + " · ".join(row["supporting_evidence"]))
-            else:
-                st.caption("직접 뒷받침하는 사실은 아직 없습니다.")
-            if row["opposing_evidence"]:
-                st.markdown("**반대 사실** · " + " · ".join(row["opposing_evidence"]))
-            if row.get("related_component_ids"):
-                st.caption("해당 유형의 검출 부품 · " + " · ".join(row["related_component_ids"]))
-            st.caption("상태 · 검증 전 후보. 이 결과만으로 부품 고장을 확정하지 않습니다.")
+    groups = result.get("hypothesis_groups", {})
+    for group_key, group_label in (("component", "소자 내부·기능 블록 원인"),
+                                   ("board", "기판·납땜 원인"),
+                                   ("system", "외부·시스템 원인")):
+        rows = groups.get(group_key, []) if isinstance(groups, dict) else []
+        if not rows:
+            continue
+        st.markdown(f"**{group_label}**")
+        for index, row in enumerate(rows[:5], start=1):
+            title = f"{index}. {row['title']} · 미확정 후보"
+            with st.expander(title, expanded=(group_key == "component" and index == 1)):
+                if row["supporting_evidence"]:
+                    st.markdown("**뒷받침한 사실** · " + " · ".join(row["supporting_evidence"]))
+                else:
+                    st.caption("직접 뒷받침하는 사실은 아직 없습니다.")
+                if row["opposing_evidence"]:
+                    st.markdown("**반대 사실** · " + " · ".join(row["opposing_evidence"]))
+                if row.get("related_component_ids"):
+                    st.caption("확인된 관련 부품 · " + " · ".join(row["related_component_ids"]))
+                st.caption("상태 · 검증 전 후보. 이 결과만으로 부품 고장을 확정하지 않습니다.")
     if result.get("functional_blocks"):
         with st.expander("부품 기능 역할 추정", expanded=False):
             for block in result["functional_blocks"]:
@@ -443,7 +456,7 @@ def render_symptom_diagnosis_panel(
             for row in result["measurement_evidence"]:
                 st.caption(f"{row['component_id']} · {row['measurement_type']} {row['value']} {row['unit']} · "
                            f"{row['verification_status']}")
-            st.caption("빨강/초록 판정은 측정 위치, 기준 출처, 운전 조건이 검증된 이 측정 가설에만 적용됩니다.")
+            st.caption("빨강/초록은 검사 프로파일과 출처가 검증된 측정이 고장 가설을 직접 지지/반박할 때만 표시됩니다.")
     if result.get("joint_candidates"):
         with st.expander("소자 내부 고장과 분리한 납땜·기판 후보", expanded=False):
             for candidate in result["joint_candidates"]:
@@ -465,15 +478,17 @@ def render_symptom_diagnosis_panel(
                 project, components, selected_codes, symptom_text,
                 observations, answers, measurements,
                 silkscreen_labels, st.session_state, confirmed_component_ids, inventory_complete,
+                component_inventory,
             )
             combined_observations = _combined_observations(state, answers)
             state["result"] = diagnose(
                 symptoms=state.get("symptoms", []), symptom_text="",
                 observations=combined_observations,
-                components=_component_rows(components),
+                components=_component_rows(components, component_inventory),
                 confirmed_component_ids=confirmed_component_ids,
                 inventory_complete=inventory_complete,
                 measurements=[row.to_dict() for row in measurements],
+                current_context=_current_analysis_context(project, st.session_state, component_inventory),
                 silkscreen_labels=silkscreen_labels, connectivity_status="none",
             )
             if llm_enabled and selected_model and state["result"].get("hypotheses"):
