@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import base64
+import io
 from dataclasses import replace
 from pathlib import Path
 import tempfile
@@ -32,7 +33,10 @@ from circuitcare.dashboard.components.pcb_workspace import (
     SELECTED_MAP_KEY, render_component_viewer, scale_overlay_to_display,
 )
 from circuitcare.dashboard.views.inspection_panel import MAP_VERSION_KEY, render_inspection_panel
-from circuitcare.vision.component_recognition_panel import render_component_recognition_panel
+from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
+from circuitcare.vision.component_recognition_panel import (
+    ensure_component_detection, render_component_recognition_panel,
+)
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY, clear_intake_draft,
     reset_intake_for_new_project,
@@ -239,6 +243,17 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     except (ImageLoadError, ValueError):
         st.warning("이미지 표시 실패 · 원본 사진 보기")
         return
+    auto_detection_result = None
+    auto_detection_error = None
+    detector_image_bytes = None
+    if mode == "원본 사진":
+        detector_image = io.BytesIO()
+        image.save(detector_image, format="PNG")
+        detector_image_bytes = detector_image.getvalue()
+        auto_detection_result, auto_detection_error = ensure_component_detection(
+            st, image_bytes=detector_image_bytes, project_id=project.project_id,
+            photo_id=selected,
+        )
     side_result = side_result if isinstance(side_result, dict) else {}
     detection_status = str(side_result.get("detection_status", "UNKNOWN"))
     overlay_result = adapt_component_map_components(
@@ -336,6 +351,34 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
                         else overlay_rows[item.component_id]["fault_candidate_status"]
                     ),
                 ) if item.component_id in overlay_rows else item for item in component_models)
+    if mode == "원본 사진" and detector_image_bytes is not None:
+        review_hash = hashlib.sha256(detector_image_bytes).hexdigest()[:16]
+        review_scope = f"{project.project_id}_{selected}_{review_hash}"
+        review_rows = st.session_state.get(f"cc_component_review_rows_{review_scope}", [])
+        auto_models = tuple(ComponentOverlayViewModel(
+            project_id=project.project_id,
+            board_id=project.board_id or "",
+            board_side=side_enum or active_side,
+            component_id=f"auto-{review_hash}-{index + 1}",
+            component_type=str(row.get("소자 종류", "unknown")),
+            display_label=f"{index + 1} · {row.get('소자 종류', 'unknown')}",
+            canonical_frame_id=selected,
+            coordinate_frame="SOURCE_PHOTO_PIXEL",
+            bbox_xyxy=(float(row["x1"]), float(row["y1"]),
+                       float(row["x2"]), float(row["y2"])),
+            polygon_xy=(),
+            source_backend_photo_ids=(selected,),
+            observation_ids=(),
+            detection_confidence=float(row.get("신뢰도", 0.0)),
+            identification_status="SUGGESTED_CLASS_ONLY",
+            identity_match_status=None,
+            ocr_marking=None,
+            possible_part_number=None,
+            evidence=("YOLO component proposal; awaiting user review",),
+            overlay_status="CANDIDATE",
+            diagnosis_display_status="DIAGNOSIS_NOT_RUN",
+        ) for index, row in enumerate(review_rows) if bool(row.get("사용", True)))
+        component_models = tuple(component_models) + auto_models
     st.session_state["circuitcare_v4_current_components"] = tuple(component_models)
     st.session_state["circuitcare_v4_detection_status"] = detection_status
     current_selection = st.session_state.get(SELECTION_KEY)
@@ -393,7 +436,9 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(photo_mapping.registration_status, '상태 미확인') if photo_mapping else '정합 결과 없음'}")
         with st.expander("소자 탐지 · 박스 검수", expanded=True):
             render_component_recognition_panel(
-                st, image_bytes=image_data, project_id=project.project_id, photo_id=selected,
+                st, image_bytes=detector_image_bytes or image_data,
+                project_id=project.project_id, photo_id=selected,
+                auto_result=auto_detection_result, auto_error=auto_detection_error,
             )
 
 

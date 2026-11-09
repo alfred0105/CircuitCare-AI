@@ -83,10 +83,45 @@ def _overlay(image_bytes: bytes, rows: list[dict]):
     return image
 
 
+def ensure_component_detection(
+    st_api: Any, *, image_bytes: bytes, project_id: str, photo_id: str,
+) -> tuple[dict | None, str | None]:
+    """Automatically detect a newly selected photo once per Streamlit session."""
+    image_hash = hashlib.sha256(image_bytes).hexdigest()
+    scope = f"{project_id}_{photo_id}_{image_hash[:16]}"
+    result_key = f"cc_component_recognition_{scope}"
+    records_key = f"cc_component_review_rows_{scope}"
+    error_key = f"cc_component_recognition_error_{scope}"
+    if result_key in st_api.session_state:
+        return st_api.session_state[result_key], None
+    if error_key in st_api.session_state:
+        return None, st_api.session_state[error_key]
+    try:
+        with st_api.spinner("선택한 PCB 사진에서 소자를 자동 탐지하고 있습니다…"):
+            engine = _app_server()
+            engine.load_component_locator()
+            result = engine.run_prediction(
+                image_bytes, {"conf": 0.20, "tile": 1024, "overlap": 0.25},
+            )
+        st_api.session_state[result_key] = result
+        st_api.session_state[records_key] = [
+            {"사용": True, "소자 종류": row.get("class_name", "unknown"),
+             "신뢰도": float(row.get("confidence", 0.0)),
+             "x1": row["bbox_xyxy"][0], "y1": row["bbox_xyxy"][1],
+             "x2": row["bbox_xyxy"][2], "y2": row["bbox_xyxy"][3]}
+            for row in result.get("detections", [])
+        ]
+        return result, None
+    except Exception as exc:
+        st_api.session_state[error_key] = str(exc)
+        return None, str(exc)
+
+
 def render_component_recognition_panel(
     st_api: Any, *, image_bytes: bytes, project_id: str, photo_id: str,
+    auto_result: dict | None = None, auto_error: str | None = None,
 ) -> None:
-    """Run detection and let the user review boxes and labels on this photo."""
+    """Let the user review boxes already overlaid on the PCB workbench photo."""
     from PIL import Image
 
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -97,48 +132,50 @@ def render_component_recognition_panel(
     records_key = f"cc_component_review_rows_{scope}"
     editor_key = f"cc_component_review_editor_{scope}"
     suggestion_key = f"cc_component_suggestion_{scope}"
+    error_key = f"cc_component_recognition_error_{scope}"
 
-    st_api.subheader("소자 탐지 · 박스 검수")
-    st_api.caption("사진 좌표 기준으로 후보 박스와 종류를 편집합니다. 검수 결과는 이 세션에만 저장됩니다.")
-    conf_col, tile_col, run_col = st_api.columns([1, 1, 1.1])
-    with conf_col:
-        conf = st_api.slider("신뢰도", 0.05, 0.80, 0.20, 0.05, key=f"cc_component_conf_{scope}")
-    with tile_col:
-        tile = st_api.selectbox("타일 크기", [640, 1024, 1280, 0], index=1,
-                                format_func=lambda value: "끔" if value == 0 else f"{value}px",
-                                key=f"cc_component_tile_{scope}")
-    with run_col:
-        st_api.write("")
-        st_api.write("")
-        run_detection = st_api.button("소자 탐지 실행", type="primary", key=f"cc_component_run_{scope}")
-
-    if run_detection:
-        try:
-            with st_api.spinner("소자 위치와 종류를 찾고 있습니다…"):
-                engine = _app_server()
-                engine.load_component_locator()
-                result = engine.run_prediction(image_bytes, {"conf": conf, "tile": tile, "overlap": 0.25})
-            st_api.session_state[result_key] = result
+    if result_key not in st_api.session_state:
+        if auto_result is not None:
+            st_api.session_state[result_key] = auto_result
             st_api.session_state[records_key] = [
                 {"사용": True, "소자 종류": row.get("class_name", "unknown"),
                  "신뢰도": float(row.get("confidence", 0.0)),
                  "x1": row["bbox_xyxy"][0], "y1": row["bbox_xyxy"][1],
                  "x2": row["bbox_xyxy"][2], "y2": row["bbox_xyxy"][3]}
-                for row in result.get("detections", [])
+                for row in auto_result.get("detections", [])
             ]
-            st_api.session_state.pop(editor_key, None)
-            st_api.session_state.pop(suggestion_key, None)
-        except Exception as exc:
-            st_api.error(f"소자 인식 실행 실패 · {exc}")
+        elif auto_error:
+            st_api.warning(f"자동 소자 탐지 실패 · {auto_error}")
+            if st_api.button("소자 탐지 다시 시도", key=f"cc_component_retry_{scope}"):
+                st_api.session_state.pop(result_key, None)
+                st_api.session_state.pop(records_key, None)
+                st_api.session_state.pop(error_key, None)
+                st_api.rerun()
+            return
+        else:
+            st_api.info("선택한 사진에서 자동 탐지를 실행하고 있습니다.")
+            return
 
-    if result_key not in st_api.session_state:
-        st_api.info("탐지를 실행하면 이 사진 위에 소자 후보 박스가 표시됩니다.")
-        return
+    st_api.caption("탐지 박스는 위 PCB 사진에 겹쳐 표시됩니다. 후보를 편집해도 고장 판정이나 학습 라벨은 바뀌지 않습니다.")
+    if not st_api.session_state.get(records_key):
+        st_api.caption("탐지 박스가 없습니다. 사진 좌표를 지정해 박스를 추가할 수 있습니다.")
+
+    if st_api.button("선택 사진 다시 탐지", key=f"cc_component_run_{scope}"):
+        st_api.session_state.pop(result_key, None)
+        st_api.session_state.pop(records_key, None)
+        st_api.session_state.pop(editor_key, None)
+        st_api.session_state.pop(suggestion_key, None)
+        st_api.session_state.pop(error_key, None)
+        st_api.rerun()
 
     records = st_api.session_state.get(records_key, [])
-    st_api.image(_overlay(image_bytes, records), caption="초록 박스는 사용 후보, 빨간 박스는 제외 후보", use_container_width=True)
-    if not records:
-        st_api.caption("탐지 결과가 없습니다. 아래 표에서 박스를 추가할 수 있습니다.")
+    result = st_api.session_state[result_key]
+    if auto_error:
+        st_api.warning(f"자동 소자 탐지 상태 · {auto_error}")
+    if not records and result.get("detections"):
+        st_api.session_state[records_key] = records
+    if records is None:
+        return
 
     suggestion = st_api.session_state.get(suggestion_key)
     if suggestion:
@@ -183,9 +220,25 @@ def render_component_recognition_panel(
             st_api.rerun()
 
     table_rows = [{column: row.get(column) for column in EDITOR_COLUMNS} for row in records]
+
+    def sync_editor_to_overlay() -> None:
+        editor_state = st_api.session_state.get(editor_key, {})
+        current = [dict(row) for row in st_api.session_state.get(records_key, [])]
+        if not isinstance(editor_state, dict):
+            return
+        for row_index, changes in editor_state.get("edited_rows", {}).items():
+            try:
+                index = int(row_index)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= index < len(current) and isinstance(changes, dict):
+                current[index].update(changes)
+        st_api.session_state[records_key] = _normalize_records(current, width, height)
+
     edited = st_api.data_editor(
         pd.DataFrame(table_rows, columns=EDITOR_COLUMNS),
         key=editor_key, hide_index=True, use_container_width=True,
+        on_change=sync_editor_to_overlay,
         column_config={
             "사용": st_api.column_config.CheckboxColumn("사용", default=True),
             "소자 종류": st_api.column_config.SelectboxColumn("소자 종류", options=CLASS_OPTIONS, required=True),
@@ -198,7 +251,6 @@ def render_component_recognition_panel(
     )
     st_api.session_state[records_key] = _normalize_records(edited.to_dict("records"), width, height)
     records = st_api.session_state[records_key]
-    st_api.image(_overlay(image_bytes, records), caption="편집 내용 미리보기 · 좌표는 원본 사진 픽셀", use_container_width=True)
 
     if records:
         selected = st_api.selectbox(
