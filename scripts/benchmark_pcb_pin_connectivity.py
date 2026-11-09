@@ -100,7 +100,8 @@ def candidate_audit(rows, configs):
             "validation_candidate_recall_macro": float(np.mean([
                 sum(p in row["truth_pairs"] for p in candidate_pairs(row["nodes_raw"], radius, k))/len(row["truth_pairs"])
                 for row in rows if row["split"] == "validation" and row["truth_pairs"]])) if any(row["split"] == "validation" and row["truth_pairs"] for row in rows) else None,
-            "validation_mean_candidates_per_pin": val["candidates"]/max(sum(len(r["nodes_raw"]) for r in rows if r["split"] == "validation"), 1),
+            "validation_mean_candidate_degree": 2*val["candidates"]/max(sum(len(r["nodes_raw"]) for r in rows if r["split"] == "validation"), 1),
+            "validation_mean_undirected_edges_per_pin": val["candidates"]/max(sum(len(r["nodes_raw"]) for r in rows if r["split"] == "validation"), 1),
             "train_candidate_recall_micro": stats["train"]["covered"]/stats["train"]["truth"] if stats["train"]["truth"] else None})
     return reports
 
@@ -300,8 +301,8 @@ def main():
     # points of the best validation recall rather than making every pin pair a candidate.
     best_recall=max((a["validation_candidate_recall_micro"] or 0) for a in audit)
     eligible=[a for a in audit if (a["validation_candidate_recall_micro"] or 0)>=best_recall-.005
-              and a["validation_mean_candidates_per_pin"]<=150]
-    choice=min(eligible or audit,key=lambda a:(a["validation_mean_candidates_per_pin"],
+              and a["validation_mean_candidate_degree"]<=250]
+    choice=min(eligible or audit,key=lambda a:(a["validation_mean_candidate_degree"],
                                                 -(a["validation_candidate_recall_micro"] or 0)))
     radius,k=float(choice["radius_mm"]),int(choice["k_nearest"])
     progress.update("PCB 후보 그래프 구성",3,.05,f"선택: radius={radius:g}mm, k={k}; 검증 candidate recall={choice['validation_candidate_recall_micro']:.3f}")
@@ -417,7 +418,7 @@ def main():
     summaries["evaluation_notes"]={"oracle_recall_definition":"Best possible Recall@5 after candidate generation: assumes all candidate true links rank ahead of false links, with same-component pairs consistently excluded.",
         "end_to_end_recall_definition":"Top-k hits among candidate links divided by all eligible cross-component same-net truth links, including links omitted by candidate generation.",
         "net_metrics":"Predicted edges are thresholded using validation-only calibration, then connected components impose transitivity; pairwise net precision/recall/F1 are reported on test.",
-        "candidate_choice":"On validation, select the lowest mean-candidate-cost setting within 0.5 percentage points of the best candidate recall, capped at 150 mean candidates per pin.",
+        "candidate_choice":"On validation, select the lowest mean candidate-degree setting within 0.5 percentage points of best recall, capped at 250; mean degree is 2E/N.",
         "no_image_claim":"This benchmark uses PCB CAD placement/pad geometry and PCB CAD net labels. It does not establish accuracy from photographs.",
         "prior_training_excluded":True}
     save_partial(summaries,"complete")
