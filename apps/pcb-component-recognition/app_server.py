@@ -12,7 +12,7 @@ import zipfile
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import cv2
 import numpy as np
@@ -725,17 +725,39 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(payload).encode(), "application/json; charset=utf-8")
         if path == "/api/samples":
             return self._send(200, json.dumps(SAMPLE_FILES).encode(), "application/json; charset=utf-8")
+        if path == "/api/sample":
+            name = unquote(parse_qs(urlparse(self.path).query).get("name", [""])[0])
+            if name not in SAMPLE_FILES:
+                return self._send(404, b"Sample not found", "text/plain; charset=utf-8")
+            content_type = {
+                ".png": "image/png", ".bmp": "image/bmp",
+            }.get(Path(name).suffix.lower(), "image/jpeg")
+            return self._send(200, (SAMPLES / name).read_bytes(), content_type)
         return self._send(404, b"Not found", "text/plain; charset=utf-8")
 
     def do_POST(self) -> None:
         endpoint = urlparse(self.path).path
-        if endpoint not in {"/api/predict", "/api/evaluate", "/api/pin-pad"}:
+        if endpoint not in {"/api/predict", "/api/evaluate", "/api/pin-pad", "/api/classify-box"}:
             return self._send(404, b"Not found", "text/plain; charset=utf-8")
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > MAX_UPLOAD_BYTES * 2:
                 raise ValueError("요청 크기가 비어 있거나 40 MB 제한을 넘었습니다.")
             body = json.loads(self.rfile.read(length))
+            if endpoint == "/api/classify-box":
+                if body.get("sample"):
+                    name = unquote(str(body["sample"]))
+                    if name not in SAMPLE_FILES:
+                        raise ValueError("허용된 샘플 목록에서 선택해 주세요.")
+                    image_bytes = (SAMPLES / name).read_bytes()
+                elif body.get("image_base64"):
+                    image_bytes = base64.b64decode(body["image_base64"], validate=True)
+                else:
+                    raise ValueError("샘플을 선택하거나 이미지를 업로드해 주세요.")
+                result = classify_component_crop(
+                    image_bytes, body.get("bbox_xyxy", []), body.get("confidence", 0.05),
+                )
+                return self._send(200, json.dumps(result).encode(), "application/json; charset=utf-8")
             if endpoint == "/api/pin-pad":
                 if body.get("sample"):
                     name = unquote(str(body["sample"]))

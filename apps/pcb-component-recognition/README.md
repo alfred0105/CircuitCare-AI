@@ -30,6 +30,7 @@ Check each model source's license and usage terms before downloading or redistri
 ## What the output means
 
 - Component boxes combine the YOLO26s locator and AI Doctor v12n proposals; Arshia classifies matching boxes. Pin/pad detections from the classifier are excluded from component types.
+- After detection, use **박스 검수** to draw an added box, select and move a box on the image, disable or delete incorrect boxes, edit its class or pixel coordinates, and ask the type model to classify the selected crop. Apply the model suggestion only when it looks right; export the reviewed boxes to CSV when finished. Review edits stay in the browser session until exported.
 - Pin and pad markers are candidates for visual review. Yellow is a low-confidence geometric prior; green is an image-derived pad candidate; magenta indicates a supported or observed prior. They are not verified electrical terminals.
 - The page includes single-image and YOLO ZIP evaluation tools. Only annotated regions are scored; unlabeled image areas are not treated as negatives.
 
