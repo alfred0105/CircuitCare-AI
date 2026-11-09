@@ -5,14 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 from circuitcare.symptom_diagnosis.measurement_evaluator import evaluate_component_measurements
+from circuitcare.symptom_diagnosis.fault_hypothesis_validator import validate_component_hypothesis
 
 
 def rank_component_candidates(
     *, hypotheses: list[dict[str, Any]], components: list[dict[str, Any]],
     functional_blocks: list[dict[str, Any]], observations: list[dict[str, Any]] | None,
-    measurements: list[dict[str, Any]] | None, knowledge: dict[str, Any], limit: int = 3,
+    measurements: list[dict[str, Any]] | None, knowledge: dict[str, Any],
+    confirmed_component_ids: set[str] | list[str] | tuple[str, ...] | None = None,
+    limit: int = 3,
 ) -> list[dict[str, Any]]:
-    """Return at most one fault pair per detected component, without filling weak slots."""
+    """Return Top-3 fault candidates only for IDs confirmed present on this PCB."""
+    confirmed_ids = {str(value) for value in (confirmed_component_ids or [])}
     block_by_id = {str(row.get("component_id")): row for row in functional_blocks}
     modes = knowledge.get("fault_modes", {}).get("fault_modes", {})
     tests = knowledge.get("test_catalog", {}).get("tests", {})
@@ -23,20 +27,22 @@ def rank_component_candidates(
         mode = modes.get(hypothesis.get("fault_id"), {})
         if mode.get("level") not in {"component", "functional_block"}:
             continue
-        component_types = {str(value).casefold() for value in mode.get("component_types", [])}
+        fault_id = str(hypothesis.get("fault_id"))
         required_roles = set(mode.get("functional_roles", []))
         eligible = []
         for part in components:
-            part_type = str(part.get("component_type", part.get("label", "unknown"))).casefold()
             component_id = str(part.get("component_id") or "")
             block = block_by_id.get(component_id, {})
-            roles = set(block.get("candidate_blocks", []))
-            if component_id and (not component_types or part_type in component_types) and (
-                    not required_roles or required_roles & roles):
+            assessment = assessments.get((component_id, fault_id), {})
+            validation = validate_component_hypothesis(
+                mode=mode, component=part, confirmed_component_ids=confirmed_ids,
+                component_block=block, component_observations=observed,
+                has_validated_measurement=assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"},
+            )
+            if validation["eligible"]:
                 eligible.append(part)
         if not eligible:
             continue
-        fault_id = str(hypothesis.get("fault_id"))
         targeted_ids: set[str] = set()
         for row in observed:
             component_id = str(row.get("component_id") or "")
@@ -61,7 +67,8 @@ def rank_component_candidates(
                 continue
             block = block_by_id.get(component_id, {})
             candidate_roles = set(block.get("candidate_blocks", []))
-            role_match = bool(required_roles & candidate_roles) if required_roles else False
+            confirmed_roles = set(part.get("confirmed_functional_roles", []))
+            role_match = bool(required_roles & confirmed_roles) if required_roles else False
             specific = [row for row in observed if str(row.get("component_id") or "") == component_id]
             supporting: list[str] = []
             opposing: list[str] = []

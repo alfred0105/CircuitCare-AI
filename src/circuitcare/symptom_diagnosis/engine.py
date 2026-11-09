@@ -13,6 +13,7 @@ import yaml
 from circuitcare.symptom_diagnosis.schemas import EvidenceStatus, Observation
 from circuitcare.symptom_diagnosis.functional_blocks import analyze_functional_blocks
 from circuitcare.symptom_diagnosis.component_fault_ranker import rank_component_candidates, rank_joint_candidates
+from circuitcare.symptom_diagnosis.fault_hypothesis_validator import validate_component_hypothesis
 from circuitcare.symptom_diagnosis.measurement_evaluator import evaluate_component_measurements
 
 KNOWLEDGE_DIR = Path(__file__).with_name("knowledge")
@@ -41,6 +42,7 @@ def validate_knowledge_base(knowledge: dict[str, Any]) -> None:
     symptoms = knowledge["symptom_ontology"].get("symptoms", {})
     observations = knowledge["symptom_ontology"].get("observations", {})
     fault_modes = knowledge["fault_modes"].get("fault_modes", {})
+    component_types = knowledge["component_taxonomy"].get("component_types", {})
     tests = knowledge["test_catalog"].get("tests", {})
     allowed_facts = set(symptoms) | set(observations) | {
         "FUSE_PRESENT", "MULTIPLE_FUNCTIONS_FAILED", "PARTIAL_FUNCTION_FAILURE",
@@ -77,6 +79,13 @@ def validate_knowledge_base(knowledge: dict[str, Any]) -> None:
             if fault_id not in fault_modes:
                 errors.append(f"{rule_id}: unknown fault ID {fault_id!r}")
     for fault_id, mode in fault_modes.items():
+        if mode.get("level") in {"component", "functional_block"}:
+            declared_types = {_normalized_type(value) for value in mode.get("component_types", [])}
+            if not declared_types:
+                errors.append(f"{fault_id}: component-scoped modes require component_types")
+            unknown_types = declared_types - set(component_types)
+            if unknown_types:
+                errors.append(f"{fault_id}: unknown component types {sorted(unknown_types)}")
         unknown_symptoms = set(mode.get("supported_symptoms", {})) - set(symptoms)
         if unknown_symptoms:
             errors.append(f"{fault_id}: unknown symptom codes {sorted(unknown_symptoms)}")
@@ -262,6 +271,8 @@ def diagnose(
     *, symptoms: list[str] | None = None, symptom_text: str = "",
     observations: dict[str, Any] | list[dict[str, Any]] | None = None,
     components: list[dict[str, Any]] | None = None,
+    confirmed_component_ids: list[str] | set[str] | tuple[str, ...] | None = None,
+    inventory_complete: bool = False,
     measurements: list[dict[str, Any]] | None = None,
     silkscreen_labels: list[dict[str, Any]] | None = None,
     connectivity: dict[str, Any] | None = None, connectivity_status: str = "none",
@@ -298,15 +309,37 @@ def diagnose(
         facts.setdefault(code, True)
     normalized_parts = [dict(part, component_type=_normalized_type(part.get("component_type", part.get("label"))))
                         for part in (components or [])]
+    # A detection is not proof of presence. Only explicitly reviewed IDs may
+    # create component-level hypotheses or scope component measurements.
+    supplied_confirmed_ids = {str(value) for value in (confirmed_component_ids or []) if str(value)}
+    known_component_ids = {str(part.get("component_id") or "") for part in normalized_parts}
+    confirmed_ids = supplied_confirmed_ids & known_component_ids
+    confirmed_parts = [part for part in normalized_parts
+                       if str(part.get("component_id") or "") in confirmed_ids]
+    unconfirmed_ids = [str(part.get("component_id")) for part in normalized_parts
+                       if str(part.get("component_id") or "") not in confirmed_ids]
+    normalized_parts = confirmed_parts
     detected_types = {part["component_type"] for part in normalized_parts}
-    facts.setdefault("FUSE_PRESENT", "fuse" in detected_types)
+    if "fuse" in detected_types:
+        facts.setdefault("FUSE_PRESENT", True)
+    elif inventory_complete:
+        facts.setdefault("FUSE_PRESENT", False)
     _derive_function_facts(facts)
+    taxonomy = kb["component_taxonomy"].get("component_types", {})
+    functional_blocks = analyze_functional_blocks(
+        normalized_parts, taxonomy, silkscreen_labels=silkscreen_labels,
+        ic_catalog=kb.get("ic_part_catalog", {}).get("parts", {}),
+    )
+    blocks_by_component = {str(row.get("component_id")): row for row in functional_blocks}
 
     matched_rules = [rule for rule in kb["symptom_rules"]["rules"]
                      if _condition_matches(rule.get("when", {}), facts)]
     generated: set[str] = {fault_id for rule in matched_rules for fault_id in rule.get("generate", [])}
     modes = kb["fault_modes"]["fault_modes"]
-    scoped_measurements = evaluate_component_measurements(measurements)
+    scoped_measurements = evaluate_component_measurements(
+        [row for row in (measurements or []) if isinstance(row, dict)
+         and str(row.get("component_id") or "") in confirmed_ids]
+    )
     generated.update(fault_id for (_component_id, fault_id), assessment in scoped_measurements.items()
                      if assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"}
                      and fault_id in modes)
@@ -316,6 +349,29 @@ def diagnose(
         fault_id for fault_id, mode in modes.items()
         if any(float(mode.get("supported_symptoms", {}).get(code, 0)) > 0 for code in selected)
     )
+    # Component and functional-block failure modes are not valid unless at
+    # least one reviewed instance has a compatible type and any required role
+    # is explicitly confirmed or directly supported by component-scoped facts.
+    component_scoped_faults: set[str] = set()
+    for fault_id in generated:
+        mode = modes.get(fault_id, {})
+        if mode.get("level") not in {"component", "functional_block"}:
+            continue
+        for part in normalized_parts:
+            component_id = str(part.get("component_id") or "")
+            assessment = scoped_measurements.get((component_id, fault_id), {})
+            validation = validate_component_hypothesis(
+                mode=mode, component=part, confirmed_component_ids=confirmed_ids,
+                component_block=blocks_by_component.get(component_id),
+                component_observations=observations if isinstance(observations, list) else [],
+                has_validated_measurement=assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"},
+            )
+            if validation["eligible"]:
+                component_scoped_faults.add(fault_id)
+                break
+    generated = {fault_id for fault_id in generated
+                 if modes.get(fault_id, {}).get("level") not in {"component", "functional_block"}
+                 or fault_id in component_scoped_faults}
     if selected:
         generated.update(("UNKNOWN_UNREGISTERED_FAILURE",))
         if facts.get("MULTIPLE_FUNCTIONS_FAILED"):
@@ -325,13 +381,6 @@ def diagnose(
                 "evidence_conflicts": evidence_conflicts,
                 "matched_rules": [], "hypotheses": [], "functional_blocks": [], "next_tests": [],
                 "message": "증상을 확인해야 원인 후보를 좁힐 수 있습니다."}
-
-    taxonomy = kb["component_taxonomy"].get("component_types", {})
-    functional_blocks = analyze_functional_blocks(
-        normalized_parts, taxonomy, silkscreen_labels=silkscreen_labels,
-        ic_catalog=kb.get("ic_part_catalog", {}).get("parts", {}),
-    )
-    blocks_by_component = {str(row.get("component_id")): row for row in functional_blocks}
 
     ranked = []
     for fault_id in generated:
@@ -411,13 +460,18 @@ def diagnose(
                 evidence_details.append({"code": code, "source": obs.source if obs else "user_report",
                                          "status": obs.status.value if obs else "observed",
                                          "weight": -round(contribution, 2)})
-        applicable_parts = [part for part in normalized_parts
-                            if part["component_type"] in mode.get("component_types", [])]
-        required_roles = set(mode.get("functional_roles", []))
-        if required_roles:
-            applicable_parts = [part for part in applicable_parts
-                                if required_roles & set(blocks_by_component.get(
-                                    str(part.get("component_id")), {}).get("candidate_blocks", []))]
+        applicable_parts = []
+        for part in normalized_parts:
+            component_id = str(part.get("component_id") or "")
+            assessment = scoped_measurements.get((component_id, fault_id), {})
+            validation = validate_component_hypothesis(
+                mode=mode, component=part, confirmed_component_ids=confirmed_ids,
+                component_block=blocks_by_component.get(component_id),
+                component_observations=observations if isinstance(observations, list) else [],
+                has_validated_measurement=assessment.get("status") in {"TEST_NORMAL", "TEST_ABNORMAL"},
+            )
+            if validation["eligible"]:
+                applicable_parts.append(part)
         # Part count is not evidence of failure. Detection only scopes candidates;
         # score can change only when evidence, role, or an answer supports it.
         ranked.append({"fault_id": fault_id, "title": mode["title"], "level": mode["level"],
@@ -432,7 +486,9 @@ def diagnose(
     component_candidates = rank_component_candidates(
         hypotheses=ranked, components=normalized_parts, functional_blocks=functional_blocks,
         observations=(observations if isinstance(observations, list) else []),
-        measurements=measurements, knowledge=kb, limit=3,
+        measurements=[row for row in (measurements or []) if isinstance(row, dict)
+                      and str(row.get("component_id") or "") in confirmed_ids],
+        confirmed_component_ids=confirmed_ids, knowledge=kb, limit=3,
     )
     joint_candidates = rank_joint_candidates(
         hypotheses=ranked, component_candidates=component_candidates, observations=facts,
@@ -472,7 +528,8 @@ def diagnose(
                                           for code, value in updates.items())
             simulated = diagnose(
                 symptoms=selected, observations=simulated_observations,
-                components=normalized_parts, measurements=measurements,
+                components=normalized_parts, confirmed_component_ids=confirmed_ids,
+                inventory_complete=inventory_complete, measurements=measurements,
                 silkscreen_labels=silkscreen_labels, connectivity=connectivity,
                 connectivity_status=connectivity_status, knowledge=kb,
                 _simulate_questions=False,
@@ -517,8 +574,14 @@ def diagnose(
         "reason": measurement_assessments.get((str(row.get("component_id") or ""),
                                                  str(row.get("fault_hypothesis") or "")), {}).get(
                                                      "reason", "판정에 필요한 범위·조건·측정 위치 근거가 부족합니다."),
-    } for row in measurements or [] if isinstance(row, dict)]
+    } for row in measurements or [] if isinstance(row, dict)
+        and str(row.get("component_id") or "") in confirmed_ids]
     return {"status": status, "symptom_codes": selected, "observations": facts,
+            "component_inventory": {"complete": bool(inventory_complete),
+                                    "confirmed_component_ids": sorted(confirmed_ids),
+                                    "confirmed_component_types": sorted(detected_types),
+                                    "unconfirmed_detection_ids": unconfirmed_ids,
+                                    "confirmed_count": len(confirmed_ids)},
             "observation_provenance": [item.to_dict() for item in provenance.values()],
             "evidence_conflicts": evidence_conflicts,
             "matched_rules": [{"id": rule["id"], "name": rule["name"]}

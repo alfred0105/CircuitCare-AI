@@ -87,7 +87,8 @@ def suggest_unregistered_causes(client: OllamaClient, model: str, *, symptom_tex
     payload = {"symptom_text": symptom_text[:2000],
                "known_hypotheses": [{"id": row["fault_id"], "title": row["title"]}
                                     for row in diagnosis.get("hypotheses", [])[:8]],
-               "known_evidence": diagnosis.get("observations", {})}
+               "known_evidence": diagnosis.get("observations", {}),
+               "confirmed_component_inventory": diagnosis.get("component_inventory", {})}
     evidence_values = sorted(diagnosis.get("observations", {}).keys()) or ["__none__"]
     schema = {"type": "object", "additionalProperties": False,
               "required": ["suggestions"], "properties": {
@@ -104,7 +105,9 @@ def suggest_unregistered_causes(client: OllamaClient, model: str, *, symptom_tex
         {"role": "system", "content": (
             "PCB 고장 원인 보완 검토자다. 규칙 엔진 후보에 없는 가능성을 최대 2개 제안한다. "
             "제안은 미검증 가설이며 순위를 매기거나 확정하지 않는다. 없는 배선·핀·측정값을 만들지 않는다. "
-            "구체 부품 위치를 지목하지 않는다. JSON: {\"suggestions\":[{\"title\":\"...\","
+            "부품 고장은 규칙 엔진이 확인된 소자 목록으로만 평가한다. 확인 목록에 없는 소자 고장을 제안하지 말고, "
+            "구체 부품 ID나 위치를 지목하지 않는다. 목록이 미완료면 부품의 존재/부재를 단정하지 않는다. "
+            "JSON: {\"suggestions\":[{\"title\":\"...\","
             "\"reason\":\"입력 증상과의 관계\",\"evidence_used\":[\"입력에 존재하는 관측 키\"]}]}"
         )},
         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
