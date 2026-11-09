@@ -32,6 +32,7 @@ from circuitcare.dashboard.components.pcb_workspace import (
     SELECTED_MAP_KEY, render_component_viewer, scale_overlay_to_display,
 )
 from circuitcare.dashboard.views.inspection_panel import MAP_VERSION_KEY, render_inspection_panel
+from circuitcare.vision.component_recognition_panel import render_component_recognition_panel
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY, clear_intake_draft,
     reset_intake_for_new_project,
@@ -390,6 +391,10 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         mapped = entry.get("photo_id_map", []) if entry else []
         photo_mapping = next((row for row in mapped if row.frontend_photo_id == selected and row.project_id == project.project_id), None)
         st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(photo_mapping.registration_status, '상태 미확인') if photo_mapping else '정합 결과 없음'}")
+        with st.expander("소자 탐지 · 박스 검수", expanded=True):
+            render_component_recognition_panel(
+                st, image_bytes=image_data, project_id=project.project_id, photo_id=selected,
+            )
 
 
 def _photo_label(record: Any, number: int) -> str:

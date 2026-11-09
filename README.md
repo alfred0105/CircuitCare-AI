@@ -101,6 +101,15 @@ python -m pip install -e ".[ui]"
 streamlit run src/circuitcare/ui.py
 ```
 
+To enable the PCB component detector and editable box review inside the PCB fault-diagnosis screen, install its local model runtime too:
+
+```bash
+python -m pip install -e ".[ui,pcb-recognition]"
+streamlit run src/circuitcare/ui.py
+```
+
+After adding a PCB photo, start the diagnosis workspace, open **PCB**, then expand **소자 탐지 · 박스 검수** under the selected photo. Detection boxes and labels can be reviewed, excluded, edited, added, and classified again inside the selected box. Review changes remain in the current session and can be exported as CSV; they do not alter training labels.
+
 To enable the **데이터시트 AI** tab's local PDF text/table extraction, install the optional PDF readers too:
 
 ```bash
