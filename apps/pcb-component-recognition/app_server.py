@@ -20,6 +20,8 @@ import torch
 from ultralytics import YOLO
 
 from hr.infer.predict import agnostic_nms, combine, detect, draw, draw_elements
+from ic_marking_ocr import read_ic_marking
+from ic_part_lookup import resolve_ic_marking
 
 ROOT = Path(__file__).resolve().parent
 SAMPLES = ROOT / "data" / "samples"
@@ -113,6 +115,19 @@ def classify_component_crop(image_bytes: bytes, bbox_xyxy: list[float], confiden
     return {"class_name": label, "confidence": score,
             "bbox_xyxy": [crop_box[0] + x0, crop_box[1] + y0,
                           crop_box[2] + x0, crop_box[3] + y0]}
+
+
+def read_ic_component_marking(image_bytes: bytes, bbox_xyxy: list[float],
+                              search_results: list[dict] | None = None) -> dict:
+    """Run IC-only OCR and conservatively resolve exact markings from supplied search results."""
+    image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("선택한 PCB 사진을 읽을 수 없습니다.")
+    if len(bbox_xyxy) != 4:
+        raise ValueError("IC 박스 좌표가 올바르지 않습니다.")
+    ocr = read_ic_marking(image, bbox_xyxy)
+    lookup = resolve_ic_marking(ocr.get("text", ""), search_results or [])
+    return {"ocr": ocr, "part_lookup": lookup}
 
 
 def jpeg_data_url(image: np.ndarray) -> str:
@@ -740,14 +755,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         endpoint = urlparse(self.path).path
-        if endpoint not in {"/api/predict", "/api/evaluate", "/api/pin-pad", "/api/classify-box"}:
+        if endpoint not in {"/api/predict", "/api/evaluate", "/api/pin-pad", "/api/classify-box", "/api/ic-marking"}:
             return self._send(404, b"Not found", "text/plain; charset=utf-8")
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > MAX_UPLOAD_BYTES * 2:
                 raise ValueError("요청 크기가 비어 있거나 40 MB 제한을 넘었습니다.")
             body = json.loads(self.rfile.read(length))
-            if endpoint == "/api/classify-box":
+            if endpoint == "/api/ic-marking":
+                if str(body.get("class_name", "")).strip().casefold() != "ic":
+                    raise ValueError("IC 박스에 대해서만 각인 OCR을 실행할 수 있습니다.")
+                search_results = body.get("search_results", [])
+                if not isinstance(search_results, list) or len(search_results) > 20:
+                    raise ValueError("검색 결과는 최대 20개까지 전달할 수 있습니다.")
+                if body.get("ocr_text") is not None:
+                    lookup = resolve_ic_marking(str(body["ocr_text"]), search_results)
+                    result = {"ocr": {"text": str(body["ocr_text"]), "verification_status": "unverified"},
+                              "part_lookup": lookup}
+                    return self._send(200, json.dumps(result).encode(), "application/json; charset=utf-8")
+            if endpoint in {"/api/classify-box", "/api/ic-marking"}:
                 if body.get("sample"):
                     name = unquote(str(body["sample"]))
                     if name not in SAMPLE_FILES:
@@ -757,6 +783,11 @@ class Handler(BaseHTTPRequestHandler):
                     image_bytes = base64.b64decode(body["image_base64"], validate=True)
                 else:
                     raise ValueError("샘플을 선택하거나 이미지를 업로드해 주세요.")
+                if endpoint == "/api/ic-marking":
+                    result = read_ic_component_marking(
+                        image_bytes, body.get("bbox_xyxy", []), [],
+                    )
+                    return self._send(200, json.dumps(result).encode(), "application/json; charset=utf-8")
                 result = classify_component_crop(
                     image_bytes, body.get("bbox_xyxy", []), body.get("confidence", 0.05),
                 )

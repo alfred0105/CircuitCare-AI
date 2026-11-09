@@ -1,6 +1,6 @@
 # CircuitCare AI PCB Component Recognition
 
-This local web module provides PCB component location detection, component type classification, and review-only pin/pad candidates. It is packaged under CircuitCare AI as the selected browser UI (`apps/pcb-component-recognition/index.html`). It does not infer wire paths or electrical connections.
+This local web module provides PCB component location detection, component type classification, IC marking OCR and lookup review, and review-only pin/pad candidates. It is packaged under CircuitCare AI as the selected browser UI (`apps/pcb-component-recognition/index.html`). It does not infer wire paths or electrical connections.
 
 ## Run locally
 
@@ -8,11 +8,10 @@ Python 3.11+ is recommended. Install PyTorch for the user's CUDA version first, 
 
 ```powershell
 python -m pip install -r requirements.txt
-$env:CIRCUITCARE_PCB_WEIGHTS = 'C:\path\to\pcb-model-weights'
 python app_server.py --port 8768
 ```
 
-Open `http://127.0.0.1:8768`. The weight root can also be the module's `weights` directory. Model files and sample PCB photos are intentionally excluded from Git; image upload remains available. Place optional sample photos under `data/samples/`.
+Open `http://127.0.0.1:8768`. The bundled checkpoints are used by default. Set `CIRCUITCARE_PCB_WEIGHTS` only when using a separate local weight folder. Place optional sample photos under `data/samples/`.
 
 ## Bundled model checkpoints
 
@@ -27,6 +26,10 @@ The repository includes the checkpoints needed by the default locator/classifier
 The optional PAINE pin-segmentation comparison checkpoint is not bundled because its Zenodo record does not show a redistribution license. Download it from the upstream record and place it at `weights/external/paine2026/unet_trained.pth` only if its author/license permits redistribution.
 
 Third-party model attribution and license links are listed in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). QWEN/LLM weights are not part of this repository. Setting `CIRCUITCARE_PCB_WEIGHTS` overrides the bundled weights directory.
+
+## IC marking OCR and lookup
+
+In **박스 검수**, select a box labeled `IC` and choose **선택 IC 각인 OCR**. RapidOCR reads the marking from the original image crop. The result remains an unverified OCR candidate; use **각인 검색 열기** to check it. If no exact part-number match is confirmed, the component stays labeled `IC`. `ic_marking_ocr.py` and `ic_part_lookup.py` expose the same logic for other callers; lookup accepts search results from an approved provider and never guesses a part number.
 
 ## What the output means
 
