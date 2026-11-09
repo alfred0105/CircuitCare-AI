@@ -28,6 +28,15 @@ class ComponentOverlayViewModel:
     overlay_status: str
     fault_candidate_status: str | None = None
     diagnosis_display_status: str | None = None
+    fault_hypothesis: str | None = None
+    measurement_status: str | None = None
+    solder_status: str | None = None
+    fault_score: float | None = None
+    fault_evidence: tuple[str, ...] = ()
+    recommended_tests: tuple[str, ...] = ()
+    component_info: str | None = None
+    ocr_status: str | None = None
+    ocr_candidates: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -56,6 +65,9 @@ IDENTITY_STATUS_LABELS = {
     "suggested": "미확인 후보",
     "unmatched": "미확인",
     "class_candidate": "종류 후보",
+    "OCR_VALUE_CANDIDATE": "각인 기반 값 후보 · 미확인",
+    "OCR_TEXT_CANDIDATE": "각인 문자 후보 · 미확인",
+    "NO_MARKING_READ": "각인 판독 없음",
 }
 
 

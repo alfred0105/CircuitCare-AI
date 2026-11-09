@@ -14,7 +14,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
-ui = ["streamlit>=1.40,<2"]
+ui = ["streamlit>=1.40,<2", "PyYAML>=6,<7"]
 pcb-recognition = ["numpy>=1.26,<3", "opencv-python-headless>=4.10,<5", "Pillow>=10", "torch>=2.3", "torchvision>=0.18", "ultralytics>=8.3"]
 poster = ["matplotlib>=3.8"]
 vision = ["numpy>=1.26,<3", "opencv-python-headless>=4.10,<5", "Pillow>=10"]
@@ -34,7 +34,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 circuitcare = ["schematic/assets/*.html", "schematic/assets/*.css", "schematic/assets/*.js",
               "dashboard/components/assets/*.html", "dashboard/components/assets/*.css",
-              "dashboard/components/assets/*.js"]
+              "dashboard/components/assets/*.js", "symptom_diagnosis/knowledge/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

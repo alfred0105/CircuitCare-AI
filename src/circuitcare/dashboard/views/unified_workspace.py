@@ -11,6 +11,7 @@ import tempfile
 from typing import Any
 
 from circuitcare.frontend.models import ProjectContext
+from circuitcare.symptom_diagnosis.diagnosis_state import current_overlay_candidates
 from circuitcare.frontend.component_overlay_adapter import (
     adapt_component_map_components, adapt_original_photo_components,
 )
@@ -22,7 +23,7 @@ from circuitcare.frontend.diagnosis_adapter import (
 from circuitcare.frontend.measurement_models import measurement_set_sha256
 from circuitcare.frontend.measurement_state import diagnosis_state, get_measurements
 from circuitcare.frontend.component_map_adapter import (
-    COMPONENT_MAP_STATE_KEY, LOGGER, REGISTRATION_LABELS, available_photo_sides,
+    COMPONENT_MAP_STATE_KEY, LOGGER, REGISTRATION_LABELS,
     clear_component_map_state,
     component_map_cache_key, component_map_entry_is_current, decode_canonical_image,
     map_backend_photo_ids, optional_backend_provider, photo_input_fingerprint,
@@ -32,10 +33,13 @@ from circuitcare.frontend.photo_adapter import adapt_component_map_input
 from circuitcare.dashboard.components.pcb_workspace import (
     SELECTED_MAP_KEY, render_component_viewer, scale_overlay_to_display,
 )
-from circuitcare.dashboard.views.inspection_panel import MAP_VERSION_KEY, render_inspection_panel
+from circuitcare.dashboard.components.loading_screen import show_fullscreen_loading
+from circuitcare.dashboard.views.inspection_panel import (
+    COMPONENT_EDIT_KEY, MAP_VERSION_KEY, render_inspection_panel,
+)
 from circuitcare.frontend.component_overlay_models import ComponentOverlayViewModel
 from circuitcare.vision.component_recognition_panel import (
-    ensure_component_detection, render_component_recognition_panel,
+    ensure_component_detection,
 )
 from circuitcare.frontend.state import (
     INTAKE_IMAGES_KEY, INTAKE_PROJECT_KEY, clear_intake_draft,
@@ -85,14 +89,14 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
             st.session_state.pop(VIEW_ZOOM_KEY, None)
             st.rerun()
         return
-    available_sides = available_photo_sides([records[item["image_id"]] for item in valid])
-    side_labels = {"front": "앞면", "back": "뒷면", "unknown": "미지정"}
-    side_key = "circuitcare_v3_active_side"
-    if st.session_state.get(side_key) not in available_sides:
-        st.session_state[side_key] = available_sides[0]
-    active_side = st.selectbox("면", available_sides, format_func=side_labels.get, key=side_key)
-    side_valid = [item for item in valid if records[item["image_id"]].side == active_side]
-    ids = [item["image_id"] for item in side_valid]
+    ids = [item["image_id"] for item in valid]
+    selected_id = st.session_state.get("circuitcare_v2_photo_choice")
+    if selected_id not in ids:
+        selected_id = st.session_state.get(ACTIVE_PHOTO_KEY)
+    if selected_id not in ids:
+        selected_id = ids[0]
+    st.session_state["circuitcare_v2_photo_choice"] = selected_id
+    active_side = records[selected_id].side
 
     # A single board map covers every supported photo on both physical sides.
     ready_inputs = []
@@ -179,51 +183,27 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     st.session_state[MAP_VERSION_KEY] = cache_key if component_map else None
     side_enum = {"front": "TOP", "back": "BOTTOM"}.get(active_side)
     side_result = component_map.get("sides", {}).get(side_enum, {}) if component_map and side_enum else {}
-    canonical = side_result.get("canonical_image")
-    failed_artifacts = entry["failed_artifacts"] if entry else []
-    artifact_key = (side_enum, canonical.get("image_id")) if canonical and side_enum else None
-    view_key = "circuitcare_v3_view_mode"
-    if artifact_key in failed_artifacts:
-        canonical = None
-    elif canonical and st.session_state.get(view_key) == "통합 이미지":
-        try:
-            decoded_canonical = decode_canonical_image(canonical)
-        except Exception:
-            LOGGER.exception("Canonical image artifact failed validation")
-            failed_artifacts.append(artifact_key)
-            if entry:
-                entry["failed_artifacts"] = failed_artifacts
-                st.session_state[COMPONENT_MAP_STATE_KEY] = entry
-            canonical = None
-            st.session_state["circuitcare_v3_processing_error"] = "canonical_image"
-        if canonical is None:
-            st.session_state[view_key] = "원본 사진"
-            st.warning("통합 이미지 표시 실패 · 원본 사진으로 전환했습니다.")
-    mode_options = ["원본 사진"] + (["통합 이미지"] if canonical else [])
-    if st.session_state.get(view_key) not in mode_options:
-        st.session_state[view_key] = "원본 사진"
-    mode = st.radio("보기", mode_options, horizontal=True, key=view_key)
+    # Keep the viewer on the selected source photo; no separate view-mode control.
+    canonical = None
+    st.session_state.pop("circuitcare_v3_view_mode", None)
+    mode = "원본 사진"
     if not ids:
         st.info("선택한 면의 원본 사진 없음")
         return
-    selected_id = st.session_state.get(ACTIVE_PHOTO_KEY)
-    if selected_id not in ids:
-        selected_id = ids[0]
-        st.session_state["circuitcare_v2_photo_choice"] = selected_id
     selected = st.selectbox(
         "원본 사진", ids, index=ids.index(selected_id),
         format_func=lambda image_id: _photo_label(records[image_id], ids.index(image_id) + 1),
         key="circuitcare_v2_photo_choice",
     )
-    if selected != selected_id:
+    if selected != st.session_state.get(ACTIVE_PHOTO_KEY):
         update_selection(st.session_state, project=project, active_photo_id=selected)
     record = records[selected]
-    image_data = next(item["data"] for item in side_valid if item["image_id"] == selected)
+    image_data = next(item["data"] for item in valid if item["image_id"] == selected)
     size = record.image_dimensions
     if size:
-        st.caption(f"{record.filename or 'PCB 사진'} · {record.side} / {record.capture_type} · {size[0]}×{size[1]} px")
+        st.caption(f"{record.filename or 'PCB 사진'} · {record.capture_type} · {size[0]}×{size[1]} px")
     else:
-        st.caption(f"{record.filename or 'PCB 사진'} · {record.side} / {record.capture_type}")
+        st.caption(f"{record.filename or 'PCB 사진'} · {record.capture_type}")
     canonical_png_bytes = None
     try:
         if mode == "통합 이미지" and canonical:
@@ -256,6 +236,10 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         )
     side_result = side_result if isinstance(side_result, dict) else {}
     detection_status = str(side_result.get("detection_status", "UNKNOWN"))
+    if auto_detection_error:
+        detection_status = "BLOCKED_MODEL_UNAVAILABLE"
+    elif auto_detection_result is not None:
+        detection_status = "INFERENCE_COMPLETE"
     overlay_result = adapt_component_map_components(
         component_map, project_id=project.project_id, board_id=project.board_id or "", side=side_enum or "",
     ) if component_map and side_enum else None
@@ -355,30 +339,162 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         review_hash = hashlib.sha256(detector_image_bytes).hexdigest()[:16]
         review_scope = f"{project.project_id}_{selected}_{review_hash}"
         review_rows = st.session_state.get(f"cc_component_review_rows_{review_scope}", [])
-        auto_models = tuple(ComponentOverlayViewModel(
-            project_id=project.project_id,
-            board_id=project.board_id or "",
-            board_side=side_enum or active_side,
-            component_id=f"auto-{review_hash}-{index + 1}",
-            component_type=str(row.get("소자 종류", "unknown")),
-            display_label=f"{index + 1} · {row.get('소자 종류', 'unknown')}",
-            canonical_frame_id=selected,
-            coordinate_frame="SOURCE_PHOTO_PIXEL",
-            bbox_xyxy=(float(row["x1"]), float(row["y1"]),
-                       float(row["x2"]), float(row["y2"])),
-            polygon_xy=(),
-            source_backend_photo_ids=(selected,),
-            observation_ids=(),
-            detection_confidence=float(row.get("신뢰도", 0.0)),
-            identification_status="SUGGESTED_CLASS_ONLY",
-            identity_match_status=None,
-            ocr_marking=None,
-            possible_part_number=None,
-            evidence=("YOLO component proposal; awaiting user review",),
-            overlay_status="CANDIDATE",
-            diagnosis_display_status="DIAGNOSIS_NOT_RUN",
-        ) for index, row in enumerate(review_rows) if bool(row.get("사용", True)))
+        marking_results_key = f"cc_component_marking_results_{review_scope}"
+        marking_results = st.session_state.setdefault(marking_results_key, {})
+        current_selection = st.session_state.get(SELECTION_KEY)
+        selected_auto_id = getattr(current_selection, "selected_component", None)
+        selected_row_index = None
+        auto_prefix = f"auto-{review_hash}-"
+        if isinstance(selected_auto_id, str) and selected_auto_id.startswith(auto_prefix):
+            try:
+                candidate_index = int(selected_auto_id[len(auto_prefix):]) - 1
+                if 0 <= candidate_index < len(review_rows):
+                    selected_row_index = candidate_index
+            except ValueError:
+                selected_row_index = None
+        pending_ocr = [(index, row) for index, row in enumerate(review_rows)
+                       if bool(row.get("사용", True)) and index not in marking_results]
+        if pending_ocr:
+            from circuitcare.vision.ocr_backend import run_component_marking_ocr
+
+            loading_screen = show_fullscreen_loading(st, "탐지된 부품의 각인을 읽고 값을 정리하고 있습니다.")
+            progress = st.progress(0, text=f"각인 OCR 자동 처리 0/{len(pending_ocr)}")
+            try:
+                ocr_unavailable_error = None
+                for completed, (index, row) in enumerate(pending_ocr, 1):
+                    if ocr_unavailable_error:
+                        marking_result = {"status": "OCR_UNAVAILABLE", "error": ocr_unavailable_error,
+                                          "identification_status": "NO_MARKING_READ"}
+                    else:
+                        try:
+                            marking_result = run_component_marking_ocr(
+                                image,
+                                [row["x1"], row["y1"], row["x2"], row["y2"]],
+                                str(row.get("소자 종류", "unknown")),
+                            )
+                        except Exception as exc:
+                            marking_result = {"status": "OCR_UNAVAILABLE", "error": str(exc),
+                                              "identification_status": "NO_MARKING_READ"}
+                            ocr_unavailable_error = str(exc)
+                    marking_results[index] = marking_result
+                    st.session_state[marking_results_key] = marking_results
+                    progress.progress(completed / len(pending_ocr),
+                                      text=f"각인 OCR 자동 처리 {completed}/{len(pending_ocr)}")
+            finally:
+                progress.empty()
+                loading_screen.empty()
+        from circuitcare.vision.ocr_backend import infer_passive_value
+
+        auto_model_rows = []
+        for index, row in enumerate(review_rows):
+            if not bool(row.get("사용", True)):
+                continue
+            label = str(row.get("소자 종류", "unknown"))
+            ocr_result = dict(marking_results.get(index, {}))
+            marking = ocr_result.get("marking")
+            inferred = infer_passive_value(label, marking or "") if marking else None
+            is_ic = label.casefold() in {"ic", "integrated_circuit"}
+            if marking:
+                ocr_result["inferred_value"] = inferred["value"] if inferred else None
+                ocr_result["identification_status"] = (
+                    inferred["status"] if inferred else "OCR_TEXT_CANDIDATE"
+                )
+                ocr_result["possible_part_number"] = marking if is_ic else None
+            marking_results[index] = ocr_result
+            auto_model_rows.append(ComponentOverlayViewModel(
+                project_id=project.project_id,
+                board_id=project.board_id or "",
+                board_side=side_enum or active_side,
+                component_id=f"auto-{review_hash}-{index + 1}",
+                component_type=label,
+                display_label=f"{index + 1} · {label}",
+                canonical_frame_id=selected,
+                coordinate_frame="SOURCE_PHOTO_PIXEL",
+                bbox_xyxy=(float(row["x1"]), float(row["y1"]),
+                           float(row["x2"]), float(row["y2"])),
+                polygon_xy=(),
+                source_backend_photo_ids=(selected,),
+                observation_ids=(),
+                detection_confidence=float(row.get("신뢰도", 0.0)),
+                identification_status=ocr_result.get(
+                    "identification_status", "SUGGESTED_CLASS_ONLY"),
+                identity_match_status=None,
+                ocr_marking=marking,
+                possible_part_number=ocr_result.get("possible_part_number"),
+                evidence=("YOLO component proposal; awaiting user review",),
+                overlay_status="CANDIDATE",
+                diagnosis_display_status="DIAGNOSIS_NOT_RUN",
+                component_info=ocr_result.get("inferred_value"),
+                ocr_status=ocr_result.get("status"),
+                ocr_candidates=tuple(item.get("text", "") for item in ocr_result.get("candidates", [])),
+            ))
+        st.session_state[marking_results_key] = marking_results
+        auto_models = tuple(auto_model_rows)
         component_models = tuple(component_models) + auto_models
+        marking_context = None
+        if selected_row_index is not None:
+            selected_row = review_rows[selected_row_index]
+            marking_context = {
+                "image_bytes": detector_image_bytes,
+                "bbox_xyxy": [selected_row["x1"], selected_row["y1"], selected_row["x2"], selected_row["y2"]],
+                "component_type": str(selected_row.get("소자 종류", "unknown")),
+                "result": marking_results.get(selected_row_index, {}),
+                "retry_key": marking_results_key,
+                "row_index": selected_row_index,
+            }
+        st.session_state["circuitcare_v4_selected_marking_context"] = marking_context
+    else:
+        st.session_state["circuitcare_v4_selected_marking_context"] = None
+    component_edits = st.session_state.get(COMPONENT_EDIT_KEY, {})
+    if component_edits:
+        updated_models = []
+        for model in component_models:
+            edit = component_edits.get(model.component_id, {})
+            if edit:
+                component_type = edit.get("component_type", model.component_type)
+                model = replace(
+                    model,
+                    component_type=component_type,
+                    display_label=f"{model.component_id.rsplit('-', 1)[-1]} · {component_type}",
+                    ocr_marking=edit.get("ocr_marking", model.ocr_marking) or None,
+                    possible_part_number=(
+                        edit.get("ocr_marking", model.possible_part_number)
+                        if component_type.casefold() in {"ic", "integrated_circuit"}
+                        else model.possible_part_number
+                    ),
+                    component_info=edit.get("component_info", model.component_info) or None,
+                )
+            updated_models.append(model)
+        component_models = tuple(updated_models)
+    candidate_state_by_project = st.session_state.get("circuitcare_v4_diagnosis_candidates_by_project", {})
+    candidate_state = current_overlay_candidates(
+        candidate_state_by_project.get(project.project_id) if isinstance(candidate_state_by_project, dict) else {},
+        project_id=project.project_id, board_id=project.board_id,
+        component_map_version=st.session_state.get("circuitcare_v4_selection_map_key"),
+    )
+    if isinstance(candidate_state, dict) and candidate_state:
+        status_map = {
+            "SUSPECTED": ("SUSPECTED_FAULT", "의심 후보 · 미확정"),
+            "TEST_ABNORMAL": ("TEST_ABNORMAL", "측정 이상 · 이 가설 고장 의심"),
+            "TEST_NORMAL": ("TEST_NORMAL", "해당 검사 정상 · 다른 기능은 미판정"),
+            "INCONCLUSIVE": ("INCONCLUSIVE", "측정 판정 불가"),
+            "CONFLICTED": ("CONFLICTED", "측정 결과 충돌 · 판단 보류"),
+        }
+        component_models = tuple(
+            replace(model,
+                    fault_candidate_status=status_map.get(candidate_state[model.component_id].get("visual_status"),
+                                                          ("INCONCLUSIVE", "판정 불가"))[0],
+                    diagnosis_display_status=status_map.get(candidate_state[model.component_id].get("visual_status"),
+                                                            ("INCONCLUSIVE", "판정 불가"))[1],
+                    fault_hypothesis=candidate_state[model.component_id].get("fault_hypothesis"),
+                    measurement_status=candidate_state[model.component_id].get("measurement_status"),
+                    solder_status=candidate_state[model.component_id].get("solder_status"),
+                    fault_score=candidate_state[model.component_id].get("score"),
+                    fault_evidence=tuple(candidate_state[model.component_id].get("evidence", [])),
+                    recommended_tests=tuple(candidate_state[model.component_id].get("recommended_tests", [])))
+            if model.component_id in candidate_state else model
+            for model in component_models
+        )
     st.session_state["circuitcare_v4_current_components"] = tuple(component_models)
     st.session_state["circuitcare_v4_detection_status"] = detection_status
     current_selection = st.session_state.get(SELECTION_KEY)
@@ -409,8 +525,13 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         image_size_px=viewer_size, components=tuple(component_models), project=project,
         board_side=side_enum or active_side, frame_id=frame_id,
         selected_component_id=selected_component_id,
-        map_cache_key=cache_key if entry else "no-map", image_mode=mode,
+        # Keep the selection owner key identical to _render_pcb's invalidation
+        # key even when this photo has no registered component map yet.
+        map_cache_key=cache_key, image_mode=mode,
     )
+    if candidate_state:
+        st.caption("진단 색상 · 노랑: 검사 후보 · 빨강: 해당 가설 측정 이상 · 초록: 해당 검사 정상 · 회색: 판정 불가. "
+                   "초록은 소자 전체의 정상 판정을 뜻하지 않습니다.")
     if not interactive:
         with st.container(key="cc_viewer_canvas"):
             st.image(image, width=720)
@@ -424,6 +545,12 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
     st.session_state[VIEW_TRANSFORM_KEY] = transform
     if overlay_result and overlay_result.status == "READY":
         st.caption(f"검출 결과 · {len(overlay_result.components)}개 · 후보 · 고장 진단 미실행")
+    elif auto_detection_error:
+        st.error(f"자동 소자 탐지에 실패했습니다 · {auto_detection_error}")
+    elif auto_detection_result is not None and not auto_detection_result.get("detections"):
+        st.info("이 사진에서 선택할 탐지 박스를 찾지 못했습니다.")
+    elif auto_detection_result is not None:
+        st.caption(f"탐지 박스 · {len(auto_detection_result.get('detections', []))}개")
     elif detection_status == "DETECTOR_NOT_CONFIGURED":
         st.caption("검출 모델 미설정 · 원본 사진 보기 가능")
     elif detection_status == "BLOCKED_MODEL_UNAVAILABLE":
@@ -434,21 +561,14 @@ def _render_pcb(st: Any, project: ProjectContext, photos: list[dict[str, Any]]) 
         mapped = entry.get("photo_id_map", []) if entry else []
         photo_mapping = next((row for row in mapped if row.frontend_photo_id == selected and row.project_id == project.project_id), None)
         st.caption(f"정합 상태 · {REGISTRATION_LABELS.get(photo_mapping.registration_status, '상태 미확인') if photo_mapping else '정합 결과 없음'}")
-        with st.expander("소자 탐지 · 박스 검수", expanded=True):
-            render_component_recognition_panel(
-                st, image_bytes=detector_image_bytes or image_data,
-                project_id=project.project_id, photo_id=selected,
-                auto_result=auto_detection_result, auto_error=auto_detection_error,
-            )
 
 
 def _photo_label(record: Any, number: int) -> str:
-    side = {"front": "앞면", "back": "뒷면", "unknown": "미지정"}[record.side]
     role = {
         "full_view": "전체", "close_up": "확대", "oblique": "비스듬히",
         "marking_detail": "부품 표기", "unknown": "미지정",
     }[record.capture_type]
-    return f"{side} {number} · {role}"
+    return f"사진 {number} · {role}"
 
 
 def render_workbench_shell(st: Any, project: ProjectContext) -> None:
@@ -492,23 +612,11 @@ def render_workbench_shell(st: Any, project: ProjectContext) -> None:
     with st.container(key="cc_workbench_body"):
         left, right = st.columns([3.6, 1.25], gap="medium")
         with left:
-            pcb_tab, schematic_tab = st.tabs(
-                ["PCB", "회로도"], key="circuitcare_v2_active_tab",
-                default="PCB", on_change="rerun",
-            )
-            active_tab = st.session_state.get("circuitcare_v2_active_tab", "PCB")
+            st.session_state.pop("circuitcare_v2_active_tab", None)
             update_selection(
-                st.session_state, project=project,
-                active_tab="pcb" if active_tab == "PCB" else "schematic",
+                st.session_state, project=project, active_tab="pcb",
             )
-            with pcb_tab:
-                if active_tab == "PCB":
-                    _render_pcb(st, project, st.session_state.get(INTAKE_IMAGES_KEY, []))
-            with schematic_tab:
-                if active_tab == "회로도":
-                    _render_schematic(
-                        st, project, st.session_state.get("circuitcare_v2_circuit_bytes"),
-                    )
+            _render_pcb(st, project, st.session_state.get(INTAKE_IMAGES_KEY, []))
         with right:
             current_components = tuple(st.session_state.get("circuitcare_v4_current_components", ()))
             selection = st.session_state.get(SELECTION_KEY)
@@ -518,6 +626,7 @@ def render_workbench_shell(st: Any, project: ProjectContext) -> None:
                 st, project, preview=preview, components=current_components,
                 selected_component=selected_component,
                 detection_status=st.session_state.get("circuitcare_v4_detection_status", "UNKNOWN"),
+                selected_marking_context=st.session_state.get("circuitcare_v4_selected_marking_context"),
             )
 
 

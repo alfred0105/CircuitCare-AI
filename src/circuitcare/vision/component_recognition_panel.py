@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from circuitcare.dashboard.components.loading_screen import show_fullscreen_loading
 
 APP_DIR = Path(__file__).resolve().parents[3] / "apps" / "pcb-component-recognition"
 MODULE_NAME = "circuitcare_pcb_component_app_server"
@@ -96,6 +97,7 @@ def ensure_component_detection(
         return st_api.session_state[result_key], None
     if error_key in st_api.session_state:
         return None, st_api.session_state[error_key]
+    loading_screen = show_fullscreen_loading(st_api, "PCB 사진에서 부품 위치를 찾고 있습니다.")
     try:
         with st_api.spinner("선택한 PCB 사진에서 소자를 자동 탐지하고 있습니다…"):
             engine = _app_server()
@@ -115,6 +117,8 @@ def ensure_component_detection(
     except Exception as exc:
         st_api.session_state[error_key] = str(exc)
         return None, str(exc)
+    finally:
+        loading_screen.empty()
 
 
 def render_component_recognition_panel(

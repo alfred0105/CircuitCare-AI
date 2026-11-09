@@ -113,8 +113,10 @@ def render_component_viewer(
     mount_status_key = f"{viewer_key}_mount_status"
     expected_asset_key = f"{map_cache_key}|{project.project_id}|{project.board_id or ''}|{board_side}|{frame_id}"
 
-    def handle_selection_change() -> None:
-        result = st.session_state.get(viewer_key)
+    def handle_selection_change(result_override: Any = None) -> None:
+        # Read the returned ComponentResult directly when the viewer reruns.
+        # The keyed Session State value may lag one run behind component v2.
+        result = result_override if result_override is not None else st.session_state.get(viewer_key)
         viewer_status = (result.get("viewer_status") if isinstance(result, dict)
                          else getattr(result, "viewer_status", None))
         if isinstance(viewer_status, dict):
@@ -126,25 +128,19 @@ def render_component_viewer(
                 st.session_state[mount_status_key] = "READY"
         event = (result.get("selection") if isinstance(result, dict)
                  else getattr(result, "selection", None))
-        if not isinstance(event, dict):
+        if event is None:
             return
-        last_id_key = f"{viewer_key}_last_event"
-        last_seq_key = f"{viewer_key}_last_seq"
-        if event.get("event_id") == st.session_state.get(last_id_key):
-            return
-        seq = event.get("event_seq")
-        component_id = event.get("component_id")
-        allowed_ids = {item.component_id for item in components}
-        accepted, _reason = validate_component_selection_event(
-            event, project_id=project.project_id, board_id=project.board_id or "",
-            board_side=board_side, frame_id=frame_id, allowed_ids=allowed_ids,
-            last_sequence=int(st.session_state.get(last_seq_key, 0)),
+        # Select by the ID on the exact box the user clicked. The detector
+        # component list rendered above is the authority for allowed IDs.
+        component_id = (
+            event.get("component_id") if isinstance(event, dict)
+            else event if isinstance(event, str) else None
         )
-        if not accepted:
-            st.session_state[f"{viewer_key}_event_rejected"] = True
+        allowed_ids = {item.component_id for item in components}
+        if component_id == "__clear__":
+            component_id = None
+        elif component_id not in allowed_ids:
             return
-        st.session_state[last_id_key] = event.get("event_id")
-        st.session_state[last_seq_key] = seq
         st.session_state[SELECTED_MAP_KEY] = map_cache_key
         update_selection(st.session_state, project=project, selected_component=component_id)
 
@@ -162,16 +158,22 @@ def render_component_viewer(
         "possible_part_number": item.possible_part_number,
         "fault_candidate_status": item.fault_candidate_status,
         "diagnosis_display_status": item.diagnosis_display_status,
+        "fault_hypothesis": item.fault_hypothesis,
+        "measurement_status": item.measurement_status,
+        "solder_status": item.solder_status,
     } for item in components]
     result = render_pcb_viewer(
         st, image_png_base64=image_b64, image_size_px=image_size_px, components=payload,
         project_id=project.project_id, board_id=project.board_id or "", board_side=board_side,
         frame_id=frame_id, selected_component_id=selected_id, asset_key=map_cache_key,
-        event_sequence_seed=int(st.session_state.get(f"{viewer_key}_last_seq", 0)),
+        event_sequence_seed=0,
         key=viewer_key, on_selection_change=handle_selection_change,
         on_viewer_status_change=handle_selection_change,
     )
     if result is None:
         return False, viewer_key, coordinate_status_for_viewer(api_available=False, client_ready=False)
+    # Component v2 callback timing differs slightly between Streamlit builds;
+    # consume the latest state here as well so a box click is not lost on rerun.
+    handle_selection_change(result)
     mounted = st.session_state.get(mount_status_key) == "READY"
     return True, viewer_key, coordinate_status_for_viewer(api_available=True, client_ready=mounted)

@@ -50,6 +50,15 @@ class MeasurementRecord:
     analysis_context_id: str | None = None
     measurement_set_id: str | None = None
     changed_at: str | None = None
+    measurement_target: str | None = None
+    fault_hypothesis: str | None = None
+    reference_min: float | None = None
+    reference_max: float | None = None
+    reference_source: str | None = None
+    operating_conditions: str | None = None
+    reference_conditions: str | None = None
+    location_verified: bool = False
+    uncertainty_source: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,6 +83,10 @@ def create_measurement_record(
     component_map_version: str | None = None,
     analysis_context_id: str | None = None, measurement_id: str | None = None,
     timestamp: str | None = None,
+    measurement_target: str | None = None, fault_hypothesis: str | None = None,
+    reference_min: Any = None, reference_max: Any = None, reference_source: str | None = None,
+    operating_conditions: str | None = None, reference_conditions: str | None = None,
+    location_verified: bool = False, uncertainty_source: str | None = None,
 ) -> MeasurementRecord:
     if not project_id.strip() or not board_id.strip() or not component_id.strip():
         raise ValueError("프로젝트, 보드, 부품 정보가 필요합니다.")
@@ -96,6 +109,14 @@ def create_measurement_record(
         sigma = entered_sigma * multiplier
         if not math.isfinite(sigma) or sigma <= 0:
             raise ValueError("불확실도 단위 변환 결과가 유효하지 않습니다.")
+    parsed_min = (parse_finite_number(reference_min, label="정상 범위 하한") * multiplier
+                  if reference_min is not None and str(reference_min).strip() else None)
+    parsed_max = (parse_finite_number(reference_max, label="정상 범위 상한") * multiplier
+                  if reference_max is not None and str(reference_max).strip() else None)
+    if (parsed_min is None) != (parsed_max is None):
+        raise ValueError("정상 범위의 하한과 상한을 모두 입력하거나 둘 다 비워 주세요.")
+    if parsed_min is not None and parsed_max is not None and parsed_min > parsed_max:
+        raise ValueError("정상 범위 하한은 상한보다 클 수 없습니다.")
     verification = {
         "user_measurement": "USER_REPORTED",
         "simulation": "MODEL_OUTPUT",
@@ -114,6 +135,14 @@ def create_measurement_record(
         source=source, verification_status=verification,
         timestamp=timestamp or datetime.now(timezone.utc).isoformat(),
         analysis_context_id=analysis_context_id,
+        measurement_target=(measurement_target or "").strip() or None,
+        fault_hypothesis=(fault_hypothesis or "").strip() or None,
+        reference_min=parsed_min, reference_max=parsed_max,
+        reference_source=(reference_source or "").strip() or None,
+        operating_conditions=(operating_conditions or "").strip() or None,
+        reference_conditions=(reference_conditions or "").strip() or None,
+        location_verified=bool(location_verified),
+        uncertainty_source=(uncertainty_source or "").strip() or None,
     )
 
 

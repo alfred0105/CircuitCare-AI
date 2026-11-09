@@ -1,0 +1,5 @@
+schema_version: 1
+description: >-
+  Component-specific test limits must come from an explicitly cited datasheet or
+  board specification. No generic electrical limits are assumed.
+profiles: {}

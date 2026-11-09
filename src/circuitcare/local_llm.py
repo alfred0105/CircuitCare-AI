@@ -36,14 +36,15 @@ class OllamaClient:
             raise LocalLLMError(f"Model {model_name!r} is not installed locally (available: {available})")
         return match
 
-    def chat_json(self, model_name: str, messages: list[dict[str, str]]) -> dict:
+    def chat_json(self, model_name: str, messages: list[dict[str, str]], *,
+                  output_schema: dict | None = None) -> dict:
         model_info = self.model_info(model_name)
         body = {
             "model": model_name,
             "messages": messages,
             "stream": False,
             "think": False,
-            "format": "json",
+            "format": output_schema or "json",
             "options": {"temperature": 0.1, "num_predict": 1300},
         }
         json_mode = True

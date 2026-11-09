@@ -16,6 +16,7 @@ from circuitcare.frontend.measurement_state import (
     delete_measurement, get_measurements, save_measurement, update_measurement,
 )
 from circuitcare.frontend.models import ProjectContext
+from circuitcare.symptom_diagnosis import load_knowledge
 
 SOURCE_OPTIONS = (
     "실제 측정 · 사용자 입력", "시뮬레이션", "가상 데모", "가져온 측정값", "출처 미확인",
@@ -66,6 +67,8 @@ def render_measurement_panel(
         key=type_key,
     )
     units = tuple(MEASUREMENT_UNITS[measurement_type])
+    fault_modes = load_knowledge().get("fault_modes", {}).get("fault_modes", {})
+    fault_options = [""] + list(fault_modes)
     unit_key = f"cc_v5_unit_{owner}"
     if st.session_state.get(unit_key) not in units:
         st.session_state[unit_key] = units[0]
@@ -73,9 +76,24 @@ def render_measurement_panel(
         value = st.text_input("측정값", key=f"cc_v5_value_{owner}", placeholder="예: 0, -0.25, 3.3")
         unit = st.selectbox("단위", units, key=unit_key)
         uncertainty = st.text_input(
-            f"측정 불확실도 σ ({BASE_UNITS[measurement_type]}, 선택)",
-            key=f"cc_v5_sigma_{owner}", placeholder="기준 단위로 입력 · 진단에는 양수 필요",
+            f"측정기 오차/측정 불확실도 σ ({BASE_UNITS[measurement_type]})",
+            key=f"cc_v5_sigma_{owner}", placeholder="계측기 사양에 따른 양수 입력 · 미입력 시 판정 보류",
         )
+        uncertainty_source = st.text_input("측정 불확실도 출처", placeholder="예: 멀티미터 모델·정확도 사양")
+        target = st.text_input("측정 대상/단자", placeholder="예: BZ1 양단 전압, U1 VCC-GND")
+        fault_hypothesis = st.selectbox(
+            "검사할 고장 가설", fault_options,
+            format_func=lambda code: "선택 안 함" if not code else fault_modes[code]["title"],
+        )
+        range_col_a, range_col_b = st.columns(2)
+        with range_col_a:
+            reference_min = st.text_input(f"정상 범위 하한 ({unit})")
+        with range_col_b:
+            reference_max = st.text_input(f"정상 범위 상한 ({unit})")
+        reference_source = st.text_input("정상 범위 출처", placeholder="예: 제조사 데이터시트, 보드 사양")
+        operating_conditions = st.text_input("실제 측정 조건", placeholder="예: 전원 5 V, 무부하")
+        reference_conditions = st.text_input("기준 조건", placeholder="실제 측정 조건과 같아야 판정에 사용")
+        location_verified = st.checkbox("측정 지점이 선택한 부품의 지정 단자임을 확인함")
         source_label = st.selectbox("측정 출처", SOURCE_OPTIONS, key=f"cc_v5_source_{owner}")
         submitted = st.form_submit_button("측정값 저장", type="primary")
     if submitted:
@@ -88,6 +106,13 @@ def render_measurement_panel(
                 uncertainty=_sigma_for_input_unit(uncertainty, measurement_type, unit),
                 source=SOURCE_CODES[source_label],
                 component_map_version=component_map_version,
+                measurement_target=target, fault_hypothesis=fault_hypothesis or None,
+                reference_min=reference_min, reference_max=reference_max,
+                reference_source=reference_source,
+                operating_conditions=operating_conditions,
+                reference_conditions=reference_conditions,
+                location_verified=location_verified,
+                uncertainty_source=uncertainty_source,
             )
             save_measurement(st.session_state, record)
             st.success("측정값을 기록했습니다. 전기적 Node Mapping은 확인되지 않아 진단에는 사용되지 않습니다.")
@@ -117,6 +142,11 @@ def _render_record_editor(st: Any, *, project: ProjectContext, record: Measureme
     with st.expander(title):
         st.caption(f"출처 · {SOURCE_LABELS[record.source]} · 검증 상태 {record.verification_status}")
         st.caption(f"Component ID · {record.component_id} · 전기적 Mapping 미확인")
+        if record.measurement_target or record.fault_hypothesis:
+            st.caption(f"검사 대상 · {record.measurement_target or '미지정'} · 가설 {record.fault_hypothesis or '미지정'}")
+        if record.reference_min is not None and record.reference_max is not None:
+            st.caption(f"등록 기준 · {record.reference_min:g}–{record.reference_max:g} {record.unit} · "
+                       f"{record.reference_source or '출처 없음'} · 조건 {record.operating_conditions or '미지정'}")
         if record.uncertainty is not None:
             st.caption(f"불확실도 σ · {record.uncertainty:g} {record.unit}")
         st.caption(f"Measurement Set · {(record.measurement_set_id or '')[:12]}")
@@ -172,6 +202,17 @@ def _render_record_editor(st: Any, *, project: ProjectContext, record: Measureme
                     source=SOURCE_CODES[source_label],
                     component_map_version=record.component_map_version,
                     measurement_id=record.measurement_id, timestamp=record.timestamp,
+                    measurement_target=record.measurement_target,
+                    fault_hypothesis=record.fault_hypothesis,
+                    reference_min=(record.reference_min / MEASUREMENT_UNITS[edit_type][unit]
+                                   if edit_type == record.measurement_type and record.reference_min is not None else None),
+                    reference_max=(record.reference_max / MEASUREMENT_UNITS[edit_type][unit]
+                                   if edit_type == record.measurement_type and record.reference_max is not None else None),
+                    reference_source=record.reference_source,
+                    operating_conditions=record.operating_conditions,
+                    reference_conditions=record.reference_conditions,
+                    location_verified=record.location_verified,
+                    uncertainty_source=record.uncertainty_source,
                 )
                 updated = replace(updated, changed_at=datetime.now(timezone.utc).isoformat())
                 update_measurement(st.session_state, updated)
